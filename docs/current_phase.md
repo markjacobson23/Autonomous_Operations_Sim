@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 12 — Executable scenario harness
+Step 13 — Scenario schema for operations
 
 ## Step status summary
 - Step 1: complete
@@ -15,61 +15,62 @@ Step 12 — Executable scenario harness
 - Step 9: complete
 - Step 10: complete
 - Step 11: complete
-- Step 12: active
-- Step 13: not started
+- Step 12: complete
+- Step 13: active
+- Step 14: not started
 
 ## What already exists
 The repository already has:
-- scenario/config parsing and deterministic scenario summaries
+- scenario parsing and deterministic summaries
+- executable scenario-driven runs for a narrow single-vehicle job path
 - static topology separated from runtime blocked-edge state via `WorldState`
-- graph-based routing with injectable cost models through `Router`
-- `SimulationEngine` with explicit simulated time and deterministic RNG
-- single-vehicle route execution with deterministic trace output
-- jobs, tasks, shared resources, and baseline dispatching
-- deterministic multi-vehicle reservation-based conflict handling
-- a vehicle behavior FSM with explicit transitions
-- stable metrics summaries, deterministic exports, and golden regression coverage
+- graph-based routing with injectable cost models
+- deterministic simulated-time execution through `SimulationEngine`
+- jobs, tasks, shared resources, baseline dispatch, and multi-vehicle conflict handling
+- trace-centered metrics, exports, and golden regression coverage
 
 ## Goal of the current phase
-Turn scenario files into real executable simulator runs rather than validation-only inputs.
+Expand the scenario schema so scenario files can describe more of the operational world and runtime setup.
 
-The main Step 12 objective is:
-- wire scenario input into end-to-end simulator execution
-- keep the execution path deterministic
-- produce stable export output directly from scenario-driven runs
-- establish the scenario-run harness that later steps can build on
+The main Step 13 objective is:
+- move more execution configuration into scenario files
+- support scenario-defined resources
+- support scenario-defined runtime world-state setup
+- support scenario-defined dispatcher selection/config in a narrow form
+- keep scenario-driven execution deterministic and regression-friendly
 
 ## In-scope work
 Work that is allowed right now:
-- add a scenario execution/orchestration path
-- extend the CLI so a scenario can drive a real simulation run
-- convert parsed scenario data into instantiated map/world-state/engine/runtime setup
-- add deterministic export output for scenario-driven runs
-- add at least one golden regression fixture for a scenario-driven run
-- perform small additive refactors that make scenario execution cleaner without changing simulator scope
+- add resource specs to the scenario schema
+- add runtime blocked-edge/world-state initialization to the scenario schema
+- add dispatcher selection/config to the scenario schema in a narrow form
+- extend scenario loading and validation
+- extend scenario execution/orchestration to instantiate these runtime objects
+- add richer executable scenario fixtures and golden regression coverage
+- make small additive refactors that keep scenario execution clean
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- add real-time visualization
-- add interactive live control surfaces
-- promote a full persistent `Vehicle` entity model yet
-- redesign the reservation/conflict algorithm
-- add richer map import formats beyond what Step 12 strictly needs
-- build a dashboard, viewer, or UI
-- add broad command/replay infrastructure
+- redesign the persistent vehicle/entity model
+- add visualization
+- add interactive control/command surfaces
+- redesign multi-vehicle coordination
+- add richer map import formats
+- over-generalize the scenario schema
+- build a broad scenario DSL
 
 ## Architectural guidance for this phase
-- Keep the current deterministic trace/export surface as the source of truth.
-- Prefer orchestration code that reuses existing engine/job/dispatch APIs over new parallel execution paths.
-- Keep schema expansion minimal and only introduce fields needed to support real scenario execution.
-- Separate parsing from runtime instantiation cleanly.
-- Do not smuggle in later-step visualization or interaction architecture.
-- Avoid large rewrites.
+- Keep schema growth minimal and tied to real execution needs.
+- Keep parsing separate from runtime instantiation.
+- Reuse existing operations/runtime surfaces rather than creating parallel structures.
+- Prefer one narrow fully working scenario-driven configuration path over a flexible but half-finished schema.
+- Preserve deterministic trace/export behavior.
 
-## Completion criteria for Step 12
-Step 12 is complete when:
-- a scenario file can drive a real simulator run, not just validation/summary
-- the CLI can produce deterministic export output from a scenario-driven run
-- repeated runs with the same scenario produce identical output
-- at least one scenario-run golden regression fixture exists
+## Completion criteria for Step 13
+Step 13 is complete when:
+- scenarios can define resources used by execution
+- scenarios can define initial runtime blocked-edge/world-state conditions
+- scenarios can define dispatcher selection in a narrow supported form
+- scenario-driven execution remains deterministic
+- at least one richer scenario-run golden regression fixture exists
 - tests/lint/type checks pass
