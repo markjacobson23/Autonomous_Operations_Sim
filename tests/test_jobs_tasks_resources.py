@@ -72,6 +72,20 @@ def test_jobs_execute_tasks_in_declared_order():
         for event in engine.trace.events
         if event.event_type == TraceEventType.TASK_COMPLETE
     ] == [0, 1, 2, 3]
+    assert [
+        (event.from_behavior_state, event.to_behavior_state, event.transition_reason)
+        for event in engine.trace.events
+        if event.event_type == TraceEventType.BEHAVIOR_TRANSITION
+    ] == [
+        ("idle", "moving", "route_start"),
+        ("moving", "idle", "route_complete"),
+        ("idle", "servicing", "load_service_start"),
+        ("servicing", "idle", "load_service_complete"),
+        ("idle", "moving", "route_start"),
+        ("moving", "idle", "route_complete"),
+        ("idle", "servicing", "unload_service_start"),
+        ("servicing", "idle", "unload_service_complete"),
+    ]
 
 
 def test_service_timing_advances_simulated_time_for_load_and_unload():
@@ -139,20 +153,37 @@ def test_shared_resources_force_waiting_when_busy():
     assert wait_events[0].timestamp_s == 2.0
     assert wait_events[0].duration_s == 2.0
     assert [
-        (event.event_type, event.timestamp_s)
+        (
+            event.event_type,
+            event.timestamp_s,
+            event.transition_reason,
+        )
         for event in engine.trace.events
         if event.event_type
         in (
+            TraceEventType.BEHAVIOR_TRANSITION,
             TraceEventType.RESOURCE_WAIT_START,
             TraceEventType.RESOURCE_WAIT_COMPLETE,
             TraceEventType.SERVICE_START,
             TraceEventType.SERVICE_COMPLETE,
         )
+        and (
+            event.event_type != TraceEventType.BEHAVIOR_TRANSITION
+            or event.transition_reason
+            in {
+                "load_resource_wait",
+                "load_service_start",
+                "load_service_complete",
+            }
+        )
     ] == [
-        (TraceEventType.RESOURCE_WAIT_START, 2.0),
-        (TraceEventType.RESOURCE_WAIT_COMPLETE, 4.0),
-        (TraceEventType.SERVICE_START, 4.0),
-        (TraceEventType.SERVICE_COMPLETE, 7.0),
+        (TraceEventType.BEHAVIOR_TRANSITION, 2.0, "load_resource_wait"),
+        (TraceEventType.RESOURCE_WAIT_START, 2.0, None),
+        (TraceEventType.RESOURCE_WAIT_COMPLETE, 4.0, None),
+        (TraceEventType.BEHAVIOR_TRANSITION, 4.0, "load_service_start"),
+        (TraceEventType.SERVICE_START, 4.0, None),
+        (TraceEventType.SERVICE_COMPLETE, 7.0, None),
+        (TraceEventType.BEHAVIOR_TRANSITION, 7.0, "load_service_complete"),
     ]
     assert engine.simulated_time_s == 7.0
 

@@ -12,6 +12,10 @@ from autonomous_ops_sim.operations.dispatcher import (
 )
 from autonomous_ops_sim.operations.jobs import Job, JobExecutionResult
 from autonomous_ops_sim.operations.resources import SharedResource
+from autonomous_ops_sim.simulation.behavior import (
+    VehicleBehaviorController,
+    VehicleOperationalState,
+)
 from autonomous_ops_sim.simulation.reservations import (
     ConflictWait,
     ReservationTable,
@@ -57,6 +61,9 @@ class _ScheduledTraceEvent:
     start_node_id: int | None = None
     end_node_id: int | None = None
     duration_s: float | None = None
+    from_behavior_state: str | None = None
+    to_behavior_state: str | None = None
+    transition_reason: str | None = None
 
 
 class SimulationEngine:
@@ -216,6 +223,9 @@ class SimulationEngine:
                 start_node_id=event.start_node_id,
                 end_node_id=event.end_node_id,
                 duration_s=event.duration_s,
+                from_behavior_state=event.from_behavior_state,
+                to_behavior_state=event.to_behavior_state,
+                transition_reason=event.transition_reason,
             )
 
         completion_time_s = max(
@@ -318,6 +328,7 @@ class SimulationEngine:
         current_time_s = 0.0
         waits: list[ConflictWait] = []
         local_order = 0
+        behavior = VehicleBehaviorController(vehicle_id=request.vehicle_id)
 
         def schedule(
             *,
@@ -328,6 +339,9 @@ class SimulationEngine:
             start_node_id: int | None = None,
             end_node_id: int | None = None,
             duration_s: float | None = None,
+            from_behavior_state: str | None = None,
+            to_behavior_state: str | None = None,
+            transition_reason: str | None = None,
         ) -> None:
             nonlocal local_order
             scheduled_events.append(
@@ -342,17 +356,73 @@ class SimulationEngine:
                     start_node_id=start_node_id,
                     end_node_id=end_node_id,
                     duration_s=duration_s,
+                    from_behavior_state=from_behavior_state,
+                    to_behavior_state=to_behavior_state,
+                    transition_reason=transition_reason,
                 )
             )
             local_order += 1
 
-        schedule(
-            timestamp_s=0.0,
-            event_type=TraceEventType.ROUTE_START,
-            node_id=request.start_node_id,
-            start_node_id=request.start_node_id,
-            end_node_id=request.destination_node_id,
-        )
+        def transition_behavior(
+            *,
+            timestamp_s: float,
+            node_id: int,
+            to_state: VehicleOperationalState,
+            reason: str,
+        ) -> None:
+            transition = behavior.transition_to(to_state, reason=reason)
+            schedule(
+                timestamp_s=timestamp_s,
+                event_type=TraceEventType.BEHAVIOR_TRANSITION,
+                node_id=node_id,
+                from_behavior_state=transition.from_state.value,
+                to_behavior_state=transition.to_state.value,
+                transition_reason=transition.reason,
+            )
+
+        if len(route) == 1:
+            transition_behavior(
+                timestamp_s=0.0,
+                node_id=request.start_node_id,
+                to_state=VehicleOperationalState.MOVING,
+                reason="route_start",
+            )
+            schedule(
+                timestamp_s=0.0,
+                event_type=TraceEventType.ROUTE_START,
+                node_id=request.start_node_id,
+                start_node_id=request.start_node_id,
+                end_node_id=request.destination_node_id,
+            )
+            schedule(
+                timestamp_s=0.0,
+                event_type=TraceEventType.ROUTE_COMPLETE,
+                node_id=route[-1],
+                start_node_id=route[0],
+                end_node_id=request.destination_node_id,
+            )
+            transition_behavior(
+                timestamp_s=0.0,
+                node_id=route[-1],
+                to_state=VehicleOperationalState.IDLE,
+                reason="route_complete",
+            )
+            reservations.reserve_node(
+                vehicle_id=request.vehicle_id,
+                node_id=route[-1],
+                start_time_s=0.0,
+                end_time_s=math.inf,
+                reason="route_complete",
+            )
+            return MultiVehicleRouteResult(
+                vehicle_id=request.vehicle_id,
+                priority=priority,
+                route=route,
+                completion_time_s=0.0,
+                waits=(),
+            )
+
+        active_node_id = request.start_node_id
 
         for start_node_id, end_node_id in zip(route, route[1:]):
             edge = self.map.get_edge_between(start_node_id, end_node_id)
@@ -371,6 +441,13 @@ class SimulationEngine:
             )
 
             if departure_time_s > current_time_s:
+                if behavior.state == VehicleOperationalState.IDLE:
+                    transition_behavior(
+                        timestamp_s=current_time_s,
+                        node_id=start_node_id,
+                        to_state=VehicleOperationalState.CONFLICT_WAIT,
+                        reason="conflict_wait_start",
+                    )
                 wait = ConflictWait(
                     node_id=start_node_id,
                     start_time_s=current_time_s,
@@ -397,6 +474,28 @@ class SimulationEngine:
                     duration_s=wait.duration_s,
                 )
 
+            if behavior.state == VehicleOperationalState.IDLE:
+                transition_behavior(
+                    timestamp_s=departure_time_s,
+                    node_id=start_node_id,
+                    to_state=VehicleOperationalState.MOVING,
+                    reason="route_start",
+                )
+                schedule(
+                    timestamp_s=departure_time_s,
+                    event_type=TraceEventType.ROUTE_START,
+                    node_id=request.start_node_id,
+                    start_node_id=request.start_node_id,
+                    end_node_id=request.destination_node_id,
+                )
+            elif behavior.state == VehicleOperationalState.CONFLICT_WAIT:
+                transition_behavior(
+                    timestamp_s=departure_time_s,
+                    node_id=start_node_id,
+                    to_state=VehicleOperationalState.MOVING,
+                    reason="conflict_wait_complete",
+                )
+
             arrival_time_s = departure_time_s + travel_time_s
             reservations.reserve_edge(
                 vehicle_id=request.vehicle_id,
@@ -421,6 +520,7 @@ class SimulationEngine:
                 end_node_id=end_node_id,
             )
             current_time_s = arrival_time_s
+            active_node_id = end_node_id
 
         reservations.reserve_node(
             vehicle_id=request.vehicle_id,
@@ -435,6 +535,18 @@ class SimulationEngine:
             node_id=route[-1],
             start_node_id=route[0],
             end_node_id=request.destination_node_id,
+        )
+        transition = behavior.transition_to(
+            VehicleOperationalState.IDLE,
+            reason="route_complete",
+        )
+        schedule(
+            timestamp_s=current_time_s,
+            event_type=TraceEventType.BEHAVIOR_TRANSITION,
+            node_id=active_node_id,
+            from_behavior_state=transition.from_state.value,
+            to_behavior_state=transition.to_state.value,
+            transition_reason=transition.reason,
         )
         return MultiVehicleRouteResult(
             vehicle_id=request.vehicle_id,

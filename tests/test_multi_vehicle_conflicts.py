@@ -89,7 +89,7 @@ def test_multi_vehicle_priority_order_is_deterministic_and_configurable():
 
     assert [route.vehicle_id for route in result.route_results] == [50, 10]
     assert [len(route.waits) for route in result.route_results] == [0, 1]
-    assert engine.trace.events[1].vehicle_id == 50
+    assert engine.trace.events[0].vehicle_id == 50
 
 
 def test_multi_vehicle_conflict_response_uses_deterministic_waiting():
@@ -116,6 +116,21 @@ def test_multi_vehicle_conflict_response_uses_deterministic_waiting():
         TraceEventType.CONFLICT_WAIT_COMPLETE,
     ]
     assert [event.timestamp_s for event in wait_events] == [0.0, 1.0]
+
+    behavior_events = [
+        event
+        for event in engine.trace.events
+        if event.vehicle_id == lower_priority_route.vehicle_id
+        and event.event_type == TraceEventType.BEHAVIOR_TRANSITION
+    ]
+    assert [
+        (event.from_behavior_state, event.to_behavior_state, event.transition_reason)
+        for event in behavior_events
+    ] == [
+        ("idle", "conflict_wait", "conflict_wait_start"),
+        ("conflict_wait", "moving", "conflict_wait_complete"),
+        ("moving", "idle", "route_complete"),
+    ]
 
 
 def test_multi_vehicle_runs_repeat_with_same_deterministic_outcome():

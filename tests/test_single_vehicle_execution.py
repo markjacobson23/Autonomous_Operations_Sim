@@ -62,10 +62,18 @@ def test_trace_timestamps_are_monotone():
 def test_single_vehicle_trace_event_ordering_is_deterministic():
     engine = run_single_vehicle_route()
 
-    event_kinds = [event.event_type for event in engine.trace.events]
-    event_pairs = [(event.edge_id, event.node_id) for event in engine.trace.events]
+    non_behavior_events = [
+        event
+        for event in engine.trace.events
+        if event.event_type != TraceEventType.BEHAVIOR_TRANSITION
+    ]
+    behavior_events = [
+        event
+        for event in engine.trace.events
+        if event.event_type == TraceEventType.BEHAVIOR_TRANSITION
+    ]
 
-    assert event_kinds == [
+    assert [event.event_type for event in non_behavior_events] == [
         TraceEventType.ROUTE_START,
         TraceEventType.EDGE_ENTER,
         TraceEventType.NODE_ARRIVAL,
@@ -73,13 +81,24 @@ def test_single_vehicle_trace_event_ordering_is_deterministic():
         TraceEventType.NODE_ARRIVAL,
         TraceEventType.ROUTE_COMPLETE,
     ]
-    assert event_pairs == [
+    assert [(event.edge_id, event.node_id) for event in non_behavior_events] == [
         (None, 1),
         (1, None),
         (None, 2),
         (2, None),
         (None, 3),
         (None, 3),
+    ]
+    assert [
+        (
+            event.from_behavior_state,
+            event.to_behavior_state,
+            event.transition_reason,
+        )
+        for event in behavior_events
+    ] == [
+        ("idle", "moving", "route_start"),
+        ("moving", "idle", "route_complete"),
     ]
 
 
@@ -90,8 +109,10 @@ def test_single_vehicle_arrival_timing_matches_edge_traversal_time():
     assert [event.timestamp_s for event in engine.trace.events] == [
         0.0,
         0.0,
+        0.0,
         2.0,
         2.0,
+        4.0,
         4.0,
         4.0,
     ]

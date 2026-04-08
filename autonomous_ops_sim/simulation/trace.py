@@ -6,6 +6,7 @@ import math
 class TraceEventType(str, Enum):
     """Stable event kinds emitted during simulated execution."""
 
+    BEHAVIOR_TRANSITION = "behavior_transition"
     ROUTE_START = "route_start"
     EDGE_ENTER = "edge_enter"
     NODE_ARRIVAL = "node_arrival"
@@ -39,6 +40,9 @@ class TraceEvent:
     task_type: str | None = None
     resource_id: str | None = None
     duration_s: float | None = None
+    from_behavior_state: str | None = None
+    to_behavior_state: str | None = None
+    transition_reason: str | None = None
 
 
 class Trace:
@@ -69,6 +73,9 @@ class Trace:
         task_type: str | None = None,
         resource_id: str | None = None,
         duration_s: float | None = None,
+        from_behavior_state: str | None = None,
+        to_behavior_state: str | None = None,
+        transition_reason: str | None = None,
     ) -> TraceEvent:
         """Append and return a trace event."""
 
@@ -89,6 +96,9 @@ class Trace:
             task_type=task_type,
             resource_id=resource_id,
             duration_s=duration_s,
+            from_behavior_state=from_behavior_state,
+            to_behavior_state=to_behavior_state,
+            transition_reason=transition_reason,
         )
         self._events.append(event)
         self._next_sequence += 1
