@@ -1,15 +1,17 @@
 import json
+from pathlib import Path
+
 from autonomous_ops_sim.simulation.scenario import Scenario
 
 
-def format_scenario_summary(scenario: Scenario) -> str:
+def format_scenario_summary(scenario: Scenario, source_path: Path) -> str:
     """Return a deterministic, human-readable scenario summary."""
 
     map_params_json = json.dumps(scenario.map_spec.params, sort_keys=True)
 
     lines = [
         f"scenario: {scenario.name}",
-        f"source: {scenario.source_path}",
+        f"source: {source_path}",
         f"seed: {scenario.seed}",
         f"duration_s: {scenario.duration_s}",
         f"map_kind: {scenario.map_spec.kind}",

@@ -14,7 +14,7 @@ def _run_scenario_command(scenario_path: str) -> int:
         print(f"Error: failed to load scenario '{scenario_path}': {exc}", file=sys.stderr)
         return 1
 
-    print(format_scenario_summary(scenario))
+    print(format_scenario_summary(scenario, source_path))
     return 0
 
 
