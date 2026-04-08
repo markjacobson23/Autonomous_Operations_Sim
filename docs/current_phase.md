@@ -1,12 +1,13 @@
 # Current Phase
 
 ## Active roadmap step
-Step 2 — Scenario/config spine with determinism plumbing
+Step 3 — Static Map vs dynamic WorldState split
 
 ## Step status summary
 - Step 1: complete
-- Step 2: nearly complete
-- Step 3: not started
+- Step 2: complete
+- Step 3: active
+- Step 4: not started
 
 ## What already exists
 The repository already has:
@@ -15,58 +16,52 @@ The repository already has:
 - CLI entry point
 - pytest / Ruff / mypy baseline
 - CI workflow
-- scenario dataclasses:
-  - `Scenario`
-  - `MapSpec`
-  - `VehicleSpec`
+- scenario/config spine
 - JSON-first scenario loading
-- scenario validation tests
-- example scenario file
-- core graph/map/routing foundation needed so far
+- CLI scenario-loading path
+- deterministic scenario summary output
+- core graph/map/routing foundation
 
-## What is still missing for Step 2 closure
-Step 2 is not complete until the CLI exposes the scenario-loading path.
+## Goal of the current phase
+Separate static topology/geometry from runtime-changing simulation state.
 
-The key missing deliverables are:
-1. a real CLI command that accepts a scenario JSON path
-2. validated loading through the existing scenario loader
-3. deterministic, stable scenario summary output
-4. CLI tests for successful and failing scenario loads
+The main Step 3 objective is:
+- `Map` remains static
+- runtime blocked-edge state moves out of `Edge` / `Map`
+- `WorldState` becomes the owner of blocked-edge runtime state
 
 ## In-scope work
 Work that is allowed right now:
-- update CLI argument structure
-- add a `run` subcommand
-- load scenario files through the existing loader
-- print a stable validated scenario summary
-- add or update tests for the Step 2 CLI path
-- small additive refactors that make Step 2 cleaner without introducing later-step architecture
+- add `simulation/world_state.py`
+- move blocked-edge ownership to `WorldState`
+- update pathfinding to query `WorldState`
+- remove or update any map-owned blocking helpers so `Map` remains static
+- add/update tests proving static map vs dynamic world-state separation
+- small additive refactors that make Step 3 cleaner without introducing Step 4 architecture
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- introduce `WorldState`
-- move dynamic map state out of `Map`
-- add `Router`
-- introduce cost model protocols
-- refactor routing to use world-state-aware cost evaluation
+- introduce `Router`
+- introduce `CostModel`
+- refactor routing beyond what is needed to honor `WorldState`
 - add simulation engine/run loop
-- add agent processes
 - add trace/event systems
 - add jobs/resources/dispatch logic
 - add multi-vehicle logic
+- add behavior systems
 
 ## Architectural guidance for this phase
-- Keep `cli.py` thin.
-- Keep scenario loading separate from scenario formatting/reporting.
-- Preserve the current scenario schema unless a very small change is clearly necessary.
-- Treat `seed` as part of the validated scenario surface.
-- Keep output deterministic and stable.
-- Prefer straightforward code over “framework” code.
+- `Map` is static.
+- `WorldState` is runtime state for a run.
+- blocked-edge state should not live on `Edge`.
+- prefer one clear source of truth for runtime conditions.
+- keep the change focused on the state split, not future routing architecture.
 
-## Completion criteria for Step 2
-Step 2 is complete when:
-- `autonomous-ops-sim run <scenario_path>` works
-- the scenario is validated through the existing loader
-- a stable scenario summary is produced
-- invalid inputs fail cleanly
+## Completion criteria for Step 3
+Step 3 is complete when:
+- `WorldState` exists and owns blocked-edge runtime state
+- `Edge` no longer owns blocked-edge runtime state
+- pathfinding honors blocked edges through `WorldState`
+- the same `Map` can be reused with different `WorldState` instances independently
+- fresh/default `WorldState` restores baseline behavior
 - tests/lint/type checks pass
