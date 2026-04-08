@@ -1,6 +1,7 @@
 from autonomous_ops_sim.core.graph import Graph
 from autonomous_ops_sim.core.node import Node
 from autonomous_ops_sim.core.edge import Edge
+from autonomous_ops_sim.routing.cost_model import TimeCostModel
 from autonomous_ops_sim.routing.pathfinding import dijkstra
 from autonomous_ops_sim.simulation.world_state import WorldState
 import pytest
@@ -150,3 +151,12 @@ def test_dijkstra_raises_when_all_routes_are_blocked():
 
     with pytest.raises(ValueError):
         dijkstra(graph, 1, 3, world_state=world_state)
+
+
+def test_dijkstra_uses_injected_cost_model():
+    graph = build_direct_route_cheaper_graph()
+
+    cost, path = dijkstra(graph, 1, 3, cost_model=TimeCostModel())
+
+    assert cost == 0.04
+    assert path == [1, 3]

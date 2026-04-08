@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: autonomous_ops_sim
+Version: 0.1.0
+Summary: A Python simulator for autonomous operations research and development.
+Requires-Python: >=3.11

@@ -1,0 +1,325 @@
+Index: .idea/modules.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/modules.xml b/.idea/modules.xml
+new file mode 100644
+--- /dev/null	(date 1774295306754)
++++ b/.idea/modules.xml	(date 1774295306754)
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="ProjectModuleManager">
++    <modules>
++      <module fileurl="file://$PROJECT_DIR$/.idea/PythonProject11.iml" filepath="$PROJECT_DIR$/.idea/PythonProject11.iml" />
++    </modules>
++  </component>
++</project>
+\ No newline at end of file
+Index: .idea/workspace.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+new file mode 100644
+--- /dev/null	(date 1775612733619)
++++ b/.idea/workspace.xml	(date 1775612733619)
+@@ -0,0 +1,238 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="AutoImportSettings">
++    <option name="autoReloadType" value="SELECTIVE" />
++  </component>
++  <component name="ChangeListManager">
++    <list default="true" id="abb4f4b5-85fb-4433-a731-6f8365a1f680" name="Changes" comment="Initial Repo with build and setup files. Along with minimal imports and structure.">
++      <change afterPath="$PROJECT_DIR$/.idea/PythonProject11.iml" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/autonomous_ops_sim/io/__init__.py" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/autonomous_ops_sim/io/scenario_loader.py" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/autonomous_ops_sim/simulation/scenario.py" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/scenarios/example.json" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/tests/test_map.py" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/tests/test_scenario_loader.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/core/edge.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/core/edge.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/core/graph.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/core/graph.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/core/node.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/core/node.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/maps/map.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/maps/map.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/routing/cost.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/routing/cost.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/routing/pathfinding.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/routing/pathfinding.py" afterDir="false" />
++    </list>
++    <option name="SHOW_DIALOG" value="false" />
++    <option name="HIGHLIGHT_CONFLICTS" value="true" />
++    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
++    <option name="LAST_RESOLUTION" value="IGNORE" />
++  </component>
++  <component name="EmbeddingIndexingInfo">
++    <option name="cachedIndexableFilesCount" value="30" />
++    <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
++  </component>
++  <component name="FileTemplateManagerImpl">
++    <option name="RECENT_TEMPLATES">
++      <list>
++        <option value="Python Script" />
++      </list>
++    </option>
++  </component>
++  <component name="Git.Settings">
++    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
++  </component>
++  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
++  "lastFilter": {
++    "state": "OPEN",
++    "assignee": "markjacobson23"
++  }
++}]]></component>
++  <component name="GithubPullRequestsUISettings"><![CDATA[{
++  "selectedUrlAndAccountId": {
++    "url": "https://github.com/markjacobson23/Autonomous_Operations_Sim.git",
++    "accountId": "9f8eb214-3c26-43ce-806f-9a09a7fec8b0"
++  }
++}]]></component>
++  <component name="McpProjectServerCommands">
++    <commands />
++    <urls />
++  </component>
++  <component name="ProjectColorInfo">{
++  &quot;associatedIndex&quot;: 5
++}</component>
++  <component name="ProjectId" id="3BMO7SPKd1Hpjy54hNqT1zGu6nv" />
++  <component name="ProjectViewState">
++    <option name="hideEmptyMiddlePackages" value="true" />
++    <option name="showLibraryContents" value="true" />
++  </component>
++  <component name="PropertiesComponent"><![CDATA[{
++  "keyToString": {
++    "Python tests.Python tests for test_pathfinding.test_dijkstra_raises_for_unreachable_destination.executor": "Run",
++    "Python tests.Python tests for test_pathfinding.test_dijkstra_returns_direct_path_when_it_is_cheapest.executor": "Run",
++    "Python tests.Python tests for test_pathfinding.test_dijkstra_returns_shortest_path.executor": "Run",
++    "Python tests.Python tests for test_pathfinding.test_dijkstra_returns_trivial_path_when_start_equals_end.executor": "Run",
++    "Python tests.Python tests for tests.test_scenario_loader.test_load_scenario_parses_valid_grid_scenario.executor": "Run",
++    "Python tests.Python tests in test_graph.py.executor": "Run",
++    "Python tests.Python tests in test_grid_map.py.executor": "Run",
++    "Python tests.Python tests in test_map.py.executor": "Run",
++    "Python tests.Python tests in test_pathfinding.py.executor": "Run",
++    "Python tests.Python tests in test_scenario_loader.py.executor": "Run",
++    "Python.map.executor": "Run",
++    "Python.scenario_loader.executor": "Run",
++    "Python.simple_map.executor": "Run",
++    "RunOnceActivity.MCP Project settings loaded": "true",
++    "RunOnceActivity.ShowReadmeOnStart": "true",
++    "RunOnceActivity.git.unshallow": "true",
++    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
++    "codeWithMe.voiceChat.enabledByDefault": "false",
++    "git-widget-placeholder": "main",
++    "last_opened_file_path": "/Users/markjacobson/PycharmProjects/PythonProject11",
++    "node.js.detected.package.eslint": "true",
++    "node.js.detected.package.tslint": "true",
++    "node.js.selected.package.eslint": "(autodetect)",
++    "node.js.selected.package.tslint": "(autodetect)",
++    "nodejs_package_manager_path": "npm",
++    "settings.editor.selected.configurable": "editing.templates"
++  }
++}]]></component>
++  <component name="RecentsManager">
++    <key name="MoveFile.RECENT_KEYS">
++      <recent name="$PROJECT_DIR$" />
++      <recent name="$PROJECT_DIR$/autonomous_ops_sim/scenarios" />
++      <recent name="$PROJECT_DIR$/autonomous_ops_sim/io" />
++      <recent name="$PROJECT_DIR$/autonomous_ops_sim" />
++      <recent name="$PROJECT_DIR$/vehicles" />
++    </key>
++  </component>
++  <component name="RunManager">
++    <configuration name="Python tests for test_pathfinding.test_dijkstra_raises_for_unreachable_destination" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
++      <module name="PythonProject11" />
++      <option name="ENV_FILES" value="" />
++      <option name="INTERPRETER_OPTIONS" value="" />
++      <option name="PARENT_ENVS" value="true" />
++      <option name="SDK_HOME" value="" />
++      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
++      <option name="IS_MODULE_SDK" value="true" />
++      <option name="ADD_CONTENT_ROOTS" value="true" />
++      <option name="ADD_SOURCE_ROOTS" value="true" />
++      <option name="DEBUG_JUST_MY_CODE" value="true" />
++      <option name="RUN_TOOL" value="" />
++      <option name="_new_additionalArguments" value="&quot;&quot;" />
++      <option name="_new_target" value="&quot;test_pathfinding.test_dijkstra_raises_for_unreachable_destination&quot;" />
++      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
++      <method v="2" />
++    </configuration>
++    <configuration name="Python tests for test_pathfinding.test_dijkstra_returns_direct_path_when_it_is_cheapest" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
++      <module name="PythonProject11" />
++      <option name="ENV_FILES" value="" />
++      <option name="INTERPRETER_OPTIONS" value="" />
++      <option name="PARENT_ENVS" value="true" />
++      <option name="SDK_HOME" value="" />
++      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
++      <option name="IS_MODULE_SDK" value="true" />
++      <option name="ADD_CONTENT_ROOTS" value="true" />
++      <option name="ADD_SOURCE_ROOTS" value="true" />
++      <option name="DEBUG_JUST_MY_CODE" value="true" />
++      <option name="RUN_TOOL" value="" />
++      <option name="_new_additionalArguments" value="&quot;&quot;" />
++      <option name="_new_target" value="&quot;test_pathfinding.test_dijkstra_returns_direct_path_when_it_is_cheapest&quot;" />
++      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
++      <method v="2" />
++    </configuration>
++    <configuration name="Python tests for test_pathfinding.test_dijkstra_returns_shortest_path" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
++      <module name="PythonProject11" />
++      <option name="ENV_FILES" value="" />
++      <option name="INTERPRETER_OPTIONS" value="" />
++      <option name="PARENT_ENVS" value="true" />
++      <option name="SDK_HOME" value="" />
++      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
++      <option name="IS_MODULE_SDK" value="true" />
++      <option name="ADD_CONTENT_ROOTS" value="true" />
++      <option name="ADD_SOURCE_ROOTS" value="true" />
++      <option name="DEBUG_JUST_MY_CODE" value="true" />
++      <option name="RUN_TOOL" value="" />
++      <option name="_new_additionalArguments" value="&quot;&quot;" />
++      <option name="_new_target" value="&quot;test_pathfinding.test_dijkstra_returns_shortest_path&quot;" />
++      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
++      <method v="2" />
++    </configuration>
++    <configuration name="Python tests for test_pathfinding.test_dijkstra_returns_trivial_path_when_start_equals_end" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
++      <module name="PythonProject11" />
++      <option name="ENV_FILES" value="" />
++      <option name="INTERPRETER_OPTIONS" value="" />
++      <option name="PARENT_ENVS" value="true" />
++      <option name="SDK_HOME" value="" />
++      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
++      <option name="IS_MODULE_SDK" value="true" />
++      <option name="ADD_CONTENT_ROOTS" value="true" />
++      <option name="ADD_SOURCE_ROOTS" value="true" />
++      <option name="DEBUG_JUST_MY_CODE" value="true" />
++      <option name="RUN_TOOL" value="" />
++      <option name="_new_additionalArguments" value="&quot;&quot;" />
++      <option name="_new_target" value="&quot;test_pathfinding.test_dijkstra_returns_trivial_path_when_start_equals_end&quot;" />
++      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
++      <method v="2" />
++    </configuration>
++    <configuration name="Python tests for tests.test_scenario_loader.test_load_scenario_parses_valid_grid_scenario" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
++      <module name="PythonProject11" />
++      <option name="ENV_FILES" value="" />
++      <option name="INTERPRETER_OPTIONS" value="" />
++      <option name="PARENT_ENVS" value="true" />
++      <option name="SDK_HOME" value="" />
++      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
++      <option name="IS_MODULE_SDK" value="true" />
++      <option name="ADD_CONTENT_ROOTS" value="true" />
++      <option name="ADD_SOURCE_ROOTS" value="true" />
++      <option name="DEBUG_JUST_MY_CODE" value="false" />
++      <option name="RUN_TOOL" value="" />
++      <option name="_new_additionalArguments" value="&quot;&quot;" />
++      <option name="_new_target" value="&quot;tests.test_scenario_loader.test_load_scenario_parses_valid_grid_scenario&quot;" />
++      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
++      <method v="2" />
++    </configuration>
++    <recent_temporary>
++      <list>
++        <item itemvalue="Python tests.Python tests for tests.test_scenario_loader.test_load_scenario_parses_valid_grid_scenario" />
++        <item itemvalue="Python tests.Python tests for test_pathfinding.test_dijkstra_raises_for_unreachable_destination" />
++        <item itemvalue="Python tests.Python tests for test_pathfinding.test_dijkstra_returns_direct_path_when_it_is_cheapest" />
++        <item itemvalue="Python tests.Python tests for test_pathfinding.test_dijkstra_returns_shortest_path" />
++        <item itemvalue="Python tests.Python tests for test_pathfinding.test_dijkstra_returns_trivial_path_when_start_equals_end" />
++      </list>
++    </recent_temporary>
++  </component>
++  <component name="SharedIndexes">
++    <attachedChunks>
++      <set>
++        <option value="bundled-python-sdk-b63d5a1f7c97-b61e75351b1f-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-261.22158.340" />
++      </set>
++    </attachedChunks>
++  </component>
++  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
++  <component name="TaskManager">
++    <task active="true" id="Default" summary="Default task">
++      <changelist id="abb4f4b5-85fb-4433-a731-6f8365a1f680" name="Changes" comment="" />
++      <created>1774295304823</created>
++      <option name="number" value="Default" />
++      <option name="presentableId" value="Default" />
++      <updated>1774295304823</updated>
++    </task>
++    <task id="LOCAL-00001" summary="Initial Repo with build and setup files. Along with minimal imports and structure.">
++      <option name="closed" value="true" />
++      <created>1775497797728</created>
++      <option name="number" value="00001" />
++      <option name="presentableId" value="LOCAL-00001" />
++      <option name="project" value="LOCAL" />
++      <updated>1775497797728</updated>
++    </task>
++    <option name="localTasksCounter" value="2" />
++    <servers />
++  </component>
++  <component name="TypeScriptGeneratedFilesManager">
++    <option name="version" value="3" />
++  </component>
++  <component name="VcsManagerConfiguration">
++    <MESSAGE value="Initial Repo with build and setup files. Along with minimal imports and structure." />
++    <option name="LAST_COMMIT_MESSAGE" value="Initial Repo with build and setup files. Along with minimal imports and structure." />
++  </component>
++</project>
+\ No newline at end of file
+Index: .idea/vcs.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/vcs.xml b/.idea/vcs.xml
+new file mode 100644
+--- /dev/null	(date 1774295306769)
++++ b/.idea/vcs.xml	(date 1774295306769)
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="VcsDirectoryMappings">
++    <mapping directory="$PROJECT_DIR$" vcs="Git" />
++  </component>
++</project>
+\ No newline at end of file
+Index: .idea/inspectionProfiles/profiles_settings.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/inspectionProfiles/profiles_settings.xml b/.idea/inspectionProfiles/profiles_settings.xml
+new file mode 100644
+--- /dev/null	(date 1774295306759)
++++ b/.idea/inspectionProfiles/profiles_settings.xml	(date 1774295306759)
+@@ -0,0 +1,6 @@
++<component name="InspectionProjectProfileManager">
++  <settings>
++    <option name="USE_PROJECT_PROFILE" value="false" />
++    <version value="1.0" />
++  </settings>
++</component>
+\ No newline at end of file
+Index: .idea/PythonProject11.iml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/PythonProject11.iml b/.idea/PythonProject11.iml
+new file mode 100644
+--- /dev/null	(date 1775580338415)
++++ b/.idea/PythonProject11.iml	(date 1775580338415)
+@@ -0,0 +1,12 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<module type="PYTHON_MODULE" version="4">
++  <component name="NewModuleRootManager">
++    <content url="file://$MODULE_DIR$">
++      <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" />
++      <sourceFolder url="file://$MODULE_DIR$/autonomous_ops_sim" isTestSource="false" />
++      <excludeFolder url="file://$MODULE_DIR$/.venv" />
++    </content>
++    <orderEntry type="jdk" jdkName="Python 3.12 (PythonProject11)" jdkType="Python SDK" />
++    <orderEntry type="sourceFolder" forTests="false" />
++  </component>
++</module>
+\ No newline at end of file

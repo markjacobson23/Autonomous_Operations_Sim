@@ -1,0 +1,598 @@
+Index: autonomous_ops_sim/cli.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import argparse\nimport sys\nfrom pathlib import Path\n\nfrom autonomous_ops_sim.io.scenario_loader import load_scenario\nfrom autonomous_ops_sim.io.scenario_summary import format_scenario_summary\n\n\ndef _run_scenario_command(scenario_path: str) -> int:\n    try:\n        scenario = load_scenario(Path(scenario_path))\n    except (OSError, ValueError, TypeError, KeyError, OverflowError) as exc:\n        print(f\"Error: failed to load scenario '{scenario_path}': {exc}\", file=sys.stderr)\n        return 1\n\n    print(format_scenario_summary(scenario))\n    return 0\n\n\ndef build_parser() -> argparse.ArgumentParser:\n    parser = argparse.ArgumentParser(\n        prog=\"autonomous-ops-sim\",\n        description=\"A Python simulator for autonomous operations research and development.\",\n    )\n    parser.add_argument(\n        \"--version\",\n        action=\"version\",\n        version=\"autonomous-ops-sim 0.1.0\",\n    )\n\n    subparsers = parser.add_subparsers(dest=\"command\")\n\n    run_parser = subparsers.add_parser(\"run\", help=\"Load and validate a scenario JSON file.\")\n    run_parser.add_argument(\"scenario_path\", help=\"Path to a scenario JSON file.\")\n\n    return parser\n\n\ndef main(argv: list[str] | None = None) -> int:\n    parser = build_parser()\n    args = parser.parse_args(argv)\n\n    if args.command == \"run\":\n        return _run_scenario_command(args.scenario_path)\n\n    parser.print_help()\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/autonomous_ops_sim/cli.py b/autonomous_ops_sim/cli.py
+--- a/autonomous_ops_sim/cli.py	(revision 85ad432a578baebe592b5a0d90d567ad67d81dea)
++++ b/autonomous_ops_sim/cli.py	(date 1775618219703)
+@@ -49,3 +49,5 @@
+ 
+ if __name__ == "__main__":
+     raise SystemExit(main())
++
++
+Index: .idea/vcs.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/vcs.xml b/.idea/vcs.xml
+new file mode 100644
+--- /dev/null	(date 1775618219707)
++++ b/.idea/vcs.xml	(date 1775618219707)
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="VcsDirectoryMappings">
++    <mapping directory="$PROJECT_DIR$" vcs="Git" />
++  </component>
++</project>
+\ No newline at end of file
+Index: .idea/modules.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/modules.xml b/.idea/modules.xml
+new file mode 100644
+--- /dev/null	(date 1775618219712)
++++ b/.idea/modules.xml	(date 1775618219712)
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="ProjectModuleManager">
++    <modules>
++      <module fileurl="file://$PROJECT_DIR$/.idea/PythonProject11.iml" filepath="$PROJECT_DIR$/.idea/PythonProject11.iml" />
++    </modules>
++  </component>
++</project>
+\ No newline at end of file
+Index: autonomous_ops_sim/routing/pathfinding.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>from autonomous_ops_sim.core.graph import Graph\nimport heapq\nimport math\n\ndef dijkstra(graph: Graph, start_id: int, end_id: int) -> tuple[float, list[int]]:\n\n    if not graph.has_node(start_id):\n        raise ValueError(f\"Node-{start_id} does not exist in graph.\")\n    if not graph.has_node(end_id):\n        raise ValueError(f\"Node-{end_id} does not exist in graph.\")\n\n    prev: dict[int, int] = {}\n    distance: dict[int, float] = {start_id: 0.0}\n    queue: list[tuple[float, int]] = [(0.0, start_id)]\n\n    while queue:\n\n        cost, node = heapq.heappop(queue)\n\n        if cost > distance.get(node, math.inf):\n            continue\n\n        if node == end_id:\n            break\n\n        for edge in graph.get_outgoing_edges(node):\n\n            if edge.blocked:\n                continue\n\n            neighbor = edge.end_node.id\n            new_cost = cost + edge.distance\n            if new_cost < distance.get(neighbor, math.inf):\n                distance[neighbor] = new_cost\n                prev[neighbor] = node\n                heapq.heappush(queue, (new_cost, neighbor))\n\n    if end_id not in distance:\n        raise ValueError(f'Node-{end_id} is unreachable from Node-{start_id}.')\n\n    path = [end_id]\n    step = end_id\n    while step != start_id:\n        step = prev[step]\n        path.append(step)\n    path.reverse()\n\n    return distance[end_id], path
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/autonomous_ops_sim/routing/pathfinding.py b/autonomous_ops_sim/routing/pathfinding.py
+--- a/autonomous_ops_sim/routing/pathfinding.py	(revision 85ad432a578baebe592b5a0d90d567ad67d81dea)
++++ b/autonomous_ops_sim/routing/pathfinding.py	(date 1775620093603)
+@@ -1,13 +1,20 @@
+ from autonomous_ops_sim.core.graph import Graph
++from autonomous_ops_sim.simulation.world_state import WorldState
+ import heapq
+ import math
+ 
+-def dijkstra(graph: Graph, start_id: int, end_id: int) -> tuple[float, list[int]]:
++def dijkstra(
++        graph: Graph,
++        start_id: int,
++        end_id: int,
++        world_state: WorldState | None = None
++) -> tuple[float, list[int]]:
+ 
+     if not graph.has_node(start_id):
+         raise ValueError(f"Node-{start_id} does not exist in graph.")
+     if not graph.has_node(end_id):
+         raise ValueError(f"Node-{end_id} does not exist in graph.")
++    runtime_state = world_state or WorldState(graph)
+ 
+     prev: dict[int, int] = {}
+     distance: dict[int, float] = {start_id: 0.0}
+@@ -25,7 +32,7 @@
+ 
+         for edge in graph.get_outgoing_edges(node):
+ 
+-            if edge.blocked:
++            if runtime_state.is_edge_blocked(edge.id):
+                 continue
+ 
+             neighbor = edge.end_node.id
+@@ -45,4 +52,4 @@
+         path.append(step)
+     path.reverse()
+ 
+-    return distance[end_id], path
+\ No newline at end of file
++    return distance[end_id], path
+Index: .idea/inspectionProfiles/profiles_settings.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/inspectionProfiles/profiles_settings.xml b/.idea/inspectionProfiles/profiles_settings.xml
+new file mode 100644
+--- /dev/null	(date 1775618219717)
++++ b/.idea/inspectionProfiles/profiles_settings.xml	(date 1775618219717)
+@@ -0,0 +1,6 @@
++<component name="InspectionProjectProfileManager">
++  <settings>
++    <option name="USE_PROJECT_PROFILE" value="false" />
++    <version value="1.0" />
++  </settings>
++</component>
+\ No newline at end of file
+Index: tests/test_map.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>from autonomous_ops_sim.core.edge import Edge\nfrom autonomous_ops_sim.core.graph import Graph\nfrom autonomous_ops_sim.core.node import Node, NodeType\nfrom autonomous_ops_sim.maps.map import Map\nimport pytest\n\ndef build_test_map() -> tuple[Map, list[Node], list[Edge]]:\n    graph = Graph()\n\n    node_1 = Node(1, (0.0, 0.0, 0.0), NodeType.DEPOT)\n    node_2 = Node(2, (1.0, 0.0, 0.0), NodeType.INTERSECTION)\n    node_3 = Node(3, (0.0, 1.0, 0.0), NodeType.LOADING_ZONE)\n    node_4 = Node(4, (2.0, 0.0, 0.0), NodeType.UNLOADING_ZONE)\n    node_5 = Node(5, (5.0, 5.0, 0.0), NodeType.CHARGING_STATION)\n    node_6 = Node(6, (6.0, 6.0, 5.0), NodeType.CHARGING_STATION)\n    nodes_list = [node_1, node_2, node_3, node_4, node_5, node_6]\n    for node in nodes_list:\n        graph.add_node(node)\n\n    edge_1 = Edge(1, node_1, node_2, 1.0, 25.0)\n    edge_2 = Edge(2, node_2, node_4, 1.0, 25.0)\n    edge_3 = Edge(3, node_1, node_3, 1.0, 25.0)\n    edge_4 = Edge(4, node_3, node_2, 1.0, 25.0)\n    edge_5 = Edge(5, node_4, node_5, 1.0, 25.0)\n    edges_list = [edge_1, edge_2, edge_3, edge_4, edge_5]\n    for edge in edges_list:\n        graph.add_edge(edge)\n\n    coord_to_id = {\n        (0.0, 0.0, 0.0): 1,\n        (1.0, 0.0, 0.0): 2,\n        (0.0, 1.0, 0.0): 3,\n        (2.0, 0.0, 0.0): 4,\n        (5.0, 5.0, 0.0): 5,\n        (6.0, 6.0, 5.0): 6,\n    }\n\n    return Map(graph, coord_to_id), nodes_list, edges_list\n\n@pytest.fixture\ndef map_parts():\n    return build_test_map()\n\ndef test_has_coordinate_returns_true_for_existing_coordinate(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.has_coordinate((0.0, 0.0, 0.0))\n\ndef test_has_coordinate_returns_false_for_missing_coordinate(map_parts):\n    test_map, _, _ = map_parts\n    assert not test_map.has_coordinate((10.0, 10.0, 10.0))\n\ndef test_get_node_id_returns_correct_id_for_existing_coordinate(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.get_node_id((0.0, 0.0, 0.0)) == 1\n\ndef test_get_node_id_raises_for_missing_coordinate(map_parts):\n    test_map, _, _ = map_parts\n    with pytest.raises(KeyError):\n        test_map.get_node_id((10.0, 10.0, 10.0))\n\ndef test_get_position_returns_correct_coordinate_for_existing_node(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.get_position(1) == (0.0, 0.0, 0.0)\n\ndef test_get_position_raises_for_missing_node(map_parts):\n    test_map, _, _ = map_parts\n    with pytest.raises(KeyError):\n        test_map.get_position(99)\n\ndef test_get_nodes_by_type_returns_matching_node_ids(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.get_nodes_by_type(NodeType.DEPOT) == [1]\n\ndef test_get_node_type_returns_type_for_existing_node(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.get_node_type(1) == NodeType.DEPOT\n\ndef test_get_node_type_raises_for_missing_node(map_parts):\n    test_map, _, _ = map_parts\n    with pytest.raises(KeyError):\n        test_map.get_node_type(99)\n\ndef test_get_nodes_in_region_returns_nodes_inside_bounds(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.get_nodes_in_region(0,0,0,2,2,2) == [1, 2, 3, 4]\n\ndef test_get_nodes_in_region_raises_when_max_less_than_min(map_parts):\n    test_map, _, _ = map_parts\n    with pytest.raises(ValueError):\n        test_map.get_nodes_in_region(2,0,0,1,1,1)\n\ndef test_get_node_returns_node_for_existing_id(map_parts):\n    test_map, test_nodes, _ = map_parts\n    assert test_map.get_node(1) is test_nodes[0]\n\ndef test_get_node_raises_for_missing_id(map_parts):\n    test_map, _, _ = map_parts\n    with pytest.raises(KeyError):\n        test_map.get_node(99)\n\ndef test_get_all_node_ids_returns_all_ids(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.get_all_node_ids() == [1, 2, 3, 4, 5, 6]\n\ndef test_get_nearest_node_of_type_returns_closest_matching_node(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.get_nearest_node_of_type((5.0, 5.0, 5.0), NodeType.CHARGING_STATION) == 6\n\ndef test_get_nearest_node_of_type_raises_when_no_nodes_of_type_exist(map_parts):\n    test_map, _, _ = map_parts\n    with pytest.raises(ValueError):\n        test_map.get_nearest_node_of_type((5.0, 5.0, 5.0), NodeType.JOB_SITE)\n\ndef test_get_outgoing_edges_returns_copy_from_graph(map_parts):\n    test_map, _, _ = map_parts\n    outgoing_edges = test_map.get_outgoing_edges(1)\n    outgoing_edges.pop()\n    new_outgoing_edges = test_map.get_outgoing_edges(1)\n    assert len(outgoing_edges) == 1\n    assert len(new_outgoing_edges) == 2\n\ndef test_get_neighbors_returns_direct_neighbor_ids(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.get_neighbors(1) == [2, 3]\n\ndef test_get_edge_between_returns_edge_when_present(map_parts):\n    test_map, _, test_edges = map_parts\n    assert test_map.get_edge_between(1, 3) == test_edges[2]\n\ndef test_get_edge_between_returns_none_when_missing(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.get_edge_between(1, 4) is None\n\ndef test_get_edges_from_position_returns_outgoing_edges_for_coordinate(map_parts):\n    test_map, _, test_edges = map_parts\n    assert test_map.get_edges_from_position((0.0, 0.0, 0.0)) == [test_edges[0], test_edges[2]]\n\ndef test_validate_path_returns_true_for_valid_path(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.validate_path([1, 2, 4])\n\ndef test_validate_path_returns_true_for_empty_path(map_parts):\n    test_map, _, _ = map_parts\n    assert test_map.validate_path([])\n\ndef test_validate_path_returns_false_for_missing_node(map_parts):\n    test_map, _, _ = map_parts\n    assert not test_map.validate_path([1, 2, 99])\n\ndef test_validate_path_returns_false_for_missing_edge(map_parts):\n    test_map, _, _ = map_parts\n    assert not test_map.validate_path([1, 2, 3, 4])\n\ndef test_block_edge_marks_edge_blocked(map_parts):\n    test_map, _, test_edges = map_parts\n    test_map.block_edge(1)\n    assert test_edges[0].blocked\n\n\ndef test_block_edge_raises_for_missing_edge(map_parts):\n    test_map, _, _ = map_parts\n    with pytest.raises(KeyError):\n        test_map.block_edge(99)\n\ndef test_unblock_edge_marks_edge_unblocked(map_parts):\n    test_map, _, test_edges = map_parts\n    test_map.block_edge(1)\n    assert test_edges[0].blocked\n    test_map.unblock_edge(1)\n    assert not test_edges[0].blocked\n\ndef test_unblock_edge_raises_for_missing_edge(map_parts):\n    test_map, _, _ = map_parts\n    with pytest.raises(KeyError):\n        test_map.unblock_edge(99)
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/tests/test_map.py b/tests/test_map.py
+--- a/tests/test_map.py	(revision 85ad432a578baebe592b5a0d90d567ad67d81dea)
++++ b/tests/test_map.py	(date 1775620093604)
+@@ -151,25 +151,9 @@
+     test_map, _, _ = map_parts
+     assert not test_map.validate_path([1, 2, 3, 4])
+ 
+-def test_block_edge_marks_edge_blocked(map_parts):
+-    test_map, _, test_edges = map_parts
+-    test_map.block_edge(1)
+-    assert test_edges[0].blocked
+-
+-
+-def test_block_edge_raises_for_missing_edge(map_parts):
++def test_map_no_longer_owns_runtime_edge_blocking(map_parts):
+     test_map, _, _ = map_parts
+-    with pytest.raises(KeyError):
+-        test_map.block_edge(99)
+-
+-def test_unblock_edge_marks_edge_unblocked(map_parts):
+-    test_map, _, test_edges = map_parts
+-    test_map.block_edge(1)
+-    assert test_edges[0].blocked
+-    test_map.unblock_edge(1)
+-    assert not test_edges[0].blocked
+-
+-def test_unblock_edge_raises_for_missing_edge(map_parts):
+-    test_map, _, _ = map_parts
+-    with pytest.raises(KeyError):
+-        test_map.unblock_edge(99)
+\ No newline at end of file
++    with pytest.raises(AttributeError):
++        _ = test_map.block_edge
++    with pytest.raises(AttributeError):
++        _ = test_map.unblock_edge
+Index: .idea/PythonProject11.iml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/PythonProject11.iml b/.idea/PythonProject11.iml
+new file mode 100644
+--- /dev/null	(date 1775618219720)
++++ b/.idea/PythonProject11.iml	(date 1775618219720)
+@@ -0,0 +1,12 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<module type="PYTHON_MODULE" version="4">
++  <component name="NewModuleRootManager">
++    <content url="file://$MODULE_DIR$">
++      <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" />
++      <sourceFolder url="file://$MODULE_DIR$/autonomous_ops_sim" isTestSource="false" />
++      <excludeFolder url="file://$MODULE_DIR$/.venv" />
++    </content>
++    <orderEntry type="jdk" jdkName="Python 3.12 (PythonProject11)" jdkType="Python SDK" />
++    <orderEntry type="sourceFolder" forTests="false" />
++  </component>
++</module>
+\ No newline at end of file
+Index: .idea/workspace.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+new file mode 100644
+--- /dev/null	(date 1775620114638)
++++ b/.idea/workspace.xml	(date 1775620114638)
+@@ -0,0 +1,257 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="AutoImportSettings">
++    <option name="autoReloadType" value="SELECTIVE" />
++  </component>
++  <component name="ChangeListManager">
++    <list default="true" id="abb4f4b5-85fb-4433-a731-6f8365a1f680" name="Changes" comment="added scenario parsing and map testing">
++      <change afterPath="$PROJECT_DIR$/.idea/PythonProject11.iml" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/cli.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/core/edge.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/core/edge.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/maps/map.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/maps/map.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/routing/pathfinding.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/routing/pathfinding.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/simulation/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/simulation/__init__.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/tests/test_map.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_map.py" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/tests/test_pathfinding.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_pathfinding.py" afterDir="false" />
++    </list>
++    <option name="SHOW_DIALOG" value="false" />
++    <option name="HIGHLIGHT_CONFLICTS" value="true" />
++    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
++    <option name="LAST_RESOLUTION" value="IGNORE" />
++  </component>
++  <component name="EmbeddingIndexingInfo">
++    <option name="cachedIndexableFilesCount" value="30" />
++    <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
++  </component>
++  <component name="FileTemplateManagerImpl">
++    <option name="RECENT_TEMPLATES">
++      <list>
++        <option value="Python Script" />
++      </list>
++    </option>
++  </component>
++  <component name="Git.Settings">
++    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
++  </component>
++  <component name="GitHubPullRequestSearchHistory">{
++  &quot;lastFilter&quot;: {
++    &quot;state&quot;: &quot;OPEN&quot;,
++    &quot;assignee&quot;: &quot;markjacobson23&quot;
++  }
++}</component>
++  <component name="GithubPullRequestsUISettings">{
++  &quot;selectedUrlAndAccountId&quot;: {
++    &quot;url&quot;: &quot;https://github.com/markjacobson23/Autonomous_Operations_Sim.git&quot;,
++    &quot;accountId&quot;: &quot;7ba487ae-62bf-4496-83d0-d0bad5ec872b&quot;
++  }
++}</component>
++  <component name="McpProjectServerCommands">
++    <McpServerCommand sourceId="UserConfigurationSource">
++      <option name="allowedToolsNames" />
++      <option name="enabled" value="true" />
++      <option name="name" />
++      <option name="programPath" />
++      <option name="arguments" />
++      <option name="workingDirectory" />
++      <envs />
++    </McpServerCommand>
++    <McpServerCommand sourceId="UserConfigurationSource">
++      <option name="allowedToolsNames" />
++      <option name="enabled" value="true" />
++      <option name="name" />
++      <option name="programPath" />
++      <option name="arguments" />
++      <option name="workingDirectory" />
++      <envs />
++    </McpServerCommand>
++  </component>
++  <component name="ProjectColorInfo">{
++  &quot;associatedIndex&quot;: 5
++}</component>
++  <component name="ProjectId" id="3BMO7SPKd1Hpjy54hNqT1zGu6nv" />
++  <component name="ProjectViewState">
++    <option name="hideEmptyMiddlePackages" value="true" />
++    <option name="showLibraryContents" value="true" />
++  </component>
++  <component name="PropertiesComponent">{
++  &quot;keyToString&quot;: {
++    &quot;Python tests.Python tests for test_pathfinding.test_dijkstra_raises_for_unreachable_destination.executor&quot;: &quot;Run&quot;,
++    &quot;Python tests.Python tests for test_pathfinding.test_dijkstra_returns_direct_path_when_it_is_cheapest.executor&quot;: &quot;Run&quot;,
++    &quot;Python tests.Python tests for test_pathfinding.test_dijkstra_returns_shortest_path.executor&quot;: &quot;Run&quot;,
++    &quot;Python tests.Python tests for test_pathfinding.test_dijkstra_returns_trivial_path_when_start_equals_end.executor&quot;: &quot;Run&quot;,
++    &quot;Python tests.Python tests for tests.test_scenario_loader.test_load_scenario_parses_valid_grid_scenario.executor&quot;: &quot;Run&quot;,
++    &quot;Python tests.Python tests in test_graph.py.executor&quot;: &quot;Run&quot;,
++    &quot;Python tests.Python tests in test_grid_map.py.executor&quot;: &quot;Run&quot;,
++    &quot;Python tests.Python tests in test_map.py.executor&quot;: &quot;Run&quot;,
++    &quot;Python tests.Python tests in test_pathfinding.py.executor&quot;: &quot;Run&quot;,
++    &quot;Python tests.Python tests in test_scenario_loader.py.executor&quot;: &quot;Run&quot;,
++    &quot;Python.map.executor&quot;: &quot;Run&quot;,
++    &quot;Python.scenario_loader.executor&quot;: &quot;Run&quot;,
++    &quot;Python.simple_map.executor&quot;: &quot;Run&quot;,
++    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
++    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
++    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
++    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
++    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
++    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
++    &quot;last_opened_file_path&quot;: &quot;/Users/markjacobson/PycharmProjects/PythonProject11&quot;,
++    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
++    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
++    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
++    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
++    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
++    &quot;settings.editor.selected.configurable&quot;: &quot;editing.templates&quot;
++  }
++}</component>
++  <component name="RecentsManager">
++    <key name="MoveFile.RECENT_KEYS">
++      <recent name="$PROJECT_DIR$" />
++      <recent name="$PROJECT_DIR$/autonomous_ops_sim/scenarios" />
++      <recent name="$PROJECT_DIR$/autonomous_ops_sim/io" />
++      <recent name="$PROJECT_DIR$/autonomous_ops_sim" />
++      <recent name="$PROJECT_DIR$/vehicles" />
++    </key>
++  </component>
++  <component name="RunManager" selected="Python tests.Python tests for test_pathfinding.test_dijkstra_raises_for_unreachable_destination">
++    <configuration name="Python tests for test_pathfinding.test_dijkstra_raises_for_unreachable_destination" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
++      <module name="PythonProject11" />
++      <option name="ENV_FILES" value="" />
++      <option name="INTERPRETER_OPTIONS" value="" />
++      <option name="PARENT_ENVS" value="true" />
++      <option name="SDK_HOME" value="" />
++      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
++      <option name="IS_MODULE_SDK" value="true" />
++      <option name="ADD_CONTENT_ROOTS" value="true" />
++      <option name="ADD_SOURCE_ROOTS" value="true" />
++      <option name="_new_additionalArguments" value="&quot;&quot;" />
++      <option name="_new_target" value="&quot;test_pathfinding.test_dijkstra_raises_for_unreachable_destination&quot;" />
++      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
++      <method v="2" />
++    </configuration>
++    <configuration name="Python tests for test_pathfinding.test_dijkstra_returns_direct_path_when_it_is_cheapest" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
++      <module name="PythonProject11" />
++      <option name="ENV_FILES" value="" />
++      <option name="INTERPRETER_OPTIONS" value="" />
++      <option name="PARENT_ENVS" value="true" />
++      <option name="SDK_HOME" value="" />
++      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
++      <option name="IS_MODULE_SDK" value="true" />
++      <option name="ADD_CONTENT_ROOTS" value="true" />
++      <option name="ADD_SOURCE_ROOTS" value="true" />
++      <option name="_new_additionalArguments" value="&quot;&quot;" />
++      <option name="_new_target" value="&quot;test_pathfinding.test_dijkstra_returns_direct_path_when_it_is_cheapest&quot;" />
++      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
++      <method v="2" />
++    </configuration>
++    <configuration name="Python tests for test_pathfinding.test_dijkstra_returns_shortest_path" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
++      <module name="PythonProject11" />
++      <option name="ENV_FILES" value="" />
++      <option name="INTERPRETER_OPTIONS" value="" />
++      <option name="PARENT_ENVS" value="true" />
++      <option name="SDK_HOME" value="" />
++      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
++      <option name="IS_MODULE_SDK" value="true" />
++      <option name="ADD_CONTENT_ROOTS" value="true" />
++      <option name="ADD_SOURCE_ROOTS" value="true" />
++      <option name="_new_additionalArguments" value="&quot;&quot;" />
++      <option name="_new_target" value="&quot;test_pathfinding.test_dijkstra_returns_shortest_path&quot;" />
++      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
++      <method v="2" />
++    </configuration>
++    <configuration name="Python tests for test_pathfinding.test_dijkstra_returns_trivial_path_when_start_equals_end" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
++      <module name="PythonProject11" />
++      <option name="ENV_FILES" value="" />
++      <option name="INTERPRETER_OPTIONS" value="" />
++      <option name="PARENT_ENVS" value="true" />
++      <option name="SDK_HOME" value="" />
++      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
++      <option name="IS_MODULE_SDK" value="true" />
++      <option name="ADD_CONTENT_ROOTS" value="true" />
++      <option name="ADD_SOURCE_ROOTS" value="true" />
++      <option name="_new_additionalArguments" value="&quot;&quot;" />
++      <option name="_new_target" value="&quot;test_pathfinding.test_dijkstra_returns_trivial_path_when_start_equals_end&quot;" />
++      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
++      <method v="2" />
++    </configuration>
++    <configuration name="Python tests for tests.test_scenario_loader.test_load_scenario_parses_valid_grid_scenario" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
++      <module name="PythonProject11" />
++      <option name="ENV_FILES" value="" />
++      <option name="INTERPRETER_OPTIONS" value="" />
++      <option name="PARENT_ENVS" value="true" />
++      <option name="SDK_HOME" value="" />
++      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
++      <option name="IS_MODULE_SDK" value="true" />
++      <option name="ADD_CONTENT_ROOTS" value="true" />
++      <option name="ADD_SOURCE_ROOTS" value="true" />
++      <option name="_new_additionalArguments" value="&quot;&quot;" />
++      <option name="_new_target" value="&quot;tests.test_scenario_loader.test_load_scenario_parses_valid_grid_scenario&quot;" />
++      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
++      <method v="2" />
++    </configuration>
++    <recent_temporary>
++      <list>
++        <item itemvalue="Python tests.Python tests for test_pathfinding.test_dijkstra_raises_for_unreachable_destination" />
++        <item itemvalue="Python tests.Python tests for tests.test_scenario_loader.test_load_scenario_parses_valid_grid_scenario" />
++        <item itemvalue="Python tests.Python tests for test_pathfinding.test_dijkstra_returns_direct_path_when_it_is_cheapest" />
++        <item itemvalue="Python tests.Python tests for test_pathfinding.test_dijkstra_returns_shortest_path" />
++        <item itemvalue="Python tests.Python tests for test_pathfinding.test_dijkstra_returns_trivial_path_when_start_equals_end" />
++      </list>
++    </recent_temporary>
++  </component>
++  <component name="SharedIndexes">
++    <attachedChunks>
++      <set>
++        <option value="bundled-python-sdk-4e2b1448bda8-9a97661f3031-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.27397.106" />
++      </set>
++    </attachedChunks>
++  </component>
++  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
++  <component name="TaskManager">
++    <task active="true" id="Default" summary="Default task">
++      <changelist id="abb4f4b5-85fb-4433-a731-6f8365a1f680" name="Changes" comment="" />
++      <created>1774295304823</created>
++      <option name="number" value="Default" />
++      <option name="presentableId" value="Default" />
++      <updated>1774295304823</updated>
++    </task>
++    <task id="LOCAL-00001" summary="Initial Repo with build and setup files. Along with minimal imports and structure.">
++      <option name="closed" value="true" />
++      <created>1775497797728</created>
++      <option name="number" value="00001" />
++      <option name="presentableId" value="LOCAL-00001" />
++      <option name="project" value="LOCAL" />
++      <updated>1775497797728</updated>
++    </task>
++    <task id="LOCAL-00002" summary="added scenario parsing and map testing">
++      <option name="closed" value="true" />
++      <created>1775614755620</created>
++      <option name="number" value="00002" />
++      <option name="presentableId" value="LOCAL-00002" />
++      <option name="project" value="LOCAL" />
++      <updated>1775614755620</updated>
++    </task>
++    <task id="LOCAL-00003" summary="boost agentic coding">
++      <option name="closed" value="true" />
++      <created>1775615192186</created>
++      <option name="number" value="00003" />
++      <option name="presentableId" value="LOCAL-00003" />
++      <option name="project" value="LOCAL" />
++      <updated>1775615192186</updated>
++    </task>
++    <option name="localTasksCounter" value="4" />
++    <servers />
++  </component>
++  <component name="TypeScriptGeneratedFilesManager">
++    <option name="version" value="3" />
++  </component>
++  <component name="VcsManagerConfiguration">
++    <MESSAGE value="Initial Repo with build and setup files. Along with minimal imports and structure." />
++    <MESSAGE value="added scenario parsing and map testing" />
++    <MESSAGE value="boost agentic coding" />
++    <option name="LAST_COMMIT_MESSAGE" value="boost agentic coding" />
++  </component>
++</project>
+\ No newline at end of file
+Index: tests/test_pathfinding.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>from autonomous_ops_sim.core.graph import Graph\nfrom autonomous_ops_sim.core.node import Node\nfrom autonomous_ops_sim.core.edge import Edge\nfrom autonomous_ops_sim.routing.pathfinding import dijkstra\nimport pytest\n\ndef build_indirect_route_cheaper_graph() -> Graph:\n    graph = Graph()\n\n    node_1 = Node(1, (0, 0, 0))\n    node_2 = Node(2, (1, 0, 0))\n    node_3 = Node(3, (2, 0, 0))\n\n    graph.add_node(node_1)\n    graph.add_node(node_2)\n    graph.add_node(node_3)\n\n    graph.add_edge(Edge(1, node_1, node_2, 1.0, 25.0))\n    graph.add_edge(Edge(2, node_2, node_3, 1.0, 25.0))\n    graph.add_edge(Edge(3, node_1, node_3, 5.0, 25.0))\n\n    return graph\n\ndef build_direct_route_cheaper_graph() -> Graph:\n    graph = Graph()\n\n    node_1 = Node(1, (0, 0, 0))\n    node_2 = Node(2, (1, 0, 0))\n    node_3 = Node(3, (2, 0, 0))\n\n    graph.add_node(node_1)\n    graph.add_node(node_2)\n    graph.add_node(node_3)\n\n    graph.add_edge(Edge(1, node_1, node_2, 2.0, 25.0))\n    graph.add_edge(Edge(2, node_2, node_3, 2.0, 25.0))\n    graph.add_edge(Edge(3, node_1, node_3, 1.0, 25.0))\n    return graph\n\ndef build_unreachable_node_graph() -> Graph:\n    graph = Graph()\n\n    node_1 = Node(1, (0, 0, 0))\n    node_2 = Node(2, (1, 0, 0))\n    node_3 = Node(3, (2, 0, 0))\n\n    graph.add_node(node_1)\n    graph.add_node(node_2)\n    graph.add_node(node_3)\n\n    graph.add_edge(Edge(1, node_1, node_2, 1.0, 25.0))\n\n    return graph\n\ndef build_blocked_route_graph() -> Graph:\n    graph = Graph()\n\n    node_1 = Node(1, (0, 0, 0))\n    node_2 = Node(2, (1, 0, 0))\n    node_3 = Node(3, (2, 0, 0))\n\n    graph.add_node(node_1)\n    graph.add_node(node_2)\n    graph.add_node(node_3)\n\n    graph.add_edge(Edge(1, node_1, node_2, 1.0, 25.0))\n    graph.add_edge(Edge(2, node_2, node_3, 1.0, 25.0, blocked=True))\n    graph.add_edge(Edge(3, node_1, node_3, 3.0, 25.0))\n\n    return graph\n\ndef build_all_routes_blocked_graph() -> Graph:\n    graph = Graph()\n\n    node_1 = Node(1, (0, 0, 0))\n    node_2 = Node(2, (1, 0, 0))\n    node_3 = Node(3, (2, 0, 0))\n\n    graph.add_node(node_1)\n    graph.add_node(node_2)\n    graph.add_node(node_3)\n\n    graph.add_edge(Edge(1, node_1, node_2, 1.0, 25.0, blocked=True))\n    graph.add_edge(Edge(2, node_2, node_3, 1.0, 25.0))\n    graph.add_edge(Edge(3, node_1, node_3, 3.0, 25.0, blocked=True))\n\n    return graph\n\n\ndef test_dijkstra_returns_shortest_path():\n\n    graph = build_indirect_route_cheaper_graph()\n\n    cost, path = dijkstra(graph, 1, 3)\n\n    assert cost == 2.0\n    assert path == [1, 2, 3]\n\ndef test_dijkstra_returns_direct_path_when_it_is_cheapest():\n    graph = build_direct_route_cheaper_graph()\n\n    cost, path = dijkstra(graph,1,3)\n\n    assert cost == 1.0\n    assert path == [1, 3]\n\n\ndef test_dijkstra_returns_trivial_path_when_start_equals_end():\n    graph = build_direct_route_cheaper_graph()\n\n    cost, path = dijkstra(graph, 1, 1)\n\n    assert cost == 0.0\n    assert path == [1]\n\ndef test_dijkstra_raises_for_missing_start():\n    graph = build_direct_route_cheaper_graph()\n\n    with pytest.raises(ValueError):\n        dijkstra(graph, 99, 3)\n\ndef test_dijkstra_raises_for_missing_end():\n    graph = build_direct_route_cheaper_graph()\n\n    with pytest.raises(ValueError):\n        dijkstra(graph, 3, 99)\n\ndef test_dijkstra_raises_for_unreachable_destination():\n    graph = build_unreachable_node_graph()\n\n    with pytest.raises(ValueError):\n        dijkstra(graph, 1, 3)\n\ndef test_dijkstra_ignores_blocked_edge_and_uses_alternate_route():\n    graph = build_blocked_route_graph()\n\n    cost, path = dijkstra(graph, 1, 3)\n\n    assert cost == 3.0\n    assert path == [1, 3]\n\ndef test_dijkstra_raises_when_all_routes_are_blocked():\n    graph = build_all_routes_blocked_graph()\n\n    with pytest.raises(ValueError):\n        dijkstra(graph, 1, 3)
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/tests/test_pathfinding.py b/tests/test_pathfinding.py
+--- a/tests/test_pathfinding.py	(revision 85ad432a578baebe592b5a0d90d567ad67d81dea)
++++ b/tests/test_pathfinding.py	(date 1775620093604)
+@@ -2,6 +2,7 @@
+ from autonomous_ops_sim.core.node import Node
+ from autonomous_ops_sim.core.edge import Edge
+ from autonomous_ops_sim.routing.pathfinding import dijkstra
++from autonomous_ops_sim.simulation.world_state import WorldState
+ import pytest
+ 
+ def build_indirect_route_cheaper_graph() -> Graph:
+@@ -64,7 +65,7 @@
+     graph.add_node(node_3)
+ 
+     graph.add_edge(Edge(1, node_1, node_2, 1.0, 25.0))
+-    graph.add_edge(Edge(2, node_2, node_3, 1.0, 25.0, blocked=True))
++    graph.add_edge(Edge(2, node_2, node_3, 1.0, 25.0))
+     graph.add_edge(Edge(3, node_1, node_3, 3.0, 25.0))
+ 
+     return graph
+@@ -80,9 +81,9 @@
+     graph.add_node(node_2)
+     graph.add_node(node_3)
+ 
+-    graph.add_edge(Edge(1, node_1, node_2, 1.0, 25.0, blocked=True))
++    graph.add_edge(Edge(1, node_1, node_2, 1.0, 25.0))
+     graph.add_edge(Edge(2, node_2, node_3, 1.0, 25.0))
+-    graph.add_edge(Edge(3, node_1, node_3, 3.0, 25.0, blocked=True))
++    graph.add_edge(Edge(3, node_1, node_3, 3.0, 25.0))
+ 
+     return graph
+ 
+@@ -133,14 +134,19 @@
+ 
+ def test_dijkstra_ignores_blocked_edge_and_uses_alternate_route():
+     graph = build_blocked_route_graph()
++    world_state = WorldState(graph)
++    world_state.block_edge(2)
+ 
+-    cost, path = dijkstra(graph, 1, 3)
++    cost, path = dijkstra(graph, 1, 3, world_state=world_state)
+ 
+     assert cost == 3.0
+     assert path == [1, 3]
+ 
+ def test_dijkstra_raises_when_all_routes_are_blocked():
+     graph = build_all_routes_blocked_graph()
++    world_state = WorldState(graph)
++    world_state.block_edge(1)
++    world_state.block_edge(3)
+ 
+     with pytest.raises(ValueError):
+-        dijkstra(graph, 1, 3)
+\ No newline at end of file
++        dijkstra(graph, 1, 3, world_state=world_state)
+Index: autonomous_ops_sim/simulation/__init__.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/autonomous_ops_sim/simulation/__init__.py b/autonomous_ops_sim/simulation/__init__.py
+--- a/autonomous_ops_sim/simulation/__init__.py	(revision 85ad432a578baebe592b5a0d90d567ad67d81dea)
++++ b/autonomous_ops_sim/simulation/__init__.py	(date 1775620093603)
+@@ -1,0 +1,3 @@
++from autonomous_ops_sim.simulation.world_state import WorldState
++
++__all__ = ["WorldState"]
+Index: autonomous_ops_sim/core/edge.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>from autonomous_ops_sim.core.node import Node\nclass Edge:\n    \"\"\"Directed connection between two nodes in the graph.\n\n    Systems such as routing and simulation use edges to model\n    traversable paths, along with constraints like travel distance, speed,\n    and availability.\n    \"\"\"\n    def __init__(\n            self,\n            id: int,\n            start_node: Node,\n            end_node: Node,\n            distance: float,\n            speed_limit: float,\n            blocked: bool = False,\n\n    ):  # Expected to be unique within a graph.\n        self.id = id\n\n        # Directed edge, travel is defined from start_node to end_node.\n        self.start_node = start_node\n        self.end_node = end_node\n\n        # Travel length for this segment.\n        # Keep units consistent across a graph (ex: meters).\n        self.distance = distance\n\n        # Maximum allowed traversal speed for this segment.\n        # Keep units consistent across a graph (ex: meters/second).\n        self.speed_limit = speed_limit\n\n        # When True, routing/simulation will treat this edge as unavailable.\n        self.blocked = blocked\n\n    def __repr__(self):\n        return (\n            f\"Edge(id={self.id!r}, start_node={self.start_node!r}, \"\n            f\"end_node={self.end_node!r}, distance={self.distance!r}, \"\n            f\"speed_limit={self.speed_limit!r}, blocked={self.blocked!r})\"\n        )
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/autonomous_ops_sim/core/edge.py b/autonomous_ops_sim/core/edge.py
+--- a/autonomous_ops_sim/core/edge.py	(revision 85ad432a578baebe592b5a0d90d567ad67d81dea)
++++ b/autonomous_ops_sim/core/edge.py	(date 1775620093603)
+@@ -13,7 +13,6 @@
+             end_node: Node,
+             distance: float,
+             speed_limit: float,
+-            blocked: bool = False,
+ 
+     ):  # Expected to be unique within a graph.
+         self.id = id
+@@ -30,12 +29,9 @@
+         # Keep units consistent across a graph (ex: meters/second).
+         self.speed_limit = speed_limit
+ 
+-        # When True, routing/simulation will treat this edge as unavailable.
+-        self.blocked = blocked
+-
+     def __repr__(self):
+         return (
+             f"Edge(id={self.id!r}, start_node={self.start_node!r}, "
+             f"end_node={self.end_node!r}, distance={self.distance!r}, "
+-            f"speed_limit={self.speed_limit!r}, blocked={self.blocked!r})"
+-        )
+\ No newline at end of file
++            f"speed_limit={self.speed_limit!r})"
++        )
+Index: autonomous_ops_sim/maps/map.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>from autonomous_ops_sim.core.graph import Graph\nfrom autonomous_ops_sim.core.node import NodeType, Node\nfrom autonomous_ops_sim.core.edge import Edge\nclass Map:\n    \"\"\"Spatial facade over graph.\n\n    Provides coordinate-based access on top of the underlying graph,\n    including lookups by position, region queries, node_type filtering, and\n    edge/state operations needed by routing and simulation code.\n    \"\"\"\n\n    def __init__(\n            self,\n            graph: Graph,\n            coord_to_id: dict[tuple[float, float, float], int],\n    ):\n        self._graph = graph\n        self.coord_to_id = coord_to_id\n\n    def has_coordinate(self, position: tuple[float, float, float]) -> bool:\n        \"\"\"Return True if the given coordinate exists in the map.\"\"\"\n\n        return position in self.coord_to_id\n\n    def get_node_id(self, position: tuple[float, float, float]) -> int:\n        \"\"\"Return the node ID for a coordinate.\"\"\"\n\n        if not self.has_coordinate(position):\n            raise KeyError(f\"There is no node with Position-{position}\")\n        return self.coord_to_id[position]\n\n    def get_position(self, node_id: int) -> tuple[float, float, float]:\n        \"\"\"Return the coordinate position for a given node ID.\"\"\"\n\n        if not self._graph.has_node(node_id):\n            raise KeyError(f\"There is no Node-{node_id}\")\n        return self._graph.nodes[node_id].position\n\n    def get_nodes_by_type(self, node_type: NodeType) -> list[int]:\n        \"\"\"Return all node IDs that have the given NodeType.\"\"\"\n\n        return [\n            node_id\n            for node_id, node in self._graph.nodes.items()\n            if node.node_type == node_type\n        ]\n\n    def get_node_type(self, node_id: int) -> NodeType:\n        \"\"\"Return the NodeType for a given node ID.\"\"\"\n\n        if not self._graph.has_node(node_id):\n           raise KeyError(f\"There is no Node-{node_id}\")\n        return self._graph.nodes[node_id].node_type\n\n    def get_nodes_in_region(\n            self,\n            min_x: float,\n            min_y: float,\n            min_z: float,\n            max_x: float,\n            max_y: float,\n            max_z: float,\n    ) -> list[int]:\n        \"\"\"Return all node IDs inside the bounding box.\"\"\"\n\n        if max_x < min_x:\n            raise ValueError(f\"max_x = {max_x} < {min_x} = min_x\")\n        if max_y < min_y:\n            raise ValueError(f\"max_y = {max_y} < {min_y} = min_y\")\n        if max_z < min_z:\n            raise ValueError(f\"max_z = {max_z} < {min_z} = min_z\")\n        return [\n            node_id\n            for node_id, node in self._graph.nodes.items()\n            if min_x <= node.position[0] <= max_x\n            and min_y <= node.position[1] <= max_y\n            and min_z <= node.position[2] <= max_z\n        ]\n\n    def get_node(self, node_id: int) -> Node:\n        \"\"\"Return Node object from node ID\"\"\"\n\n        if not self._graph.has_node(node_id):\n            raise KeyError(f\"There is no Node-{node_id}\")\n        return self._graph.nodes[node_id]\n\n    def get_all_node_ids(self) -> list[int]:\n        \"\"\"Return every node ID in the map.\"\"\"\n\n        return list(self._graph.nodes.keys())\n\n    def get_nearest_node_of_type(\n            self, position: tuple[float, float, float], node_type: NodeType\n    ) -> int:\n        \"\"\"Return the closest node ID of the given type (Euclidean).\"\"\"\n\n        candidates = self.get_nodes_by_type(node_type)\n        if not candidates:\n            raise ValueError(f\"There are no nodes of type {node_type}\")\n        x, y, z = position\n        return min(\n            candidates,\n            key= lambda nid:(\n                (self.get_position(nid)[0] - x) ** 2 +\n                (self.get_position(nid)[1] - y) ** 2 +\n                (self.get_position(nid)[2] - z) ** 2\n            )\n        )\n\n    def get_outgoing_edges(self, node_id: int) -> list[Edge]:\n        \"\"\"Return a copy of all outgoing edges from the node.\"\"\"\n\n        return self._graph.get_outgoing_edges(node_id)\n\n    def get_neighbors(self, node_id: int) -> list[int]:\n        \"\"\"Return the node IDs of all direct outgoing neighbors.\"\"\"\n\n        return self._graph.get_neighbors(node_id)\n\n    def get_edge_between(self, start_id: int, end_id: int) -> Edge | None:\n        \"\"\"Return the edge from start to end, or None if none exists.\"\"\"\n\n        for edge in self.get_outgoing_edges(start_id):\n            if edge.end_node.id == end_id:\n                return edge\n        return None\n\n    def get_edges_from_position(self, position: tuple[float, float, float]) -> list[Edge]:\n        \"\"\"Return all outgoing edges from the node at the given position.\"\"\"\n\n        nid = self.get_node_id(position)\n        return self.get_outgoing_edges(nid)\n\n    def validate_path(self, path: list[int]) -> bool:\n        \"\"\"Return True if every node exists and every consecutive pair has an edge.\"\"\"\n\n        if not path:\n            return True\n        for start, end in zip(path, path[1:]):\n            if not self._graph.has_node(start) or not self._graph.has_node(end):\n                return False\n            if self.get_edge_between(start, end) is None:\n                return False\n        return True\n\n    def block_edge(self, edge_id: int) -> None:\n        \"\"\"Mark an edge as blocked.\"\"\"\n\n        if not self._graph.has_edge(edge_id):\n            raise KeyError(f\"There is no Edge-{edge_id}\")\n        self._graph.edges[edge_id].blocked = True\n\n    def unblock_edge(self, edge_id: int) -> None:\n        \"\"\"Mark an edge as unblocked.\"\"\"\n\n        if not self._graph.has_edge(edge_id):\n            raise KeyError(f\"There is no Edge-{edge_id}\")\n        self._graph.edges[edge_id].blocked = False\n\n    def __repr__(self):\n        return f\"Map(graph={self._graph!r}, coord_to_id={self.coord_to_id!r})\"\n\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/autonomous_ops_sim/maps/map.py b/autonomous_ops_sim/maps/map.py
+--- a/autonomous_ops_sim/maps/map.py	(revision 85ad432a578baebe592b5a0d90d567ad67d81dea)
++++ b/autonomous_ops_sim/maps/map.py	(date 1775620093603)
+@@ -6,7 +6,7 @@
+ 
+     Provides coordinate-based access on top of the underlying graph,
+     including lookups by position, region queries, node_type filtering, and
+-    edge/state operations needed by routing and simulation code.
++    static edge queries needed by routing and simulation code.
+     """
+ 
+     def __init__(
+@@ -143,20 +143,5 @@
+                 return False
+         return True
+ 
+-    def block_edge(self, edge_id: int) -> None:
+-        """Mark an edge as blocked."""
+-
+-        if not self._graph.has_edge(edge_id):
+-            raise KeyError(f"There is no Edge-{edge_id}")
+-        self._graph.edges[edge_id].blocked = True
+-
+-    def unblock_edge(self, edge_id: int) -> None:
+-        """Mark an edge as unblocked."""
+-
+-        if not self._graph.has_edge(edge_id):
+-            raise KeyError(f"There is no Edge-{edge_id}")
+-        self._graph.edges[edge_id].blocked = False
+-
+     def __repr__(self):
+         return f"Map(graph={self._graph!r}, coord_to_id={self.coord_to_id!r})"
+-
