@@ -1,15 +1,16 @@
 # Current Phase
 
 ## Active roadmap step
-Step 5 — Simulation engine and clock
+Step 6 — Single-vehicle execution and trace
 
 ## Step status summary
 - Step 1: complete
 - Step 2: complete
 - Step 3: complete
 - Step 4: complete
-- Step 5: active
-- Step 6: not started
+- Step 5: complete
+- Step 6: active
+- Step 7: not started
 
 ## What already exists
 The repository already has:
@@ -22,43 +23,45 @@ The repository already has:
 - static map/topology separated from runtime blocked-edge state via `WorldState`
 - `CostModel` routing
 - `Router` as the public routing surface
+- `SimulationEngine` with explicit simulated time and deterministic run control
 
 ## Goal of the current phase
-Introduce a first-class simulation engine with explicit simulated time and deterministic run control.
+Add single-vehicle execution over simulated time and record a deterministic trace.
 
-The main Step 5 objective is:
-- add `SimulationEngine`
-- define engine run control around simulated time
-- make seed ownership explicit at the engine level
-- prepare a clean foundation for later vehicle/process execution without implementing Step 6 yet
+The main Step 6 objective is:
+- execute one vehicle over a route
+- advance simulated time correctly
+- emit trace events in deterministic order
+- prepare a clean foundation for later jobs/resources without implementing Step 7 yet
 
 ## In-scope work
 Work that is allowed right now:
-- add `simulation/engine.py`
-- introduce explicit simulated time
-- implement `run(until_s)`
-- use SimPy internally if helpful
-- add tests for engine initialization, run control, and determinism
-- small additive refactors that make Step 5 cleaner without introducing Step 6 behavior
+- add `simulation/trace.py`
+- add a single-vehicle execution module such as `simulation/vehicle_process.py`
+- integrate single-vehicle execution with `SimulationEngine`
+- advance simulated time according to traversal timing
+- add tests for trace monotonicity, event ordering, and arrival timing
+- small additive refactors that make Step 6 cleaner without introducing Step 7 concepts
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- add single-vehicle route-following processes
-- add trace/event systems beyond minimal engine necessities
-- add jobs/resources/dispatch logic
+- add jobs/tasks/resources
+- add queues or service resources
+- add dispatcher logic
 - add multi-vehicle logic
-- add behavior systems
+- add behavior systems beyond what is strictly needed for one vehicle following a route
+- add rich visualization systems
 
 ## Architectural guidance for this phase
-- Keep the public engine API small.
-- Simulated time is the focus, not rich agent behavior yet.
-- Do not overbuild abstractions around the clock.
-- Prefer a production-looking engine surface over a toy script-driven loop.
+- Keep the engine as the run coordinator.
+- Keep vehicle execution logic separate from engine core.
+- Keep trace types small and explicit.
+- Prefer event records over overbuilt telemetry frameworks.
+- Do not overbuild an agent architecture yet.
 
-## Completion criteria for Step 5
-Step 5 is complete when:
-- `SimulationEngine` exists
-- engine tracks simulated time explicitly
-- `run(until_s)` works
-- same seed and same initial setup produce deterministic engine-level behavior
+## Completion criteria for Step 6
+Step 6 is complete when:
+- one vehicle can follow a route over simulated time
+- trace events are emitted in monotone time order
+- arrival timing matches expected traversal timing
 - tests/lint/type checks pass
