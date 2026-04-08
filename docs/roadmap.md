@@ -1,200 +1,306 @@
-# Roadmap
 
-This document is a condensed text version of the project roadmap. Development should proceed in order. Later steps may influence earlier design, but later-step architecture should not be implemented prematurely unless there is a clear additive refactor that supports the current step cleanly.
+## `docs/roadmap.md`
 
----
+```markdown
+# Expansion Roadmap
 
-## Step 1 — Production foundation
-Goal:
-- Make the project installable, runnable, testable, and CI-checked.
+This roadmap begins after completion of the original foundation roadmap through Step 11.
 
-Key deliverables:
-- `pyproject.toml`
-- installable package
-- CLI entry point
-- pytest baseline
-- Ruff baseline
-- mypy baseline
-- CI workflow
+The foundation phase established:
+- deterministic topology/runtime separation
+- routing and cost-model injection
+- simulated-time execution
+- jobs/tasks/resources
+- baseline dispatch
+- multi-vehicle reservation-based conflict handling
+- vehicle behavior FSM
+- metrics/export/golden regression
 
-Acceptance criteria:
-- editable install works
-- package imports work
-- CLI help/version works
-- tests run cleanly
-- lint/type checks run cleanly in CI
-
-Notes:
-- This step is about stable execution surface and engineering baseline, not simulation behavior.
+The purpose of this roadmap is to grow that deterministic simulator core into a more executable, extensible, and eventually interactive simulation platform without losing clean boundaries.
 
 ---
 
-## Step 2 — Scenario/config spine with determinism plumbing
-Goal:
-- Create the stable input/configuration layer for future simulation runs.
+## Guiding principles
 
-Key deliverables:
-- typed scenario dataclasses
-- JSON-first scenario schema
-- scenario loader/validator
-- deterministic seed captured in the scenario/config surface
-- CLI path that loads a scenario and reports validated scenario information
-
-Acceptance criteria:
-- scenario files are parsed and validated cleanly
-- raw JSON is converted into typed dataclasses before broader use
-- scenario loading is accessible through the CLI
-- repeated loads of the same scenario produce stable validated summary output
-- schema is minimal now but future-ready
-
-Notes:
-- This is still pre-simulation.
-- Do not introduce world-state/runtime mutation architecture here.
-- Do not introduce simulation engine or event processing here.
+- Determinism remains first-class.
+- Trace-centered metrics/export remain the stable outward-facing analysis surface.
+- Static topology remains separate from runtime state.
+- Prefer additive, production-style evolution over rewrites.
+- Introduce visualization and interactivity only after the runtime/control surfaces are strong enough to support them cleanly.
 
 ---
 
-## Step 3 — Static Map vs dynamic WorldState split
-Goal:
-- Separate immutable map/topology from runtime-changing simulation state.
+## Step 12 — Executable scenario harness
 
-Key deliverables:
-- `WorldState`
-- blocked edges / dynamic conditions moved out of static map ownership
-- clean resettable runtime state
+### Goal
+Turn scenario files into real executable simulator runs rather than validation-only inputs.
 
-Acceptance criteria:
-- the same map can be reused across runs without contamination
-- runtime changes do not mutate the static map asset
-- reset behavior is explicit and deterministic
+### Why this comes first
+The simulator already has execution, metrics, and exports, but scenario JSON currently stops at validation/summary rather than driving a full run. This is the highest immediate-value gap because it converts the system from a library-oriented simulator core into a runnable scenario platform. :contentReference[oaicite:1]{index=1}
 
-Notes:
-- This is the step where dynamic closures, runtime restrictions, and similar state should be refactored out of `Map`.
+### Expected outcomes
+- scenario files can drive real simulator runs
+- CLI can execute scenarios, not just summarize them
+- scenario-driven runs produce deterministic export JSON
+- at least one scenario-run golden regression fixture exists
 
----
+### Main likely modules
+- scenario execution/orchestration layer
+- CLI integration
+- minimal scenario schema extension only if needed
 
-## Step 4 — CostModel and Router refactor
-Goal:
-- Make routing depend on injectable cost logic and dynamic world state.
-
-Key deliverables:
-- cost model interface/protocol
-- `Router` abstraction
-- shortest path API routed through stable surface
-- cost-model-based routing rather than hardcoded distance-only assumptions
-
-Acceptance criteria:
-- different cost models can choose different routes
-- routing honors dynamic world state
-- non-negative cost assumptions are enforced for Dijkstra-based routing
+### Out of scope
+- visualization
+- live interactive control
+- vehicle model consolidation
+- coordination redesign
 
 ---
 
-## Step 5 — Simulation engine and clock
-Goal:
-- Introduce the simulation execution model and explicit simulated time.
+## Step 13 — Scenario schema for operations
 
-Key deliverables:
-- simulation engine
-- time/run controls
-- deterministic seed-aware initialization surface for execution
+### Goal
+Expand scenario/config schema so scenarios can express operational work, not just map + vehicles.
 
-Acceptance criteria:
-- run-to-time behavior works
-- repeated runs with same inputs are reproducible
+### Why it follows Step 12
+First establish a working execution harness. Then expand what scenarios can describe.
 
----
+### Expected outcomes
+- scenario schema can express:
+  - initial world conditions
+  - jobs/tasks
+  - resources
+  - dispatcher choice/config
+- deterministic parsing into runtime-ready structures
+- scenario-driven runs cover more of the simulator without requiring handwritten Python setup
 
-## Step 6 — Single-vehicle execution and trace
-Goal:
-- Make one vehicle move through the system under simulated time and produce trace output.
+### Main likely modules
+- `simulation/scenario.py`
+- `io/scenario_loader.py`
+- scenario execution/orchestration layer
+- docs and example scenarios
 
-Key deliverables:
-- single-vehicle process/agent
-- trace events
-- deterministic route-following behavior
-
-Acceptance criteria:
-- timestamps are monotone
-- arrival timing matches configured routing/cost behavior
-
----
-
-## Step 7 — Jobs, tasks, and resources
-Goal:
-- Add operational primitives like move/load/unload and shared resources.
-
-Key deliverables:
-- task/job primitives
-- queue/resource behavior
-- haul-cycle-style execution
-
-Acceptance criteria:
-- queue discipline and service behavior are testable and deterministic
+### Out of scope
+- large schema generalization
+- visualization
+- control-command layer
 
 ---
 
-## Step 8 — Dispatcher
-Goal:
-- Add baseline assignment logic for jobs/tasks.
+## Step 14 — Persistent vehicle entity model
 
-Key deliverables:
-- dispatcher interface
-- baseline heuristic policy
+### Goal
+Promote a real persistent vehicle/entity model instead of threading scalar vehicle inputs through many execution paths.
 
-Acceptance criteria:
-- assignments are correct
-- job completion works under load
+### Why it follows Step 13
+Once scenarios can drive real runs, the next pressure point is the still-minimal `Vehicle` model and scattered scalar vehicle state. The research identified this as a major likely refactor target. :contentReference[oaicite:2]{index=2}
 
----
+### Expected outcomes
+- a persistent `Vehicle` entity becomes the main execution-facing representation
+- vehicle state relates cleanly to:
+  - `VehicleProcess`
+  - `VehicleBehaviorController`
+  - trace
+  - runtime manipulation
+- reduced scalar argument threading
 
-## Step 9 — Multi-vehicle conflict handling
-Goal:
-- Prevent invalid shared-space occupancy and handle replanning/conflict logic.
+### Main likely modules
+- `vehicles/vehicle.py`
+- `simulation/vehicle_process.py`
+- `simulation/engine.py`
+- behavior integration points
 
-Key deliverables:
-- conflict handling / reservation logic
-- replan triggers
-- no-double-occupancy behavior
-
-Acceptance criteria:
-- conflicts are prevented or detected
-- deadlock-related behavior is test-covered
-
----
-
-## Step 10 — Behavior layer
-Goal:
-- Add operational behavior/state logic for agents.
-
-Key deliverables:
-- FSM-style state layer first
-- future-friendly path toward richer behavior systems later
-
-Acceptance criteria:
-- state transitions and recovery logic are testable
+### Out of scope
+- visualization
+- interactive control UI
+- full fleet-management optimization
 
 ---
 
-## Step 11 — Scenario packs, metrics, visualization, optional RL wrapper
-Goal:
-- Add analysis/export/visualization surfaces and optional external environment wrapping.
+## Step 15 — Evaluation and scenario-pack harness
 
-Key deliverables:
-- metrics export
-- visualization hooks
-- docs
-- optional RL wrapper
+### Goal
+Support scenario packs, batch execution, and benchmark-style comparisons.
 
-Acceptance criteria:
-- golden-scenario regression support
-- export formats are stable and tested
+### Why it follows Step 14
+Once scenarios run end-to-end and vehicles have stronger runtime identity, batch execution becomes much more useful and stable.
+
+### Expected outcomes
+- batch scenario execution
+- stable summary aggregation across runs
+- deterministic comparison harness
+- multiple golden-style scenario packs
+
+### Main likely modules
+- scenario pack runner
+- metrics aggregation utilities
+- export/report conventions
+
+### Out of scope
+- dashboard/UI
+- interactive control
 
 ---
 
-## Planning rule
-When working on any task:
-1. identify the active step
-2. implement only what is required to close that step
-3. avoid pulling later-step abstractions earlier unless absolutely necessary
-4. prefer small, production-looking additive changes
+## Step 16 — Richer operations realism
+
+### Goal
+Move from isolated jobs to richer ongoing fleet/operations studies.
+
+### Expected outcomes
+- multiple jobs over time
+- stronger workload modeling
+- utilization-oriented metrics
+- repeated haul-cycle style simulation
+- richer resource-network realism
+
+### Why it comes here
+This is where the simulator becomes more like a true operations-study platform, but it should come after executable scenarios, stronger entity modeling, and batch evaluation support.
+
+### Out of scope
+- advanced coordination algorithm redesign
+- live UI-first development
+
+---
+
+## Step 17 — Coordination upgrade
+
+### Goal
+Improve multi-vehicle coordination beyond the narrow deterministic reservation baseline.
+
+### Expected outcomes
+- stronger reservation indexing/scalability
+- better deadlock observability/prevention
+- bounded replanning or corridor/intersection semantics
+- deterministic regression cases for upgraded coordination
+
+### Why it comes after evaluation growth
+Coordination upgrades are high-risk and easy to destabilize. They should be introduced only after the simulator has strong scenario and regression harnesses to measure the change properly. The research explicitly warns that coordination upgrades are costly and can break determinism if introduced too early. :contentReference[oaicite:3]{index=3}
+
+### Out of scope
+- full optimal MAPF for all use cases
+- giant algorithmic framework rewrites
+
+---
+
+## Step 18 — Control-command surface
+
+### Goal
+Add a replayable command/event surface for controlling a run.
+
+### Why this must come before interactive UI
+Real-time interaction should not directly mutate engine state arbitrarily. A control-command surface is the clean architectural bridge between deterministic simulation and interactive tooling. The research explicitly recommends a control command/event interface for replayability and auditability. :contentReference[oaicite:4]{index=4}
+
+### Expected outcomes
+- explicit commands such as:
+  - assign destination
+  - inject closure
+  - reposition vehicle
+  - pause/resume/step
+- commands recorded in a replayable form
+- deterministic offline mode and interactive mode can share the same runtime contract
+
+### Out of scope
+- polished end-user viewer
+- full UI framework commitment unless justified
+
+---
+
+## Step 19 — Visualization state surface and first viewer
+
+### Goal
+Make the simulator watchable in real time through a thin visualization surface.
+
+### Expected outcomes
+- visualization/state stream or snapshot surface
+- minimal viewer that can:
+  - display map/topology
+  - display vehicle positions/state
+  - play/pause/step playback
+- deterministic replay of previously executed runs
+
+### Why it follows the command surface
+Visualization should consume stable simulator state/control surfaces rather than forcing architecture from the UI downward.
+
+### Out of scope
+- large dashboard
+- heavy animation framework
+- broad product UI
+
+---
+
+## Step 20 — Interactive manipulation layer
+
+### Goal
+Support live interaction with running simulations.
+
+### Expected outcomes
+- click-to-assign destination
+- drag/reposition vehicle
+- inject closures/blocked edges during execution
+- inspect vehicle/job/resource state live
+- preserve replayability through recorded control commands
+
+### Why it follows visualization
+Once the simulator can be watched and controlled through explicit surfaces, live manipulation becomes a natural extension rather than a source of architectural chaos.
+
+---
+
+## Step 21 — Environment/map realism expansion
+
+### Goal
+Expand beyond the current narrow map semantics and grid-first scenario assumptions.
+
+### Expected outcomes
+- richer map/environment semantics
+- zones/work areas/site metadata
+- better import/export paths for non-grid network data
+- stronger domain realism for specific operational settings
+
+### Why it is later
+Map realism is valuable, but the research ranked it below scenario execution and entity/harness work because execution/control surfaces need to be stronger first. :contentReference[oaicite:5]{index=5}
+
+---
+
+## Step 22 — Optional research wrapper
+
+### Goal
+Add a minimal external experimentation wrapper only if it remains clearly optional.
+
+### Possible outcomes
+- policy comparison harness
+- optional Gymnasium-style wrapper
+- research-oriented control experiments
+
+### Constraints
+This should remain an adapter on top of stable simulator surfaces, not a redesign of the simulator around a research framework.
+
+---
+
+## Recommended implementation order
+
+1. Step 12 — Executable scenario harness
+2. Step 13 — Scenario schema for operations
+3. Step 14 — Persistent vehicle entity model
+4. Step 15 — Evaluation and scenario-pack harness
+5. Step 16 — Richer operations realism
+6. Step 17 — Coordination upgrade
+7. Step 18 — Control-command surface
+8. Step 19 — Visualization state surface and first viewer
+9. Step 20 — Interactive manipulation layer
+10. Step 21 — Environment/map realism expansion
+11. Step 22 — Optional research wrapper
+
+---
+
+## How to use this roadmap
+
+At any given time:
+- `docs/current_phase.md` defines the active step
+- `docs/step-*.md` defines the specific scope and done criteria for that step
+- `AGENTS.md` defines repo-wide development rules
+
+The intent is to keep future growth as disciplined as the original foundation roadmap:
+- additive where possible
+- explicit where necessary
+- measurable by deterministic tests, metrics, and regression fixtures
