@@ -151,25 +151,9 @@ def test_validate_path_returns_false_for_missing_edge(map_parts):
     test_map, _, _ = map_parts
     assert not test_map.validate_path([1, 2, 3, 4])
 
-def test_block_edge_marks_edge_blocked(map_parts):
-    test_map, _, test_edges = map_parts
-    test_map.block_edge(1)
-    assert test_edges[0].blocked
-
-
-def test_block_edge_raises_for_missing_edge(map_parts):
+def test_map_no_longer_owns_runtime_edge_blocking(map_parts):
     test_map, _, _ = map_parts
-    with pytest.raises(KeyError):
-        test_map.block_edge(99)
-
-def test_unblock_edge_marks_edge_unblocked(map_parts):
-    test_map, _, test_edges = map_parts
-    test_map.block_edge(1)
-    assert test_edges[0].blocked
-    test_map.unblock_edge(1)
-    assert not test_edges[0].blocked
-
-def test_unblock_edge_raises_for_missing_edge(map_parts):
-    test_map, _, _ = map_parts
-    with pytest.raises(KeyError):
-        test_map.unblock_edge(99)
+    with pytest.raises(AttributeError):
+        _ = test_map.block_edge
+    with pytest.raises(AttributeError):
+        _ = test_map.unblock_edge

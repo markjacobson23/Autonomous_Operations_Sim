@@ -6,7 +6,7 @@ class Map:
 
     Provides coordinate-based access on top of the underlying graph,
     including lookups by position, region queries, node_type filtering, and
-    edge/state operations needed by routing and simulation code.
+    static edge queries needed by routing and simulation code.
     """
 
     def __init__(
@@ -143,20 +143,5 @@ class Map:
                 return False
         return True
 
-    def block_edge(self, edge_id: int) -> None:
-        """Mark an edge as blocked."""
-
-        if not self._graph.has_edge(edge_id):
-            raise KeyError(f"There is no Edge-{edge_id}")
-        self._graph.edges[edge_id].blocked = True
-
-    def unblock_edge(self, edge_id: int) -> None:
-        """Mark an edge as unblocked."""
-
-        if not self._graph.has_edge(edge_id):
-            raise KeyError(f"There is no Edge-{edge_id}")
-        self._graph.edges[edge_id].blocked = False
-
     def __repr__(self):
         return f"Map(graph={self._graph!r}, coord_to_id={self.coord_to_id!r})"
-
