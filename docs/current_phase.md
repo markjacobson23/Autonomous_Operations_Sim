@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 7 — Jobs, tasks, and resources
+Step 8 — Simple dispatcher
 
 ## Step status summary
 - Step 1: complete
@@ -10,8 +10,9 @@ Step 7 — Jobs, tasks, and resources
 - Step 4: complete
 - Step 5: complete
 - Step 6: complete
-- Step 7: active
-- Step 8: not started
+- Step 7: complete
+- Step 8: active
+- Step 9: not started
 
 ## What already exists
 The repository already has:
@@ -22,44 +23,43 @@ The repository already has:
 - `SimulationEngine` with explicit simulated time
 - single-vehicle route execution
 - deterministic trace output
+- jobs, tasks, and shared resources
 
 ## Goal of the current phase
-Add task/job primitives and shared resources so the simulator can model operational work rather than only route traversal.
+Add a baseline dispatcher that chooses which job a vehicle should execute next.
 
-The main Step 7 objective is:
-- introduce tasks such as move/load/unload
-- introduce jobs as ordered sequences of tasks
-- introduce shared resources with limited capacity
-- support waiting/service timing in simulated time
+The main Step 8 objective is:
+- introduce a dispatcher interface
+- add one deterministic baseline dispatch policy
+- connect dispatch selection to existing job execution
+- support job completion under simple load
 
 ## In-scope work
 Work that is allowed right now:
-- add `operations/tasks.py`
-- add `operations/jobs.py`
-- add `operations/resources.py`
-- integrate tasks/jobs/resources with the existing engine and trace
-- add tests for queueing/service timing and ordered task execution
-- small additive refactors that make Step 7 cleaner without introducing Step 8 concepts
+- add `operations/dispatcher.py`
+- add a dispatcher interface/protocol
+- add one concrete baseline dispatcher
+- integrate dispatch choice with existing engine/job execution
+- add tests for assignment correctness and repeated deterministic execution
+- small additive refactors that make Step 8 cleaner without introducing Step 9 concepts
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- add dispatcher logic
-- add multi-vehicle road-network conflict handling
+- add multi-vehicle road conflict handling
+- add advanced optimization or search
 - add behavior systems
-- add optimization frameworks
-- add rich scheduling policies
+- add learning-based dispatch
+- add broad planning frameworks
 
 ## Architectural guidance for this phase
-- Keep tasks small and explicit.
-- Keep jobs as ordered collections of tasks.
-- Keep resources limited and concrete.
-- Do not overbuild workflow abstractions.
-- Keep engine as the coordinator, not the home of every operation concept.
+- Keep the dispatcher interface small.
+- Keep the baseline policy simple and deterministic.
+- Reuse existing jobs/tasks/resources execution instead of duplicating it.
+- Do not overbuild dispatch abstractions yet.
 
-## Completion criteria for Step 7
-Step 7 is complete when:
-- move/load/unload task primitives exist
-- jobs can execute ordered task sequences
-- shared resources can cause waiting
-- service timing is represented in simulated time
+## Completion criteria for Step 8
+Step 8 is complete when:
+- a dispatcher interface exists
+- a baseline dispatcher can select a job deterministically
+- selected jobs execute correctly through the existing engine/job path
 - tests/lint/type checks pass
