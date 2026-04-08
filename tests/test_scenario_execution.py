@@ -15,6 +15,10 @@ STEP_16_SCENARIO_PATH = Path("scenarios/step_16_dispatch_vehicle_job_queue.json"
 STEP_16_GOLDEN_PATH = (
     Path(__file__).parent / "golden" / "step_16_scenario_execution_export.json"
 )
+STEP_21_SCENARIO_PATH = Path("scenarios/step_21_graph_map_realism.json")
+STEP_21_GOLDEN_PATH = (
+    Path(__file__).parent / "golden" / "step_21_graph_map_export.json"
+)
 
 
 def test_scenario_execution_runs_end_to_end_through_existing_engine_surfaces():
@@ -181,3 +185,51 @@ def test_step_16_scenario_execution_export_matches_golden_fixture_exactly():
 
     assert json.loads(result.export_json) == json.loads(STEP_16_GOLDEN_PATH.read_text())
     assert result.export_json == STEP_16_GOLDEN_PATH.read_text()
+
+
+def test_step_21_graph_map_scenario_executes_over_non_grid_topology():
+    scenario = load_scenario(STEP_21_SCENARIO_PATH)
+
+    result = execute_scenario(scenario)
+    runtime_vehicle = result.engine.get_vehicle(21)
+    export_record = json.loads(result.export_json)
+
+    assert scenario.map_spec.kind == "graph"
+    assert result.engine.seed == 521
+    assert result.summary.seed == 521
+    assert result.summary.final_time_s == 6.0
+    assert result.summary.completed_job_count == 1
+    assert result.summary.completed_task_count == 4
+    assert result.summary.route_count == 2
+    assert result.summary.total_route_distance == 10.0
+    assert result.summary.total_service_time_s == 2.0
+    assert runtime_vehicle.current_node_id == 40
+    assert runtime_vehicle.position == (9.0, 0.0, 0.0)
+    assert runtime_vehicle.payload == 0.0
+    assert runtime_vehicle.operational_state == "idle"
+    assert [
+        event["edge_id"]
+        for event in export_record["trace"]
+        if event["event_type"] == "edge_enter"
+    ] == [100, 102, 104]
+
+
+def test_step_21_graph_map_execution_is_deterministic_across_repeated_runs():
+    scenario = load_scenario(STEP_21_SCENARIO_PATH)
+
+    first_result = execute_scenario(scenario)
+    second_result = execute_scenario(scenario)
+
+    assert first_result.summary == second_result.summary
+    assert first_result.export_json == second_result.export_json
+    assert first_result.engine.get_vehicle(21).position == (
+        second_result.engine.get_vehicle(21).position
+    )
+
+
+def test_step_21_graph_map_export_matches_golden_fixture_exactly():
+    scenario = load_scenario(STEP_21_SCENARIO_PATH)
+    result = execute_scenario(scenario)
+
+    assert json.loads(result.export_json) == json.loads(STEP_21_GOLDEN_PATH.read_text())
+    assert result.export_json == STEP_21_GOLDEN_PATH.read_text()

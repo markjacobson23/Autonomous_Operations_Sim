@@ -93,6 +93,58 @@ def test_load_scenario_parses_valid_grid_scenario(tmp_path, valid_scenario_data)
     assert scenario.dispatcher is None
 
 
+def test_load_scenario_parses_valid_graph_map_scenario(tmp_path, valid_scenario_data):
+    data = valid_scenario_data
+    data["name"] = "graph_demo"
+    data["map"] = {
+        "kind": "graph",
+        "params": {
+            "nodes": [
+                {
+                    "id": 10,
+                    "position": [0.0, 0.0, 0.0],
+                    "node_type": "DEPOT",
+                },
+                {
+                    "id": 20,
+                    "position": [5.0, 0.0, 0.0],
+                    "node_type": "LOADING_ZONE",
+                },
+                {
+                    "id": 30,
+                    "position": [8.0, 2.0, 0.0],
+                },
+            ],
+            "edges": [
+                {
+                    "id": 100,
+                    "start_node_id": 10,
+                    "end_node_id": 20,
+                    "distance": 5.0,
+                    "speed_limit": 3.0,
+                },
+                {
+                    "id": 101,
+                    "start_node_id": 20,
+                    "end_node_id": 30,
+                    "distance": 4.0,
+                    "speed_limit": 2.0,
+                },
+            ],
+        },
+    }
+    data["vehicles"][0]["position"] = [0.0, 0.0, 0.0]
+    data["execution"]["job"]["tasks"][0]["destination"] = [8.0, 2.0, 0.0]
+
+    scenario_path = write_scenario(tmp_path, data)
+    scenario = load_scenario(scenario_path)
+
+    assert scenario.map_spec.kind == "graph"
+    assert scenario.map_spec.params["nodes"][0]["node_type"] == "DEPOT"
+    assert scenario.map_spec.params["nodes"][2].get("node_type") is None
+    assert scenario.map_spec.params["edges"][1]["end_node_id"] == 30
+
+
 def test_load_scenario_raises_for_missing_name(tmp_path, valid_scenario_data):
     data = valid_scenario_data
     del data["name"]
@@ -167,6 +219,34 @@ def test_load_scenario_raises_for_nonpositive_grid_size(tmp_path, valid_scenario
     data["map"]["params"]["grid_size"] = -4
     scenario_path = write_scenario(tmp_path, data)
     with pytest.raises(ValueError):
+        load_scenario(scenario_path)
+
+
+def test_load_scenario_raises_for_graph_edge_referencing_unknown_node(
+    tmp_path,
+    valid_scenario_data,
+):
+    data = valid_scenario_data
+    data["map"] = {
+        "kind": "graph",
+        "params": {
+            "nodes": [
+                {"id": 1, "position": [0.0, 0.0, 0.0]},
+                {"id": 2, "position": [1.0, 0.0, 0.0]},
+            ],
+            "edges": [
+                {
+                    "id": 100,
+                    "start_node_id": 1,
+                    "end_node_id": 99,
+                    "distance": 1.0,
+                    "speed_limit": 1.0,
+                }
+            ],
+        },
+    }
+    scenario_path = write_scenario(tmp_path, data)
+    with pytest.raises(ValueError, match="must reference configured node ids"):
         load_scenario(scenario_path)
 
 def test_load_scenario_raises_for_vehicle_entry_that_is_not_an_object(tmp_path, valid_scenario_data):

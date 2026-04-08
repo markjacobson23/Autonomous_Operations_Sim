@@ -2,6 +2,7 @@ import json
 import math
 from pathlib import Path
 
+from autonomous_ops_sim.core.node import NodeType
 from autonomous_ops_sim.simulation.scenario import (
     DispatchVehicleJobQueueExecutionSpec,
     BlockedEdgeSpec,
@@ -171,16 +172,131 @@ def _parse_map_spec(data: dict[str, object]) -> MapSpec:
     if not isinstance(params, dict):
         raise ValueError("Map 'params' must be an object.")
 
-    if kind != "grid":
+    if kind == "grid":
+        _validate_grid_map_params(params)
+    elif kind == "graph":
+        _validate_graph_map_params(params)
+    else:
         raise ValueError(f"Unsupported map kind: {kind!r}")
 
+    return MapSpec(kind=kind, params=params)
+
+
+def _validate_grid_map_params(params: dict[str, object]) -> None:
     grid_size = params.get("grid_size")
     if not isinstance(grid_size, int):
         raise ValueError("Grid map 'params.grid_size' must be an int.")
     if grid_size <= 0:
         raise ValueError("Grid map 'params.grid_size' must be positive.")
 
-    return MapSpec(kind=kind, params=params)
+
+def _validate_graph_map_params(params: dict[str, object]) -> None:
+    nodes = params.get("nodes")
+    edges = params.get("edges")
+
+    if not isinstance(nodes, list):
+        raise ValueError("Graph map 'params.nodes' must be a list.")
+    if not nodes:
+        raise ValueError("Graph map 'params.nodes' must not be empty.")
+    if not isinstance(edges, list):
+        raise ValueError("Graph map 'params.edges' must be a list.")
+    if not edges:
+        raise ValueError("Graph map 'params.edges' must not be empty.")
+
+    node_ids: set[int] = set()
+    node_positions: set[tuple[float, float, float]] = set()
+
+    for index, node in enumerate(nodes):
+        if not isinstance(node, dict):
+            raise ValueError(f"Graph map node[{index}] must be an object.")
+        required_keys = {"id", "position"}
+        missing = required_keys - node.keys()
+        if missing:
+            missing_str = ", ".join(sorted(missing))
+            raise ValueError(
+                f"Graph map node[{index}] is missing required field(s): {missing_str}"
+            )
+
+        node_id = node["id"]
+        position = node["position"]
+        node_type = node.get("node_type")
+
+        if not isinstance(node_id, int):
+            raise ValueError(f"Graph map node[{index}].id must be an int.")
+        if node_id in node_ids:
+            raise ValueError("Graph map node ids must be unique.")
+        node_ids.add(node_id)
+
+        parsed_position = _parse_position_value(
+            position,
+            context=f"Graph map node[{index}].position",
+        )
+        if parsed_position in node_positions:
+            raise ValueError("Graph map node positions must be unique.")
+        node_positions.add(parsed_position)
+
+        if node_type is not None:
+            if not isinstance(node_type, str):
+                raise ValueError(
+                    f"Graph map node[{index}].node_type must be a string if provided."
+                )
+            if node_type not in NodeType.__members__:
+                allowed = ", ".join(member.name for member in NodeType)
+                raise ValueError(
+                    f"Graph map node[{index}].node_type must be one of: {allowed}"
+                )
+
+    edge_ids: set[int] = set()
+    edge_pairs: set[tuple[int, int]] = set()
+    for index, edge in enumerate(edges):
+        if not isinstance(edge, dict):
+            raise ValueError(f"Graph map edge[{index}] must be an object.")
+        required_keys = {
+            "id",
+            "start_node_id",
+            "end_node_id",
+            "distance",
+            "speed_limit",
+        }
+        missing = required_keys - edge.keys()
+        if missing:
+            missing_str = ", ".join(sorted(missing))
+            raise ValueError(
+                f"Graph map edge[{index}] is missing required field(s): {missing_str}"
+            )
+
+        edge_id = edge["id"]
+        start_node_id = edge["start_node_id"]
+        end_node_id = edge["end_node_id"]
+        distance = edge["distance"]
+        speed_limit = edge["speed_limit"]
+
+        if not isinstance(edge_id, int):
+            raise ValueError(f"Graph map edge[{index}].id must be an int.")
+        if edge_id in edge_ids:
+            raise ValueError("Graph map edge ids must be unique.")
+        edge_ids.add(edge_id)
+
+        if not isinstance(start_node_id, int) or not isinstance(end_node_id, int):
+            raise ValueError(
+                f"Graph map edge[{index}] start_node_id/end_node_id must be ints."
+            )
+        if start_node_id not in node_ids or end_node_id not in node_ids:
+            raise ValueError(
+                f"Graph map edge[{index}] must reference configured node ids."
+            )
+        if start_node_id == end_node_id:
+            raise ValueError(f"Graph map edge[{index}] cannot connect a node to itself.")
+
+        edge_pair = (start_node_id, end_node_id)
+        if edge_pair in edge_pairs:
+            raise ValueError("Graph map edges must be unique by start/end node pair.")
+        edge_pairs.add(edge_pair)
+
+        if not isinstance(distance, (int, float)) or float(distance) <= 0:
+            raise ValueError(f"Graph map edge[{index}].distance must be positive.")
+        if not isinstance(speed_limit, (int, float)) or float(speed_limit) <= 0:
+            raise ValueError(f"Graph map edge[{index}].speed_limit must be positive.")
 
 
 def _parse_vehicle_spec(data: object) -> VehicleSpec:

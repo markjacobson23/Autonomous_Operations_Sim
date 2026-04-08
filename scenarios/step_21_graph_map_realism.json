@@ -1,0 +1,135 @@
+{
+  "name": "step_21_graph_map_realism",
+  "seed": 521,
+  "duration_s": 30.0,
+  "map": {
+    "kind": "graph",
+    "params": {
+      "nodes": [
+        {
+          "id": 10,
+          "position": [0.0, 0.0, 0.0],
+          "node_type": "DEPOT"
+        },
+        {
+          "id": 20,
+          "position": [3.0, 0.0, 0.0],
+          "node_type": "INTERSECTION"
+        },
+        {
+          "id": 30,
+          "position": [6.0, 2.0, 0.0],
+          "node_type": "LOADING_ZONE"
+        },
+        {
+          "id": 40,
+          "position": [9.0, 0.0, 0.0],
+          "node_type": "UNLOADING_ZONE"
+        },
+        {
+          "id": 50,
+          "position": [3.0, -2.0, 0.0],
+          "node_type": "JOB_SITE"
+        }
+      ],
+      "edges": [
+        {
+          "id": 100,
+          "start_node_id": 10,
+          "end_node_id": 20,
+          "distance": 3.0,
+          "speed_limit": 3.0
+        },
+        {
+          "id": 101,
+          "start_node_id": 20,
+          "end_node_id": 10,
+          "distance": 3.0,
+          "speed_limit": 3.0
+        },
+        {
+          "id": 102,
+          "start_node_id": 20,
+          "end_node_id": 30,
+          "distance": 4.0,
+          "speed_limit": 2.0
+        },
+        {
+          "id": 103,
+          "start_node_id": 30,
+          "end_node_id": 20,
+          "distance": 4.0,
+          "speed_limit": 2.0
+        },
+        {
+          "id": 104,
+          "start_node_id": 30,
+          "end_node_id": 40,
+          "distance": 3.0,
+          "speed_limit": 3.0
+        },
+        {
+          "id": 105,
+          "start_node_id": 40,
+          "end_node_id": 30,
+          "distance": 3.0,
+          "speed_limit": 3.0
+        },
+        {
+          "id": 106,
+          "start_node_id": 20,
+          "end_node_id": 50,
+          "distance": 2.0,
+          "speed_limit": 2.0
+        },
+        {
+          "id": 107,
+          "start_node_id": 50,
+          "end_node_id": 40,
+          "distance": 7.0,
+          "speed_limit": 2.0
+        }
+      ]
+    }
+  },
+  "vehicles": [
+    {
+      "id": 21,
+      "position": [0.0, 0.0, 0.0],
+      "velocity": 0.0,
+      "payload": 0.0,
+      "max_payload": 20.0,
+      "max_speed": 10.0,
+      "vehicle_type": "GENERIC"
+    }
+  ],
+  "execution": {
+    "kind": "single_vehicle_job",
+    "vehicle_id": 21,
+    "job": {
+      "id": "graph-haul",
+      "tasks": [
+        {
+          "kind": "move",
+          "destination": [6.0, 2.0, 0.0]
+        },
+        {
+          "kind": "load",
+          "position": [6.0, 2.0, 0.0],
+          "amount": 5.0,
+          "service_duration_s": 1.0
+        },
+        {
+          "kind": "move",
+          "destination": [9.0, 0.0, 0.0]
+        },
+        {
+          "kind": "unload",
+          "position": [9.0, 0.0, 0.0],
+          "amount": 5.0,
+          "service_duration_s": 1.0
+        }
+      ]
+    }
+  }
+}

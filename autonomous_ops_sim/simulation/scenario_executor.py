@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from autonomous_ops_sim.io.exports import export_engine_json
+from autonomous_ops_sim.maps.graph_map import make_graph_map
 from autonomous_ops_sim.maps.grid_map import make_grid_map
 from autonomous_ops_sim.operations import FirstFeasibleDispatcher
 from autonomous_ops_sim.operations.jobs import Job
@@ -86,13 +87,22 @@ def execute_scenario(scenario: Scenario) -> ScenarioExecutionResult:
 
 
 def _build_map(*, map_spec: MapSpec):
-    if map_spec.kind != "grid":
-        raise ValueError(f"Unsupported map kind for execution: {map_spec.kind!r}")
+    if map_spec.kind == "grid":
+        grid_size = map_spec.params.get("grid_size")
+        if not isinstance(grid_size, int):
+            raise ValueError("Grid scenario execution requires integer params.grid_size.")
+        return make_grid_map(grid_size)
 
-    grid_size = map_spec.params.get("grid_size")
-    if not isinstance(grid_size, int):
-        raise ValueError("Grid scenario execution requires integer params.grid_size.")
-    return make_grid_map(grid_size)
+    if map_spec.kind == "graph":
+        nodes = map_spec.params.get("nodes")
+        edges = map_spec.params.get("edges")
+        if not isinstance(nodes, list) or not isinstance(edges, list):
+            raise ValueError(
+                "Graph scenario execution requires list params.nodes and params.edges."
+            )
+        return make_graph_map(nodes=tuple(nodes), edges=tuple(edges))
+
+    raise ValueError(f"Unsupported map kind for execution: {map_spec.kind!r}")
 
 
 def _build_world_state(*, simulation_map, world_state_spec: WorldStateSpec) -> WorldState:

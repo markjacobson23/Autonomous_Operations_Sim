@@ -4,6 +4,7 @@ from pathlib import Path
 from autonomous_ops_sim.core.edge import Edge
 from autonomous_ops_sim.core.graph import Graph
 from autonomous_ops_sim.core.node import Node
+from autonomous_ops_sim.io.scenario_loader import load_scenario
 from autonomous_ops_sim.maps.map import Map
 from autonomous_ops_sim.routing import Router
 from autonomous_ops_sim.simulation import (
@@ -14,6 +15,7 @@ from autonomous_ops_sim.simulation import (
     SimulationEngine,
     WorldState,
 )
+from autonomous_ops_sim.simulation.scenario_executor import execute_scenario
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
 from autonomous_ops_sim.visualization import (
     build_visualization_state,
@@ -198,6 +200,38 @@ def test_visualization_state_export_matches_golden_fixture() -> None:
 
     assert json.loads(export_json) == json.loads(golden_path.read_text())
     assert export_json == golden_path.read_text()
+
+
+def test_graph_map_visualization_projection_is_stable() -> None:
+    scenario = load_scenario(Path("scenarios/step_21_graph_map_realism.json"))
+    result = execute_scenario(scenario)
+    state = build_visualization_state(result.engine)
+
+    assert [(node.node_id, node.node_type) for node in state.map_surface.nodes] == [
+        (10, "depot"),
+        (20, "intersection"),
+        (30, "loading_zone"),
+        (40, "unloading_zone"),
+        (50, "job_site"),
+    ]
+    assert [
+        (edge.edge_id, edge.start_node_id, edge.end_node_id)
+        for edge in state.map_surface.edges
+    ] == [
+        (100, 10, 20),
+        (101, 20, 10),
+        (102, 20, 30),
+        (103, 30, 20),
+        (104, 30, 40),
+        (105, 40, 30),
+        (106, 20, 50),
+        (107, 50, 40),
+    ]
+    assert state.frames[-1].vehicles[0].node_id == 40
+    assert state.frames[-1].vehicles[0].position == (9.0, 0.0, 0.0)
+    assert export_visualization_json(state) == export_visualization_json(
+        build_visualization_state(execute_scenario(scenario).engine)
+    )
 
 
 def test_text_viewer_consumes_visualization_state_json(tmp_path, capsys) -> None:
