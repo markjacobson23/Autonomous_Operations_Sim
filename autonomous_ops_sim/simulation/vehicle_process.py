@@ -3,6 +3,13 @@ import math
 from typing import TYPE_CHECKING
 
 from autonomous_ops_sim.core.edge import Edge
+from autonomous_ops_sim.operations.jobs import Job, JobExecutionResult
+from autonomous_ops_sim.operations.tasks import (
+    LoadTask,
+    MoveTask,
+    UnloadTask,
+    get_task_type_name,
+)
 from autonomous_ops_sim.simulation.trace import TraceEventType
 
 if TYPE_CHECKING:
@@ -16,6 +23,8 @@ class VehicleProcess:
     vehicle_id: int
     current_node_id: int
     max_speed: float
+    payload: float = 0.0
+    max_payload: float = math.inf
 
     def execute_route(
         self,
@@ -84,6 +93,200 @@ class VehicleProcess:
         )
 
         return route
+
+    def execute_job(
+        self,
+        *,
+        job: Job,
+        engine: "SimulationEngine",
+    ) -> JobExecutionResult:
+        """Execute an ordered job without introducing dispatcher behavior."""
+
+        if not math.isfinite(self.payload) or self.payload < 0.0:
+            raise ValueError("payload must be finite and non-negative")
+        if not math.isfinite(self.max_payload) or self.max_payload <= 0.0:
+            raise ValueError("max_payload must be finite and positive")
+        if self.payload > self.max_payload:
+            raise ValueError("payload cannot exceed max_payload")
+
+        engine.trace.emit(
+            timestamp_s=engine.simulated_time_s,
+            vehicle_id=self.vehicle_id,
+            event_type=TraceEventType.JOB_START,
+            node_id=self.current_node_id,
+            job_id=job.id,
+        )
+
+        for task_index, task in enumerate(job.tasks):
+            task_type = get_task_type_name(task)
+            engine.trace.emit(
+                timestamp_s=engine.simulated_time_s,
+                vehicle_id=self.vehicle_id,
+                event_type=TraceEventType.TASK_START,
+                node_id=self.current_node_id,
+                job_id=job.id,
+                task_index=task_index,
+                task_type=task_type,
+            )
+
+            if isinstance(task, MoveTask):
+                self.execute_route(
+                    destination_node_id=task.destination_node_id,
+                    engine=engine,
+                )
+            elif isinstance(task, LoadTask):
+                self._execute_load_task(
+                    task=task,
+                    job=job,
+                    task_index=task_index,
+                    engine=engine,
+                )
+            else:
+                self._execute_unload_task(
+                    task=task,
+                    job=job,
+                    task_index=task_index,
+                    engine=engine,
+                )
+
+            engine.trace.emit(
+                timestamp_s=engine.simulated_time_s,
+                vehicle_id=self.vehicle_id,
+                event_type=TraceEventType.TASK_COMPLETE,
+                node_id=self.current_node_id,
+                job_id=job.id,
+                task_index=task_index,
+                task_type=task_type,
+            )
+
+        engine.trace.emit(
+            timestamp_s=engine.simulated_time_s,
+            vehicle_id=self.vehicle_id,
+            event_type=TraceEventType.JOB_COMPLETE,
+            node_id=self.current_node_id,
+            job_id=job.id,
+        )
+        return JobExecutionResult(
+            job_id=job.id,
+            completed_task_count=len(job.tasks),
+            final_node_id=self.current_node_id,
+            final_payload=self.payload,
+        )
+
+    def _execute_load_task(
+        self,
+        *,
+        task: LoadTask,
+        job: Job,
+        task_index: int,
+        engine: "SimulationEngine",
+    ) -> None:
+        self._ensure_at_task_node(task.node_id)
+        updated_payload = self.payload + task.amount
+        if updated_payload > self.max_payload:
+            raise ValueError("load task would exceed vehicle max_payload")
+        self._perform_service(
+            job=job,
+            task_index=task_index,
+            task_type="load",
+            service_duration_s=task.service_duration_s,
+            resource_id=task.resource_id,
+            engine=engine,
+        )
+        self.payload = updated_payload
+
+    def _execute_unload_task(
+        self,
+        *,
+        task: UnloadTask,
+        job: Job,
+        task_index: int,
+        engine: "SimulationEngine",
+    ) -> None:
+        self._ensure_at_task_node(task.node_id)
+        if task.amount > self.payload:
+            raise ValueError("unload task would reduce payload below zero")
+        self._perform_service(
+            job=job,
+            task_index=task_index,
+            task_type="unload",
+            service_duration_s=task.service_duration_s,
+            resource_id=task.resource_id,
+            engine=engine,
+        )
+        self.payload -= task.amount
+
+    def _perform_service(
+        self,
+        *,
+        job: Job,
+        task_index: int,
+        task_type: str,
+        service_duration_s: float,
+        resource_id: str | None,
+        engine: "SimulationEngine",
+    ) -> None:
+        service_start_time_s = engine.simulated_time_s
+        if resource_id is not None:
+            reservation = engine.get_resource(resource_id).reserve(
+                requested_at_s=engine.simulated_time_s,
+                duration_s=service_duration_s,
+            )
+            if reservation.wait_duration_s > 0.0:
+                engine.trace.emit(
+                    timestamp_s=engine.simulated_time_s,
+                    vehicle_id=self.vehicle_id,
+                    event_type=TraceEventType.RESOURCE_WAIT_START,
+                    node_id=self.current_node_id,
+                    job_id=job.id,
+                    task_index=task_index,
+                    task_type=task_type,
+                    resource_id=resource_id,
+                    duration_s=reservation.wait_duration_s,
+                )
+                engine.run(reservation.start_time_s)
+                engine.trace.emit(
+                    timestamp_s=engine.simulated_time_s,
+                    vehicle_id=self.vehicle_id,
+                    event_type=TraceEventType.RESOURCE_WAIT_COMPLETE,
+                    node_id=self.current_node_id,
+                    job_id=job.id,
+                    task_index=task_index,
+                    task_type=task_type,
+                    resource_id=resource_id,
+                    duration_s=reservation.wait_duration_s,
+                )
+            service_start_time_s = reservation.start_time_s
+
+        engine.trace.emit(
+            timestamp_s=service_start_time_s,
+            vehicle_id=self.vehicle_id,
+            event_type=TraceEventType.SERVICE_START,
+            node_id=self.current_node_id,
+            job_id=job.id,
+            task_index=task_index,
+            task_type=task_type,
+            resource_id=resource_id,
+            duration_s=service_duration_s,
+        )
+        engine.run(service_start_time_s + service_duration_s)
+        engine.trace.emit(
+            timestamp_s=engine.simulated_time_s,
+            vehicle_id=self.vehicle_id,
+            event_type=TraceEventType.SERVICE_COMPLETE,
+            node_id=self.current_node_id,
+            job_id=job.id,
+            task_index=task_index,
+            task_type=task_type,
+            resource_id=resource_id,
+            duration_s=service_duration_s,
+        )
+
+    def _ensure_at_task_node(self, node_id: int) -> None:
+        if self.current_node_id != node_id:
+            raise RuntimeError(
+                f"Vehicle-{self.vehicle_id} must be at Node-{node_id} to execute service task."
+            )
 
 
 def _edge_travel_time_s(edge: Edge, max_speed: float) -> float:

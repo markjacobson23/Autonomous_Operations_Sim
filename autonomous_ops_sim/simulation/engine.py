@@ -1,7 +1,10 @@
 import math
 import random
+from collections.abc import Iterable
 
 from autonomous_ops_sim.maps.map import Map
+from autonomous_ops_sim.operations.jobs import Job, JobExecutionResult
+from autonomous_ops_sim.operations.resources import SharedResource
 from autonomous_ops_sim.routing.router import Router
 from autonomous_ops_sim.simulation.trace import Trace
 from autonomous_ops_sim.simulation.vehicle_process import VehicleProcess
@@ -17,7 +20,10 @@ class SimulationEngine:
         world_state: WorldState,
         router: Router,
         seed: int,
+        resources: Iterable[SharedResource] = (),
     ):
+        resources_tuple = tuple(resources)
+
         self._map = simulation_map
         self._world_state = world_state
         self._router = router
@@ -25,6 +31,11 @@ class SimulationEngine:
         self._rng = random.Random(seed)
         self._simulated_time_s = 0.0
         self._trace = Trace()
+        self._resources = {
+            resource.resource_id: resource for resource in resources_tuple
+        }
+        if len(self._resources) != len(resources_tuple):
+            raise ValueError("resource ids must be unique")
 
     @property
     def map(self) -> Map:
@@ -61,6 +72,12 @@ class SimulationEngine:
         """Return the engine-owned deterministic random stream."""
 
         return self._rng
+
+    @property
+    def resources(self) -> tuple[SharedResource, ...]:
+        """Return shared resources available during this run."""
+
+        return tuple(self._resources.values())
 
     @property
     def simulated_time_s(self) -> float:
@@ -102,3 +119,32 @@ class SimulationEngine:
             destination_node_id=destination_node_id,
             engine=self,
         )
+
+    def get_resource(self, resource_id: str) -> SharedResource:
+        """Return a configured shared resource by ID."""
+
+        try:
+            return self._resources[resource_id]
+        except KeyError as exc:
+            raise KeyError(f"Unknown resource_id: {resource_id}") from exc
+
+    def execute_job(
+        self,
+        *,
+        vehicle_id: int,
+        start_node_id: int,
+        max_speed: float,
+        job: Job,
+        initial_payload: float = 0.0,
+        max_payload: float = math.inf,
+    ) -> JobExecutionResult:
+        """Execute one ordered job sequence for one vehicle."""
+
+        process = VehicleProcess(
+            vehicle_id=vehicle_id,
+            current_node_id=start_node_id,
+            max_speed=max_speed,
+            payload=initial_payload,
+            max_payload=max_payload,
+        )
+        return process.execute_job(job=job, engine=self)
