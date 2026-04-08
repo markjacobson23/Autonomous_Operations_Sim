@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 21 — Environment/map realism expansion
+Step 22 — Optional research wrapper
 
 ## Step status summary
 - Step 1: complete
@@ -24,66 +24,63 @@ Step 21 — Environment/map realism expansion
 - Step 18: complete
 - Step 19: complete
 - Step 20: complete
-- Step 21: active
-- Step 22: not started
+- Step 21: complete
+- Step 22: active
 
 ## What already exists
 The repository already has:
 - deterministic scenario parsing and summaries
 - executable scenario-driven runs
-- scenario-defined resources, blocked-edge runtime setup, and dispatcher config
-- a persistent runtime-facing `Vehicle` entity integrated into execution
-- deterministic scenario-pack / batch execution with stable aggregate outputs
-- a narrow richer-operations workload path for repeated dispatch over time
-- upgraded corridor-aware deterministic coordination
-- a typed control-command surface with deterministic command history
-- a visualization state surface with replay frames
-- a first text-based viewer consuming visualization state
-- a thin interaction layer translating viewer-facing actions into commands
-- static topology separated from runtime blocked-edge state via `WorldState`
-- graph-based routing with injectable cost models
-- deterministic simulated-time execution through `SimulationEngine`
-- jobs, tasks, shared resources, dispatch, and multi-vehicle coordination
-- vehicle behavior FSM with explicit transitions
-- trace-centered metrics, exports, and golden regression coverage
+- richer scenario-driven operational setup
+- a persistent runtime-facing `Vehicle` entity
+- scenario-pack / batch execution
+- repeated-work workload execution
+- upgraded corridor-aware coordination
+- typed command/control surfaces with deterministic history
+- visualization replay state and a first viewer
+- a thin interaction layer translating viewer intent into commands
+- support for richer non-grid graph map scenarios with environment semantics
+- deterministic routing, execution, metrics, exports, and golden regression coverage
 
 ## Goal of the current phase
-Expand environment and map realism beyond the current narrow grid-first assumptions while preserving deterministic runtime behavior and clean topology/runtime boundaries.
+Add a thin optional research/experimentation wrapper that makes the simulator easier to use for comparative experiments without turning the simulator into a research-framework-first codebase.
 
-The main Step 21 objective is:
-- add richer map/environment semantics
-- support a more realistic topology representation than the current grid-only focus
-- preserve compatibility with the existing routing, execution, visualization, and command surfaces
-- avoid destabilizing the simulator with a giant map/import rewrite
+The main Step 22 objective is:
+- expose a narrow experimentation wrapper on top of stable simulator surfaces
+- support controlled comparison workflows
+- preserve determinism and keep the wrapper clearly optional
+- avoid redesigning the simulator around RL or benchmark framework assumptions
 
 ## In-scope work
 Work that is allowed right now:
-- add a narrow richer map/environment model or map kind
-- add explicit environment/site semantics where they map cleanly to existing runtime concepts
-- extend scenario schema and map construction as needed for the chosen realism improvement
-- adapt routing/execution surfaces only where necessary to support the richer topology
-- add deterministic tests and at least one richer environment scenario fixture/regression surface
-- perform additive refactors and targeted normal refactors needed to keep map/environment ownership clean
+- add a thin optional experimentation wrapper or adapter
+- support a narrow workflow such as:
+  - policy comparison over existing scenario packs
+  - command/interaction sequence comparison
+  - wrapper-style step/reset interface for controlled experiments
+- reuse existing scenario execution, command, visualization, and export surfaces
+- add deterministic tests and at least one comparison/demo fixture
+- perform additive refactors and targeted normal refactors needed to keep the wrapper clearly optional
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- redesign the simulator around GIS or a heavy map framework
-- add a giant import pipeline for many map formats
-- build a full world editor
-- redesign command/control, visualization, or workload foundations
-- overbuild zone/site semantics beyond the narrow realism gain chosen for this step
+- redesign the simulator around Gym/RL APIs
+- make research abstractions the new core architecture
+- add a broad training framework
+- add stochastic learning loops or optimization systems
+- overbuild a benchmark platform beyond the narrow optional wrapper goal
 
 ## Architectural guidance for this phase
-- Keep static topology and runtime state separate.
-- Prefer one narrow environment/map realism improvement and implement it well.
-- Reuse existing `Map`, routing, scenario, visualization, and execution surfaces where possible.
-- Avoid turning this into a broad asset/import framework prematurely.
-- Preserve deterministic behavior and stable regression surfaces.
+- The wrapper must sit on top of existing simulator surfaces.
+- Keep it clearly optional and adapter-like.
+- Preserve deterministic behavior and replayability.
+- Prefer one narrow experimental workflow over a broad framework abstraction.
+- Avoid changing core runtime ownership just to satisfy wrapper ergonomics.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 21
-Step 21 is complete when:
-- the simulator supports one meaningful map/environment realism improvement beyond the current baseline
-- the improvement is scenario-driven or otherwise cleanly integrated
-- routing/execution/visualization still work over the richer map model
+## Completion criteria for Step 22
+Step 22 is complete when:
+- one thin optional experimentation/research wrapper exists
+- it reuses existing simulator surfaces cleanly
+- deterministic comparison or wrapper-style execution is covered by tests
 - tests/lint/type checks pass
