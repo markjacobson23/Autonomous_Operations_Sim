@@ -1,14 +1,15 @@
 # Current Phase
 
 ## Active roadmap step
-Step 4 — CostModel and Router refactor
+Step 5 — Simulation engine and clock
 
 ## Step status summary
 - Step 1: complete
 - Step 2: complete
 - Step 3: complete
-- Step 4: active
-- Step 5: not started
+- Step 4: complete
+- Step 5: active
+- Step 6: not started
 
 ## What already exists
 The repository already has:
@@ -18,54 +19,46 @@ The repository already has:
 - pytest / Ruff / mypy baseline
 - CI workflow
 - scenario/config spine
-- JSON-first scenario loading
-- CLI scenario-loading path
-- deterministic scenario summary output
 - static map/topology separated from runtime blocked-edge state via `WorldState`
+- `CostModel` routing
+- `Router` as the public routing surface
 
 ## Goal of the current phase
-Refactor routing so shortest-path behavior depends on an injectable cost model and a stable router-facing API, while honoring runtime world state.
+Introduce a first-class simulation engine with explicit simulated time and deterministic run control.
 
-The main Step 4 objective is:
-- introduce a `CostModel` interface/protocol
-- introduce a `Router` abstraction as the public routing surface
-- keep Dijkstra as the implementation underneath for now
-- make routing decisions depend on injected cost logic rather than hardcoded edge distance
+The main Step 5 objective is:
+- add `SimulationEngine`
+- define engine run control around simulated time
+- make seed ownership explicit at the engine level
+- prepare a clean foundation for later vehicle/process execution without implementing Step 6 yet
 
 ## In-scope work
 Work that is allowed right now:
-- add `routing/cost_model.py`
-- add one or more initial concrete cost models
-- add `routing/router.py`
-- refactor pathfinding usage so public callers go through `Router`
-- update Dijkstra to use injected edge costs
-- make routing honor `WorldState`
-- add/update tests for cost-model-swappable routing behavior
-- add/update tests for non-negative cost assumptions
+- add `simulation/engine.py`
+- introduce explicit simulated time
+- implement `run(until_s)`
+- use SimPy internally if helpful
+- add tests for engine initialization, run control, and determinism
+- small additive refactors that make Step 5 cleaner without introducing Step 6 behavior
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- add simulation engine/run loop
-- add trace/event systems
+- add single-vehicle route-following processes
+- add trace/event systems beyond minimal engine necessities
 - add jobs/resources/dispatch logic
 - add multi-vehicle logic
 - add behavior systems
-- add future optimization frameworks
-- redesign scenarios beyond what Step 4 strictly needs
 
 ## Architectural guidance for this phase
-- `Router` should be the stable public routing surface.
-- `pathfinding.py` should remain the implementation module, not the main external interface.
-- `CostModel` should be small and explicit.
-- Keep Dijkstra-based assumptions clear: edge costs must be non-negative.
-- Prefer additive refactoring over broad rewrites.
-- Do not overbuild for future algorithms yet.
+- Keep the public engine API small.
+- Simulated time is the focus, not rich agent behavior yet.
+- Do not overbuild abstractions around the clock.
+- Prefer a production-looking engine surface over a toy script-driven loop.
 
-## Completion criteria for Step 4
-Step 4 is complete when:
-- `CostModel` exists and routing uses it
-- `Router` exists and is the intended public routing entry point
-- blocked edges are still honored through `WorldState`
-- at least two cost models can produce different route choices on the same graph
-- routing rejects or clearly guards against negative costs
+## Completion criteria for Step 5
+Step 5 is complete when:
+- `SimulationEngine` exists
+- engine tracks simulated time explicitly
+- `run(until_s)` works
+- same seed and same initial setup produce deterministic engine-level behavior
 - tests/lint/type checks pass
