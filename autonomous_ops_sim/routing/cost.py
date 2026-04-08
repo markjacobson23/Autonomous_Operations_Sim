@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class CostContext:
+
     vehicle_id: int
     current_payload: float = 0.0
     current_velocity: float = 0.0

@@ -2,6 +2,13 @@ from autonomous_ops_sim.core.graph import Graph
 from autonomous_ops_sim.core.node import NodeType, Node
 from autonomous_ops_sim.core.edge import Edge
 class Map:
+    """Spatial facade over graph.
+
+    Provides coordinate-based access on top of the underlying graph,
+    including lookups by position, region queries, node_type filtering, and
+    edge/state operations needed by routing and simulation code.
+    """
+
     def __init__(
             self,
             graph: Graph,
@@ -12,22 +19,26 @@ class Map:
 
     def has_coordinate(self, position: tuple[float, float, float]) -> bool:
         """Return True if the given coordinate exists in the map."""
+
         return position in self.coord_to_id
 
     def get_node_id(self, position: tuple[float, float, float]) -> int:
         """Return the node ID for a coordinate."""
+
         if not self.has_coordinate(position):
             raise KeyError(f"There is no node with Position-{position}")
         return self.coord_to_id[position]
 
     def get_position(self, node_id: int) -> tuple[float, float, float]:
-        """Return the real-world coordinate for a given node ID."""
+        """Return the coordinate position for a given node ID."""
+
         if not self._graph.has_node(node_id):
             raise KeyError(f"There is no Node-{node_id}")
         return self._graph.nodes[node_id].position
 
     def get_nodes_by_type(self, node_type: NodeType) -> list[int]:
         """Return all node IDs that have the given NodeType."""
+
         return [
             node_id
             for node_id, node in self._graph.nodes.items()
@@ -36,6 +47,7 @@ class Map:
 
     def get_node_type(self, node_id: int) -> NodeType:
         """Return the NodeType for a given node ID."""
+
         if not self._graph.has_node(node_id):
            raise KeyError(f"There is no Node-{node_id}")
         return self._graph.nodes[node_id].node_type
@@ -49,7 +61,8 @@ class Map:
             max_y: float,
             max_z: float,
     ) -> list[int]:
-        """Return all node IDs inside the axis-aligned bounding box."""
+        """Return all node IDs inside the bounding box."""
+
         if max_x < min_x:
             raise ValueError(f"max_x = {max_x} < {min_x} = min_x")
         if max_y < min_y:
@@ -66,18 +79,21 @@ class Map:
 
     def get_node(self, node_id: int) -> Node:
         """Return Node object from node ID"""
+
         if not self._graph.has_node(node_id):
             raise KeyError(f"There is no Node-{node_id}")
         return self._graph.nodes[node_id]
 
     def get_all_node_ids(self) -> list[int]:
-        """Return every node ID in the map (useful for iteration)."""
+        """Return every node ID in the map."""
+
         return list(self._graph.nodes.keys())
 
     def get_nearest_node_of_type(
             self, position: tuple[float, float, float], node_type: NodeType
     ) -> int:
-        """Return the closest node ID of the given type (Euclidean distance)."""
+        """Return the closest node ID of the given type (Euclidean)."""
+
         candidates = self.get_nodes_by_type(node_type)
         if not candidates:
             raise ValueError(f"There are no nodes of type {node_type}")
@@ -93,26 +109,31 @@ class Map:
 
     def get_outgoing_edges(self, node_id: int) -> list[Edge]:
         """Return a copy of all outgoing edges from the node."""
+
         return self._graph.get_outgoing_edges(node_id)
 
     def get_neighbors(self, node_id: int) -> list[int]:
         """Return the node IDs of all direct outgoing neighbors."""
+
         return self._graph.get_neighbors(node_id)
 
     def get_edge_between(self, start_id: int, end_id: int) -> Edge | None:
         """Return the edge from start to end, or None if none exists."""
+
         for edge in self.get_outgoing_edges(start_id):
             if edge.end_node.id == end_id:
                 return edge
         return None
 
     def get_edges_from_position(self, position: tuple[float, float, float]) -> list[Edge]:
-        """Return all outgoing edges from the node at the given real-world position."""
+        """Return all outgoing edges from the node at the given position."""
+
         nid = self.get_node_id(position)
         return self.get_outgoing_edges(nid)
 
     def validate_path(self, path: list[int]) -> bool:
         """Return True if every node exists and every consecutive pair has an edge."""
+
         if not path:
             return True
         for start, end in zip(path, path[1:]):
@@ -123,13 +144,15 @@ class Map:
         return True
 
     def block_edge(self, edge_id: int) -> None:
-        """Mark an edge as blocked (mutates for now)."""
+        """Mark an edge as blocked."""
+
         if not self._graph.has_edge(edge_id):
             raise KeyError(f"There is no Edge-{edge_id}")
         self._graph.edges[edge_id].blocked = True
 
     def unblock_edge(self, edge_id: int) -> None:
-        """Mark an edge as unblocked (mutates for now)."""
+        """Mark an edge as unblocked."""
+
         if not self._graph.has_edge(edge_id):
             raise KeyError(f"There is no Edge-{edge_id}")
         self._graph.edges[edge_id].blocked = False

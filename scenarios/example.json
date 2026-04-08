@@ -1,0 +1,21 @@
+{
+  "name": "basic_grid_demo",
+  "seed": 123,
+  "duration_s": 1000.0,
+  "map": {
+    "kind": "grid",
+    "params": {
+      "grid_size": 5
+    }
+  },
+  "vehicles": [
+    {
+      "id": 1,
+      "position": [0, 0, 0],
+      "velocity": 0.0,
+      "payload": 0.0,
+      "max_payload": 100.0,
+      "max_speed": 25.0
+    }
+  ]
+}

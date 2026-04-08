@@ -9,9 +9,9 @@ def dijkstra(graph: Graph, start_id: int, end_id: int) -> tuple[float, list[int]
     if not graph.has_node(end_id):
         raise ValueError(f"Node-{end_id} does not exist in graph.")
 
-    prev = {}
-    distance = {start_id: 0.0}
-    queue = [(0.0, start_id)]
+    prev: dict[int, int] = {}
+    distance: dict[int, float] = {start_id: 0.0}
+    queue: list[tuple[float, int]] = [(0.0, start_id)]
 
     while queue:
 
