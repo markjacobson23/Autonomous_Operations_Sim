@@ -3,6 +3,11 @@ import random
 from collections.abc import Iterable
 
 from autonomous_ops_sim.maps.map import Map
+from autonomous_ops_sim.operations.dispatcher import (
+    DispatchExecutionResult,
+    DispatchRequest,
+    Dispatcher,
+)
 from autonomous_ops_sim.operations.jobs import Job, JobExecutionResult
 from autonomous_ops_sim.operations.resources import SharedResource
 from autonomous_ops_sim.routing.router import Router
@@ -148,3 +153,44 @@ class SimulationEngine:
             max_payload=max_payload,
         )
         return process.execute_job(job=job, engine=self)
+
+    def dispatch_job(
+        self,
+        *,
+        dispatcher: Dispatcher,
+        pending_jobs: Iterable[Job],
+        vehicle_id: int,
+        start_node_id: int,
+        max_speed: float,
+        initial_payload: float = 0.0,
+        max_payload: float = math.inf,
+    ) -> DispatchExecutionResult | None:
+        """Select and execute one pending job through the existing job path."""
+
+        request = DispatchRequest(
+            vehicle_id=vehicle_id,
+            start_node_id=start_node_id,
+            max_speed=max_speed,
+            initial_payload=initial_payload,
+            max_payload=max_payload,
+        )
+        assignment = dispatcher.assign_job(
+            pending_jobs=tuple(pending_jobs),
+            engine=self,
+            request=request,
+        )
+        if assignment is None:
+            return None
+
+        job_result = self.execute_job(
+            vehicle_id=vehicle_id,
+            start_node_id=start_node_id,
+            max_speed=max_speed,
+            job=assignment.job,
+            initial_payload=initial_payload,
+            max_payload=max_payload,
+        )
+        return DispatchExecutionResult(
+            assignment=assignment,
+            job_result=job_result,
+        )
