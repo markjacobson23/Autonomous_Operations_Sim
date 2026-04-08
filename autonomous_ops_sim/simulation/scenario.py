@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from autonomous_ops_sim.vehicles.vehicle import VehicleType
@@ -55,10 +55,44 @@ class JobSpec:
 
 
 @dataclass(frozen=True)
-class ExecutionSpec:
+class ResourceSpec:
+    resource_id: str
+    capacity: int = 1
+    initial_available_times_s: tuple[float, ...] | None = None
+
+
+@dataclass(frozen=True)
+class BlockedEdgeSpec:
+    start_position: Position
+    end_position: Position
+
+
+@dataclass(frozen=True)
+class WorldStateSpec:
+    blocked_edges: tuple[BlockedEdgeSpec, ...] = ()
+
+
+@dataclass(frozen=True)
+class DispatcherSpec:
+    kind: str
+    params: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SingleVehicleJobExecutionSpec:
     kind: str
     vehicle_id: int
     job: JobSpec
+
+
+@dataclass(frozen=True)
+class DispatchVehicleJobsExecutionSpec:
+    kind: str
+    vehicle_id: int
+    jobs: tuple[JobSpec, ...]
+
+
+ExecutionSpec = SingleVehicleJobExecutionSpec | DispatchVehicleJobsExecutionSpec
 
 
 @dataclass(frozen=True)
@@ -68,5 +102,8 @@ class Scenario:
     duration_s: float
     map_spec: MapSpec
     vehicles: list[VehicleSpec]
+    resources: tuple[ResourceSpec, ...] = ()
+    world_state: WorldStateSpec = field(default_factory=WorldStateSpec)
+    dispatcher: DispatcherSpec | None = None
     execution: ExecutionSpec | None = None
     source_path: Path | None = None

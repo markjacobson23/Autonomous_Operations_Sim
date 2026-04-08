@@ -2,7 +2,9 @@ from dataclasses import dataclass
 
 from autonomous_ops_sim.io.exports import export_engine_json
 from autonomous_ops_sim.maps.grid_map import make_grid_map
+from autonomous_ops_sim.operations import FirstFeasibleDispatcher
 from autonomous_ops_sim.operations.jobs import Job
+from autonomous_ops_sim.operations.resources import SharedResource
 from autonomous_ops_sim.operations.tasks import LoadTask, MoveTask, UnloadTask
 from autonomous_ops_sim.routing import Router
 from autonomous_ops_sim.simulation.engine import SimulationEngine
@@ -11,13 +13,18 @@ from autonomous_ops_sim.simulation.metrics import (
     summarize_engine_execution,
 )
 from autonomous_ops_sim.simulation.scenario import (
+    DispatchVehicleJobsExecutionSpec,
+    DispatcherSpec,
     JobSpec,
     LoadTaskSpec,
     MapSpec,
     MoveTaskSpec,
+    ResourceSpec,
     Scenario,
     ScenarioTaskSpec,
+    SingleVehicleJobExecutionSpec,
     VehicleSpec,
+    WorldStateSpec,
 )
 from autonomous_ops_sim.simulation.world_state import WorldState
 
@@ -38,12 +45,16 @@ def execute_scenario(scenario: Scenario) -> ScenarioExecutionResult:
         raise ValueError("Scenario does not define an executable 'execution' section.")
 
     simulation_map = _build_map(map_spec=scenario.map_spec)
-    world_state = WorldState(simulation_map.graph)
+    world_state = _build_world_state(
+        simulation_map=simulation_map,
+        world_state_spec=scenario.world_state,
+    )
     engine = SimulationEngine(
         simulation_map=simulation_map,
         world_state=world_state,
         router=Router(),
         seed=scenario.seed,
+        resources=_build_resources(scenario.resources),
     )
 
     vehicle = _get_execution_vehicle(scenario=scenario)
@@ -52,18 +63,12 @@ def execute_scenario(scenario: Scenario) -> ScenarioExecutionResult:
         position=vehicle.position,
         label=f"vehicle {vehicle.id} start position",
     )
-    job = _build_job(
+    _execute_configured_work(
+        engine=engine,
+        scenario=scenario,
         simulation_map=simulation_map,
-        job_spec=scenario.execution.job,
-    )
-
-    engine.execute_job(
-        vehicle_id=vehicle.id,
+        vehicle=vehicle,
         start_node_id=start_node_id,
-        max_speed=vehicle.max_speed,
-        initial_payload=vehicle.payload,
-        max_payload=vehicle.max_payload,
-        job=job,
     )
 
     if engine.simulated_time_s > scenario.duration_s:
@@ -90,6 +95,41 @@ def _build_map(*, map_spec: MapSpec):
     return make_grid_map(grid_size)
 
 
+def _build_world_state(*, simulation_map, world_state_spec: WorldStateSpec) -> WorldState:
+    world_state = WorldState(simulation_map.graph)
+    for blocked_edge in world_state_spec.blocked_edges:
+        start_node_id = _resolve_node_id(
+            simulation_map=simulation_map,
+            position=blocked_edge.start_position,
+            label="blocked edge start position",
+        )
+        end_node_id = _resolve_node_id(
+            simulation_map=simulation_map,
+            position=blocked_edge.end_position,
+            label="blocked edge end position",
+        )
+        edge = simulation_map.get_edge_between(start_node_id, end_node_id)
+        if edge is None:
+            raise ValueError(
+                "Scenario blocked edge "
+                f"{blocked_edge.start_position} -> {blocked_edge.end_position} "
+                "is not present in the map."
+            )
+        world_state.block_edge(edge.id)
+    return world_state
+
+
+def _build_resources(resource_specs: tuple[ResourceSpec, ...]) -> tuple[SharedResource, ...]:
+    return tuple(
+        SharedResource(
+            resource_spec.resource_id,
+            capacity=resource_spec.capacity,
+            initial_available_times_s=resource_spec.initial_available_times_s,
+        )
+        for resource_spec in resource_specs
+    )
+
+
 def _get_execution_vehicle(*, scenario: Scenario) -> VehicleSpec:
     assert scenario.execution is not None
 
@@ -99,6 +139,60 @@ def _get_execution_vehicle(*, scenario: Scenario) -> VehicleSpec:
     raise ValueError(
         f"Scenario execution vehicle_id {scenario.execution.vehicle_id} was not found."
     )
+
+
+def _execute_configured_work(
+    *,
+    engine: SimulationEngine,
+    scenario: Scenario,
+    simulation_map,
+    vehicle: VehicleSpec,
+    start_node_id: int,
+) -> None:
+    assert scenario.execution is not None
+
+    execution = scenario.execution
+    if isinstance(execution, SingleVehicleJobExecutionSpec):
+        engine.execute_job(
+            vehicle_id=vehicle.id,
+            start_node_id=start_node_id,
+            max_speed=vehicle.max_speed,
+            initial_payload=vehicle.payload,
+            max_payload=vehicle.max_payload,
+            job=_build_job(
+                simulation_map=simulation_map,
+                job_spec=execution.job,
+            ),
+        )
+        return
+
+    if not isinstance(execution, DispatchVehicleJobsExecutionSpec):
+        raise ValueError(f"Unsupported scenario execution type: {type(execution)!r}")
+
+    dispatch_result = engine.dispatch_job(
+        dispatcher=_build_dispatcher(dispatcher_spec=scenario.dispatcher),
+        pending_jobs=tuple(
+            _build_job(simulation_map=simulation_map, job_spec=job_spec)
+            for job_spec in execution.jobs
+        ),
+        vehicle_id=vehicle.id,
+        start_node_id=start_node_id,
+        max_speed=vehicle.max_speed,
+        initial_payload=vehicle.payload,
+        max_payload=vehicle.max_payload,
+    )
+    if dispatch_result is None:
+        raise ValueError("Scenario dispatcher did not assign a feasible job.")
+
+
+def _build_dispatcher(*, dispatcher_spec: DispatcherSpec | None):
+    if dispatcher_spec is None:
+        raise ValueError("Scenario dispatch execution requires a configured dispatcher.")
+    if dispatcher_spec.kind != "first_feasible":
+        raise ValueError(
+            f"Unsupported dispatcher kind for execution: {dispatcher_spec.kind!r}"
+        )
+    return FirstFeasibleDispatcher()
 
 
 def _build_job(*, simulation_map, job_spec: JobSpec) -> Job:

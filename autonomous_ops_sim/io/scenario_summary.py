@@ -1,6 +1,10 @@
 import json
 
-from autonomous_ops_sim.simulation.scenario import Scenario
+from autonomous_ops_sim.simulation.scenario import (
+    DispatchVehicleJobsExecutionSpec,
+    Scenario,
+    SingleVehicleJobExecutionSpec,
+)
 
 
 def format_scenario_summary(scenario: Scenario) -> str:
@@ -16,11 +20,18 @@ def format_scenario_summary(scenario: Scenario) -> str:
         f"map_kind: {scenario.map_spec.kind}",
         f"map_params: {map_params_json}",
         f"vehicle_count: {len(scenario.vehicles)}",
+        f"resource_count: {len(scenario.resources)}",
+        f"blocked_edge_count: {len(scenario.world_state.blocked_edges)}",
     ]
+
+    if scenario.dispatcher is None:
+        lines.append("dispatcher: none")
+    else:
+        lines.append(f"dispatcher: {scenario.dispatcher.kind}")
 
     if scenario.execution is None:
         lines.append("execution: none")
-    else:
+    elif isinstance(scenario.execution, SingleVehicleJobExecutionSpec):
         lines.extend(
             [
                 f"execution: {scenario.execution.kind}",
@@ -28,6 +39,18 @@ def format_scenario_summary(scenario: Scenario) -> str:
                 f"execution_job_id: {scenario.execution.job.id}",
                 f"execution_task_count: {len(scenario.execution.job.tasks)}",
             ]
+        )
+    elif isinstance(scenario.execution, DispatchVehicleJobsExecutionSpec):
+        lines.extend(
+            [
+                f"execution: {scenario.execution.kind}",
+                f"execution_vehicle_id: {scenario.execution.vehicle_id}",
+                f"execution_job_count: {len(scenario.execution.jobs)}",
+            ]
+        )
+    else:
+        raise ValueError(
+            f"Unsupported scenario execution type: {type(scenario.execution)!r}"
         )
 
     for index, vehicle in enumerate(scenario.vehicles):

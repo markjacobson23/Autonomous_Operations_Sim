@@ -3,7 +3,11 @@ import json
 import pytest
 
 from autonomous_ops_sim.io.scenario_loader import load_scenario
-from autonomous_ops_sim.simulation.scenario import Scenario
+from autonomous_ops_sim.simulation.scenario import (
+    DispatchVehicleJobsExecutionSpec,
+    Scenario,
+    SingleVehicleJobExecutionSpec,
+)
 from autonomous_ops_sim.vehicles.vehicle import VehicleType
 
 
@@ -78,10 +82,14 @@ def test_load_scenario_parses_valid_grid_scenario(tmp_path, valid_scenario_data)
     assert vehicle.max_speed == 25.0
     assert vehicle.vehicle_type == VehicleType.GENERIC
     assert scenario.execution is not None
+    assert isinstance(scenario.execution, SingleVehicleJobExecutionSpec)
     assert scenario.execution.kind == "single_vehicle_job"
     assert scenario.execution.vehicle_id == 1
     assert scenario.execution.job.id == "demo-job"
     assert len(scenario.execution.job.tasks) == 1
+    assert scenario.resources == ()
+    assert scenario.world_state.blocked_edges == ()
+    assert scenario.dispatcher is None
 
 
 def test_load_scenario_raises_for_missing_name(tmp_path, valid_scenario_data):
@@ -301,3 +309,88 @@ def test_load_scenario_preserves_seed_value(tmp_path, valid_scenario_data):
     scenario_path = write_scenario(tmp_path, data)
     scenario = load_scenario(scenario_path)
     assert scenario.seed == data["seed"]
+
+
+def test_load_scenario_parses_resources_world_state_and_dispatcher(tmp_path, valid_scenario_data):
+    data = valid_scenario_data
+    data["resources"] = [
+        {
+            "id": "loader-1",
+            "capacity": 1,
+            "initial_available_times_s": [2.0],
+        }
+    ]
+    data["world_state"] = {
+        "blocked_edges": [
+            {
+                "start": [0, 0, 0],
+                "end": [1, 0, 0],
+            }
+        ]
+    }
+    data["dispatcher"] = {"kind": "first_feasible"}
+    data["execution"] = {
+        "kind": "dispatch_vehicle_jobs",
+        "vehicle_id": 1,
+        "jobs": [
+            {
+                "id": "selected-job",
+                "tasks": [
+                    {
+                        "kind": "move",
+                        "destination": [1, 0, 0],
+                    },
+                    {
+                        "kind": "load",
+                        "position": [1, 0, 0],
+                        "amount": 1.0,
+                        "service_duration_s": 2.0,
+                        "resource_id": "loader-1",
+                    },
+                ],
+            }
+        ],
+    }
+
+    scenario = load_scenario(write_scenario(tmp_path, data))
+
+    assert scenario.resources[0].resource_id == "loader-1"
+    assert scenario.resources[0].capacity == 1
+    assert scenario.resources[0].initial_available_times_s == (2.0,)
+    assert scenario.world_state.blocked_edges[0].start_position == (0.0, 0.0, 0.0)
+    assert scenario.world_state.blocked_edges[0].end_position == (1.0, 0.0, 0.0)
+    assert scenario.dispatcher is not None
+    assert scenario.dispatcher.kind == "first_feasible"
+    assert isinstance(scenario.execution, DispatchVehicleJobsExecutionSpec)
+    assert tuple(job.id for job in scenario.execution.jobs) == ("selected-job",)
+
+
+def test_load_scenario_raises_for_unknown_resource_reference(tmp_path, valid_scenario_data):
+    data = valid_scenario_data
+    data["execution"]["job"]["tasks"].append(
+        {
+            "kind": "load",
+            "position": [1, 0, 0],
+            "amount": 1.0,
+            "service_duration_s": 1.0,
+            "resource_id": "missing-loader",
+        }
+    )
+
+    with pytest.raises(ValueError, match="resource_id"):
+        load_scenario(write_scenario(tmp_path, data))
+
+
+def test_load_scenario_raises_for_dispatch_execution_without_dispatcher(
+    tmp_path,
+    valid_scenario_data,
+):
+    data = valid_scenario_data
+    data["execution"] = {
+        "kind": "dispatch_vehicle_jobs",
+        "vehicle_id": 1,
+        "jobs": [data["execution"]["job"]],
+    }
+
+    with pytest.raises(ValueError, match="dispatcher"):
+        load_scenario(write_scenario(tmp_path, data))

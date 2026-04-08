@@ -1,15 +1,22 @@
 import json
+import math
 from pathlib import Path
 
 from autonomous_ops_sim.simulation.scenario import (
+    BlockedEdgeSpec,
+    DispatchVehicleJobsExecutionSpec,
+    DispatcherSpec,
     ExecutionSpec,
     JobSpec,
     LoadTaskSpec,
     MapSpec,
     MoveTaskSpec,
+    ResourceSpec,
     Scenario,
+    SingleVehicleJobExecutionSpec,
     UnloadTaskSpec,
     VehicleSpec,
+    WorldStateSpec,
 )
 from autonomous_ops_sim.vehicles.vehicle import VehicleType
 
@@ -52,6 +59,9 @@ def _parse_scenario(
     duration_s = data["duration_s"]
     map_data = data["map"]
     vehicles_data = data["vehicles"]
+    resources_data = data.get("resources", [])
+    world_state_data = data.get("world_state")
+    dispatcher_data = data.get("dispatcher")
     execution_data = data.get("execution")
 
     if not isinstance(name, str):
@@ -66,10 +76,27 @@ def _parse_scenario(
         raise ValueError("Scenario 'map' must be an object.")
     if not isinstance(vehicles_data, list):
         raise ValueError("Scenario 'vehicles' must be a list.")
+    if not isinstance(resources_data, list):
+        raise ValueError("Scenario 'resources' must be a list if provided.")
+    if world_state_data is not None and not isinstance(world_state_data, dict):
+        raise ValueError("Scenario 'world_state' must be an object if provided.")
+    if dispatcher_data is not None and not isinstance(dispatcher_data, dict):
+        raise ValueError("Scenario 'dispatcher' must be an object if provided.")
     if execution_data is not None and not isinstance(execution_data, dict):
         raise ValueError("Scenario 'execution' must be an object if provided.")
 
     vehicles = [_parse_vehicle_spec(v) for v in vehicles_data]
+    resources = tuple(_parse_resource_spec(resource) for resource in resources_data)
+    world_state = (
+        WorldStateSpec()
+        if world_state_data is None
+        else _parse_world_state_spec(world_state_data)
+    )
+    dispatcher = (
+        None
+        if dispatcher_data is None
+        else _parse_dispatcher_spec(dispatcher_data)
+    )
     execution = (
         None
         if execution_data is None
@@ -83,12 +110,37 @@ def _parse_scenario(
                 "Scenario execution 'vehicle_id' must reference a configured vehicle."
             )
 
+    resource_ids = {resource.resource_id for resource in resources}
+    if len(resource_ids) != len(resources):
+        raise ValueError("Scenario resource ids must be unique.")
+
+    referenced_resource_ids = _collect_referenced_resource_ids(execution)
+    unknown_resource_ids = referenced_resource_ids - resource_ids
+    if unknown_resource_ids:
+        unknown_str = ", ".join(sorted(unknown_resource_ids))
+        raise ValueError(
+            "Scenario task resource_id values must reference configured resources: "
+            f"{unknown_str}"
+        )
+
+    if isinstance(execution, DispatchVehicleJobsExecutionSpec) and dispatcher is None:
+        raise ValueError(
+            "Scenario dispatch execution requires a configured 'dispatcher' section."
+        )
+    if dispatcher is not None and not isinstance(execution, DispatchVehicleJobsExecutionSpec):
+        raise ValueError(
+            "Scenario 'dispatcher' is only supported with 'dispatch_vehicle_jobs' execution."
+        )
+
     return Scenario(
         name=name,
         seed=seed,
         duration_s=float(duration_s),
         map_spec=_parse_map_spec(map_data),
         vehicles=vehicles,
+        resources=resources,
+        world_state=world_state,
+        dispatcher=dispatcher,
         execution=execution,
         source_path=source_path,
     )
@@ -210,7 +262,7 @@ def _parse_vehicle_spec(data: object) -> VehicleSpec:
 
 
 def _parse_execution_spec(data: dict[str, object]) -> ExecutionSpec:
-    required_keys = {"kind", "vehicle_id", "job"}
+    required_keys = {"kind", "vehicle_id"}
     missing = required_keys - data.keys()
     if missing:
         missing_str = ", ".join(sorted(missing))
@@ -220,19 +272,31 @@ def _parse_execution_spec(data: dict[str, object]) -> ExecutionSpec:
 
     kind = data["kind"]
     vehicle_id = data["vehicle_id"]
-    job_data = data["job"]
 
-    if kind != "single_vehicle_job":
+    if kind not in {"single_vehicle_job", "dispatch_vehicle_jobs"}:
         raise ValueError(f"Unsupported execution kind: {kind!r}")
     if not isinstance(vehicle_id, int):
         raise ValueError("Scenario execution 'vehicle_id' must be an int.")
-    if not isinstance(job_data, dict):
-        raise ValueError("Scenario execution 'job' must be an object.")
 
-    return ExecutionSpec(
+    if kind == "single_vehicle_job":
+        job_data = data.get("job")
+        if not isinstance(job_data, dict):
+            raise ValueError("Scenario execution 'job' must be an object.")
+        return SingleVehicleJobExecutionSpec(
+            kind=kind,
+            vehicle_id=vehicle_id,
+            job=_parse_job_spec(job_data),
+        )
+
+    jobs_data = data.get("jobs")
+    if not isinstance(jobs_data, list):
+        raise ValueError("Scenario execution 'jobs' must be a list.")
+    if not jobs_data:
+        raise ValueError("Scenario dispatch execution must contain at least one job.")
+    return DispatchVehicleJobsExecutionSpec(
         kind=kind,
         vehicle_id=vehicle_id,
-        job=_parse_job_spec(job_data),
+        jobs=tuple(_parse_job_spec(job_data) for job_data in jobs_data),
     )
 
 
@@ -300,22 +364,114 @@ def _parse_position_field(
     field_name: str,
 ) -> tuple[float, float, float]:
     raw_position = data.get(field_name)
+    return _parse_position_value(raw_position, context=f"Scenario task '{field_name}'")
+
+
+def _parse_position_value(
+    value: object,
+    *,
+    context: str,
+) -> tuple[float, float, float]:
+    raw_position = value
     if not isinstance(raw_position, list):
-        raise ValueError(f"Scenario task '{field_name}' must be a list.")
+        raise ValueError(f"{context} must be a list.")
     if len(raw_position) != 3:
-        raise ValueError(
-            f"Scenario task '{field_name}' must have exactly 3 coordinates."
-        )
+        raise ValueError(f"{context} must have exactly 3 coordinates.")
     if not all(isinstance(coord, (int, float)) for coord in raw_position):
-        raise ValueError(
-            f"Scenario task '{field_name}' coordinates must be numeric."
-        )
+        raise ValueError(f"{context} coordinates must be numeric.")
 
     return (
         float(raw_position[0]),
         float(raw_position[1]),
         float(raw_position[2]),
     )
+
+
+def _parse_resource_spec(data: object) -> ResourceSpec:
+    if not isinstance(data, dict):
+        raise ValueError("Each resource entry must be an object.")
+
+    resource_id = data.get("id")
+    capacity = data.get("capacity", 1)
+    initial_available_times = data.get("initial_available_times_s")
+
+    if not isinstance(resource_id, str) or not resource_id:
+        raise ValueError("Resource 'id' must be a non-empty string.")
+    if not isinstance(capacity, int):
+        raise ValueError("Resource 'capacity' must be an int if provided.")
+    if capacity <= 0:
+        raise ValueError("Resource 'capacity' must be positive.")
+
+    parsed_available_times: tuple[float, ...] | None
+    if initial_available_times is None:
+        parsed_available_times = None
+    else:
+        if not isinstance(initial_available_times, list):
+            raise ValueError("Resource 'initial_available_times_s' must be a list.")
+        parsed_available_times = tuple(
+            _parse_nonnegative_float_value(
+                value,
+                context="Resource 'initial_available_times_s' entries",
+            )
+            for value in initial_available_times
+        )
+        if len(parsed_available_times) != capacity:
+            raise ValueError(
+                "Resource 'initial_available_times_s' length must match capacity."
+            )
+
+    return ResourceSpec(
+        resource_id=resource_id,
+        capacity=capacity,
+        initial_available_times_s=parsed_available_times,
+    )
+
+
+def _parse_world_state_spec(data: dict[str, object]) -> WorldStateSpec:
+    blocked_edges_data = data.get("blocked_edges", [])
+    if not isinstance(blocked_edges_data, list):
+        raise ValueError("Scenario world_state 'blocked_edges' must be a list.")
+
+    return WorldStateSpec(
+        blocked_edges=tuple(
+            _parse_blocked_edge_spec(blocked_edge)
+            for blocked_edge in blocked_edges_data
+        )
+    )
+
+
+def _parse_blocked_edge_spec(data: object) -> BlockedEdgeSpec:
+    if not isinstance(data, dict):
+        raise ValueError("Each blocked edge entry must be an object.")
+
+    return BlockedEdgeSpec(
+        start_position=_parse_position_value(
+            data.get("start"),
+            context="Scenario blocked edge 'start'",
+        ),
+        end_position=_parse_position_value(
+            data.get("end"),
+            context="Scenario blocked edge 'end'",
+        ),
+    )
+
+
+def _parse_dispatcher_spec(data: dict[str, object]) -> DispatcherSpec:
+    kind = data.get("kind")
+    params = data.get("params", {})
+
+    if not isinstance(kind, str) or not kind:
+        raise ValueError("Scenario dispatcher 'kind' must be a non-empty string.")
+    if not isinstance(params, dict):
+        raise ValueError("Scenario dispatcher 'params' must be an object if provided.")
+    if kind != "first_feasible":
+        raise ValueError(f"Unsupported dispatcher kind: {kind!r}")
+    if params:
+        raise ValueError(
+            "Scenario dispatcher 'first_feasible' does not support custom params."
+        )
+
+    return DispatcherSpec(kind=kind, params=params)
 
 
 def _parse_positive_float_field(
@@ -337,11 +493,23 @@ def _parse_nonnegative_float_field(
     field_name: str,
 ) -> float:
     value = data.get(field_name)
+    return _parse_nonnegative_float_value(
+        value,
+        context=f"Scenario task '{field_name}'",
+    )
+
+
+def _parse_nonnegative_float_value(
+    value: object,
+    *,
+    context: str,
+) -> float:
     if not isinstance(value, (int, float)):
-        raise ValueError(f"Scenario task '{field_name}' must be numeric.")
-    if float(value) < 0.0:
-        raise ValueError(f"Scenario task '{field_name}' must be non-negative.")
-    return float(value)
+        raise ValueError(f"{context} must be numeric.")
+    parsed_value = float(value)
+    if not math.isfinite(parsed_value) or parsed_value < 0.0:
+        raise ValueError(f"{context} must be finite and non-negative.")
+    return parsed_value
 
 
 def _parse_optional_string_field(
@@ -358,3 +526,20 @@ def _parse_optional_string_field(
         )
     return value
 
+
+def _collect_referenced_resource_ids(execution: ExecutionSpec | None) -> set[str]:
+    if execution is None:
+        return set()
+
+    jobs: tuple[JobSpec, ...]
+    if isinstance(execution, SingleVehicleJobExecutionSpec):
+        jobs = (execution.job,)
+    else:
+        jobs = execution.jobs
+
+    return {
+        task.resource_id
+        for job in jobs
+        for task in job.tasks
+        if isinstance(task, (LoadTaskSpec, UnloadTaskSpec)) and task.resource_id is not None
+    }

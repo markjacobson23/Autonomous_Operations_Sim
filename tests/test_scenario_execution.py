@@ -7,6 +7,10 @@ from autonomous_ops_sim.simulation.scenario_executor import execute_scenario
 
 SCENARIO_PATH = Path("scenarios/step_12_single_vehicle_job.json")
 GOLDEN_PATH = Path(__file__).parent / "golden" / "step_12_scenario_execution_export.json"
+STEP_13_SCENARIO_PATH = Path("scenarios/step_13_dispatch_resources_blocked_edges.json")
+STEP_13_GOLDEN_PATH = (
+    Path(__file__).parent / "golden" / "step_13_scenario_execution_export.json"
+)
 
 
 def test_scenario_execution_runs_end_to_end_through_existing_engine_surfaces():
@@ -57,3 +61,60 @@ def test_scenario_execution_export_matches_golden_fixture_exactly():
 
     assert json.loads(result.export_json) == json.loads(GOLDEN_PATH.read_text())
     assert result.export_json == GOLDEN_PATH.read_text()
+
+
+def test_step_13_scenario_execution_uses_resources_and_dispatcher():
+    scenario = load_scenario(STEP_13_SCENARIO_PATH)
+
+    result = execute_scenario(scenario)
+    export_record = json.loads(result.export_json)
+
+    assert result.engine.seed == 313
+    assert result.summary.seed == 313
+    assert result.summary.final_time_s == 8.0
+    assert result.summary.completed_job_count == 1
+    assert result.summary.completed_task_count == 4
+    assert result.summary.route_count == 2
+    assert result.summary.total_route_distance == 4.0
+    assert result.summary.total_service_time_s == 3.0
+    assert result.summary.total_resource_wait_time_s == 1.0
+    assert result.engine.world_state.blocked_edge_ids == {2}
+    assert export_record["summary"]["completed_job_count"] == 1
+    assert export_record["summary"]["total_resource_wait_time_s"] == 1.0
+    assert [
+        event["job_id"]
+        for event in export_record["trace"]
+        if event["event_type"] in {"job_start", "job_complete"}
+    ] == ["selected-haul", "selected-haul"]
+
+
+def test_step_13_scenario_execution_honors_initial_blocked_edges():
+    scenario = load_scenario(STEP_13_SCENARIO_PATH)
+
+    result = execute_scenario(scenario)
+    edge_ids = [
+        event.edge_id
+        for event in result.engine.trace.events
+        if event.event_type.value == "edge_enter"
+    ]
+
+    assert edge_ids == [0, 6, 11, 12]
+    assert 2 not in edge_ids
+
+
+def test_step_13_repeated_scenario_execution_remains_deterministic():
+    scenario = load_scenario(STEP_13_SCENARIO_PATH)
+
+    first_result = execute_scenario(scenario)
+    second_result = execute_scenario(scenario)
+
+    assert first_result.summary == second_result.summary
+    assert first_result.export_json == second_result.export_json
+
+
+def test_step_13_scenario_execution_export_matches_golden_fixture_exactly():
+    scenario = load_scenario(STEP_13_SCENARIO_PATH)
+    result = execute_scenario(scenario)
+
+    assert json.loads(result.export_json) == json.loads(STEP_13_GOLDEN_PATH.read_text())
+    assert result.export_json == STEP_13_GOLDEN_PATH.read_text()
