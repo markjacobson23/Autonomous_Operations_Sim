@@ -1,59 +1,57 @@
-# Step 12 Executable Scenario Harness
+# Step 13 Scenario Schema for Operations
 
 ## Goal
-Finish Step 12 cleanly by making scenario files executable end-to-end simulator inputs.
+Finish Step 13 cleanly by expanding scenario/config support for operational execution.
 
 ## Required implementation
-Add a scenario execution harness that converts parsed scenario/config input into a real deterministic simulator run.
+Extend the scenario schema and execution harness so scenario files can describe more of the runtime operational setup.
 
 ## Required design
-- Add a scenario execution/orchestration module such as:
-  - `autonomous_ops_sim/simulation/scenario_executor.py`
-  - or `autonomous_ops_sim/io/scenario_runner.py`
-- Reuse the existing:
-  - scenario loader
-  - map construction
-  - `WorldState`
-  - `SimulationEngine`
-  - operations layer
-  - metrics/export surfaces
-- Extend the CLI so scenario execution is a first-class supported path
-- Keep parsing/validation separate from runtime instantiation and execution
+- Extend `autonomous_ops_sim/simulation/scenario.py` with new typed scenario specs for:
+  - resources
+  - runtime world-state initialization
+  - dispatcher selection/config
+- Extend `autonomous_ops_sim/io/scenario_loader.py` to parse and validate the new fields
+- Extend `autonomous_ops_sim/simulation/scenario_executor.py` to instantiate:
+  - `SharedResource` objects from scenario config
+  - `WorldState` blocked-edge initialization from scenario config
+  - a narrow dispatcher selection path from scenario config
+- Reuse existing runtime execution paths rather than adding parallel execution logic
 
 ## Required behavior
-- A scenario file can be loaded and turned into a real simulator run
-- The run produces deterministic output
-- The run can emit stable export JSON
-- The same scenario run repeated multiple times produces identical results
+- A scenario can define resources and execution can use them
+- A scenario can define initial blocked edges and execution honors them
+- A scenario can define dispatcher selection in a narrow supported form
+- Scenario-driven execution remains deterministic across repeated runs
 
 ## Minimum expected scope
-At minimum, Step 12 should support:
-- building the map from the scenario
-- instantiating vehicle runtime setup from the scenario
-- creating the engine from scenario-driven inputs
-- executing one deterministic scenario-run path
-- exporting the run result through existing export infrastructure
+At minimum, Step 13 should support:
+- scenario-defined shared resources
+- scenario-defined initial blocked edges
+- scenario-defined dispatcher selection with a baseline option such as `first_feasible`
+- at least one richer executable scenario that uses one or more of the above
 
 ## Design constraints
+- Do not redesign the vehicle/entity model yet
 - Do not add visualization
 - Do not add interactive control/command surfaces
-- Do not over-expand the scenario schema
-- Do not redesign the vehicle/entity model yet
-- Do not add richer map import formats unless strictly necessary
+- Do not redesign multi-vehicle coordination
+- Do not over-expand the schema into a broad DSL
 - Keep the implementation small and production-like
 
 ## Preferred strategy
-- Keep existing scenario schema support working
-- Extend the schema only where necessary to support execution
-- Reuse existing deterministic demos/tests as the basis for the first executable scenario-run fixture
-- Prefer one narrow, fully working scenario-run path over broad half-finished flexibility
+- Extend the schema only where it maps directly to existing runtime objects
+- Keep resource and dispatcher config narrow
+- Preserve backward compatibility for existing scenario files where reasonable
+- Add one fully working richer scenario fixture rather than many partially supported schema branches
 
 ## Tests to add
 Add tests for:
-- scenario-driven execution succeeds end-to-end
-- repeated runs with the same scenario produce identical output
-- scenario-run export output is stable
-- at least one scenario-run golden fixture matches exactly
+- parsing and validating scenario-defined resources
+- parsing and validating scenario-defined blocked-edge runtime setup
+- parsing and validating narrow dispatcher config
+- deterministic repeated scenario execution with the richer schema
+- at least one updated or new golden scenario-run export fixture
 
 ## Definition of done
 All of the following must succeed:
