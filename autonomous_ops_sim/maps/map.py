@@ -17,6 +17,12 @@ class Map:
         self._graph = graph
         self.coord_to_id = coord_to_id
 
+    @property
+    def graph(self) -> Graph:
+        """Return the immutable graph backing this map."""
+
+        return self._graph
+
     def has_coordinate(self, position: tuple[float, float, float]) -> bool:
         """Return True if the given coordinate exists in the map."""
 

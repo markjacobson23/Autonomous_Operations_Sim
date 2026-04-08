@@ -3,6 +3,8 @@ import random
 
 from autonomous_ops_sim.maps.map import Map
 from autonomous_ops_sim.routing.router import Router
+from autonomous_ops_sim.simulation.trace import Trace
+from autonomous_ops_sim.simulation.vehicle_process import VehicleProcess
 from autonomous_ops_sim.simulation.world_state import WorldState
 
 
@@ -22,6 +24,7 @@ class SimulationEngine:
         self._seed = seed
         self._rng = random.Random(seed)
         self._simulated_time_s = 0.0
+        self._trace = Trace()
 
     @property
     def map(self) -> Map:
@@ -46,6 +49,12 @@ class SimulationEngine:
         """Return the engine-owned deterministic seed."""
 
         return self._seed
+
+    @property
+    def trace(self) -> Trace:
+        """Return the execution trace for this run."""
+
+        return self._trace
 
     @property
     def rng(self) -> random.Random:
@@ -73,3 +82,23 @@ class SimulationEngine:
 
         self._simulated_time_s = until_s
         return self._simulated_time_s
+
+    def execute_vehicle_route(
+        self,
+        *,
+        vehicle_id: int,
+        start_node_id: int,
+        destination_node_id: int,
+        max_speed: float,
+    ) -> tuple[int, ...]:
+        """Execute one vehicle over one routed path."""
+
+        process = VehicleProcess(
+            vehicle_id=vehicle_id,
+            current_node_id=start_node_id,
+            max_speed=max_speed,
+        )
+        return process.execute_route(
+            destination_node_id=destination_node_id,
+            engine=self,
+        )
