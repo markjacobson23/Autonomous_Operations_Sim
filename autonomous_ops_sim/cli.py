@@ -1,4 +1,22 @@
 import argparse
+import sys
+from pathlib import Path
+
+from autonomous_ops_sim.io.scenario_loader import load_scenario
+from autonomous_ops_sim.io.scenario_summary import format_scenario_summary
+
+
+def _run_scenario_command(scenario_path: str) -> int:
+    try:
+        source_path = Path(scenario_path)
+        scenario = load_scenario(source_path)
+    except (OSError, ValueError, TypeError, KeyError, OverflowError) as exc:
+        print(f"Error: failed to load scenario '{scenario_path}': {exc}", file=sys.stderr)
+        return 1
+
+    print(format_scenario_summary(scenario, source_path))
+    return 0
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -10,12 +28,25 @@ def build_parser() -> argparse.ArgumentParser:
         action="version",
         version="autonomous-ops-sim 0.1.0",
     )
+
+    subparsers = parser.add_subparsers(dest="command")
+
+    run_parser = subparsers.add_parser("run", help="Load and validate a scenario JSON file.")
+    run_parser.add_argument("scenario_path", help="Path to a scenario JSON file.")
+
     return parser
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    parser.parse_args(argv)
+    args = parser.parse_args(argv)
+
+    if args.command == "run":
+        return _run_scenario_command(args.scenario_path)
+
+    parser.print_help()
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
