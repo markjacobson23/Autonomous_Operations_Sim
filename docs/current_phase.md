@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 13 — Scenario schema for operations
+Step 14 — Persistent vehicle entity model
 
 ## Step status summary
 - Step 1: complete
@@ -16,61 +16,62 @@ Step 13 — Scenario schema for operations
 - Step 10: complete
 - Step 11: complete
 - Step 12: complete
-- Step 13: active
-- Step 14: not started
+- Step 13: complete
+- Step 14: active
+- Step 15: not started
 
 ## What already exists
 The repository already has:
-- scenario parsing and deterministic summaries
-- executable scenario-driven runs for a narrow single-vehicle job path
+- deterministic scenario parsing and summaries
+- executable scenario-driven runs
+- scenario-defined resources, blocked-edge runtime setup, and dispatcher config
 - static topology separated from runtime blocked-edge state via `WorldState`
 - graph-based routing with injectable cost models
 - deterministic simulated-time execution through `SimulationEngine`
 - jobs, tasks, shared resources, baseline dispatch, and multi-vehicle conflict handling
+- vehicle behavior FSM with explicit transitions
 - trace-centered metrics, exports, and golden regression coverage
 
 ## Goal of the current phase
-Expand the scenario schema so scenario files can describe more of the operational world and runtime setup.
+Promote a real persistent vehicle/entity model so execution flows stop relying primarily on threaded scalar vehicle parameters.
 
-The main Step 13 objective is:
-- move more execution configuration into scenario files
-- support scenario-defined resources
-- support scenario-defined runtime world-state setup
-- support scenario-defined dispatcher selection/config in a narrow form
-- keep scenario-driven execution deterministic and regression-friendly
+The main Step 14 objective is:
+- make `Vehicle` a meaningful execution-facing runtime entity
+- connect vehicle state cleanly to `VehicleProcess`, behavior, trace, and scenario execution
+- reduce scalar threading for things like speed, payload, and location
+- preserve determinism and existing trace/export surfaces
 
 ## In-scope work
 Work that is allowed right now:
-- add resource specs to the scenario schema
-- add runtime blocked-edge/world-state initialization to the scenario schema
-- add dispatcher selection/config to the scenario schema in a narrow form
-- extend scenario loading and validation
-- extend scenario execution/orchestration to instantiate these runtime objects
-- add richer executable scenario fixtures and golden regression coverage
-- make small additive refactors that keep scenario execution clean
+- expand `autonomous_ops_sim/vehicles/vehicle.py` into a real runtime-facing entity
+- refactor execution paths to accept/use a `Vehicle` object where appropriate
+- define clear ownership between vehicle state, behavior state, and process execution
+- update scenario execution to instantiate runtime vehicles from `VehicleSpec`
+- add tests proving the vehicle entity is integrated into execution without changing behavior semantics
+- perform additive refactors and targeted normal refactors needed to reduce scalar parameter threading
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- redesign the persistent vehicle/entity model
 - add visualization
 - add interactive control/command surfaces
 - redesign multi-vehicle coordination
 - add richer map import formats
-- over-generalize the scenario schema
-- build a broad scenario DSL
+- build a fleet-management optimization framework
+- overbuild a large domain model around vehicles
+- rewrite the simulator around ECS/actor frameworks
 
 ## Architectural guidance for this phase
-- Keep schema growth minimal and tied to real execution needs.
-- Keep parsing separate from runtime instantiation.
-- Reuse existing operations/runtime surfaces rather than creating parallel structures.
-- Prefer one narrow fully working scenario-driven configuration path over a flexible but half-finished schema.
-- Preserve deterministic trace/export behavior.
+- Keep the vehicle model small, explicit, and execution-facing.
+- Avoid duplicating the same runtime truth across `Vehicle`, `VehicleProcess`, and behavior state.
+- Preserve trace-centered observability and deterministic behavior.
+- Reuse existing engine/job/dispatch paths instead of creating parallel vehicle execution flows.
+- Prefer one clear runtime ownership model over convenience duplication.
+- Avoid dangerous rewrites.
 
-## Completion criteria for Step 13
-Step 13 is complete when:
-- scenarios can define resources used by execution
-- scenarios can define initial runtime blocked-edge/world-state conditions
-- scenarios can define dispatcher selection in a narrow supported form
-- scenario-driven execution remains deterministic
-- at least one richer scenario-run golden regression fixture exists
+## Completion criteria for Step 14
+Step 14 is complete when:
+- a persistent `Vehicle` entity is meaningfully used in runtime execution
+- key scalar vehicle parameters are no longer threaded everywhere they do not need to be
+- scenario execution instantiates runtime vehicles cleanly
+- existing behavior/trace/export semantics remain stable or are intentionally updated with test coverage
 - tests/lint/type checks pass
