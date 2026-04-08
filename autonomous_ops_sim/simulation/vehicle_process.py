@@ -16,6 +16,7 @@ from autonomous_ops_sim.simulation.behavior import (
     VehicleOperationalState,
 )
 from autonomous_ops_sim.simulation.trace import TraceEventType
+from autonomous_ops_sim.vehicles.vehicle import Vehicle
 
 if TYPE_CHECKING:
     from autonomous_ops_sim.simulation.engine import SimulationEngine
@@ -25,16 +26,31 @@ if TYPE_CHECKING:
 class VehicleProcess:
     """Single-vehicle route execution over simulated time."""
 
-    vehicle_id: int
-    current_node_id: int
-    max_speed: float
-    payload: float = 0.0
-    max_payload: float = math.inf
-    behavior: VehicleBehaviorController | None = None
+    vehicle: Vehicle
 
-    def __post_init__(self) -> None:
-        if self.behavior is None:
-            self.behavior = VehicleBehaviorController(vehicle_id=self.vehicle_id)
+    @property
+    def vehicle_id(self) -> int:
+        return self.vehicle.id
+
+    @property
+    def current_node_id(self) -> int:
+        return self.vehicle.current_node_id
+
+    @property
+    def max_speed(self) -> float:
+        return self.vehicle.max_speed
+
+    @property
+    def payload(self) -> float:
+        return self.vehicle.payload
+
+    @property
+    def max_payload(self) -> float:
+        return self.vehicle.max_payload
+
+    @property
+    def behavior(self) -> VehicleBehaviorController | None:
+        return self.vehicle.behavior
 
     def execute_route(
         self,
@@ -89,7 +105,10 @@ class VehicleProcess:
                 engine.run(
                     engine.simulated_time_s + _edge_travel_time_s(edge, self.max_speed)
                 )
-                self.current_node_id = end_node_id
+                self.vehicle.move_to_node(
+                    node_id=end_node_id,
+                    position=engine.map.get_position(end_node_id),
+                )
 
                 engine.trace.emit(
                     timestamp_s=engine.simulated_time_s,
@@ -115,7 +134,10 @@ class VehicleProcess:
             )
             return route
         except Exception as exc:
-            self._transition_to_failed(engine=engine, reason=f"route_failed:{type(exc).__name__}")
+            self._transition_to_failed(
+                engine=engine,
+                reason=f"route_failed:{type(exc).__name__}",
+            )
             raise
 
     def execute_job(
@@ -197,7 +219,10 @@ class VehicleProcess:
                 final_payload=self.payload,
             )
         except Exception as exc:
-            self._transition_to_failed(engine=engine, reason=f"job_failed:{type(exc).__name__}")
+            self._transition_to_failed(
+                engine=engine,
+                reason=f"job_failed:{type(exc).__name__}",
+            )
             raise
 
     def _execute_load_task(
@@ -220,7 +245,7 @@ class VehicleProcess:
             resource_id=task.resource_id,
             engine=engine,
         )
-        self.payload = updated_payload
+        self.vehicle.set_payload(updated_payload)
 
     def _execute_unload_task(
         self,
@@ -241,7 +266,7 @@ class VehicleProcess:
             resource_id=task.resource_id,
             engine=engine,
         )
-        self.payload -= task.amount
+        self.vehicle.unload_payload(task.amount)
 
     def _perform_service(
         self,
@@ -330,7 +355,12 @@ class VehicleProcess:
                 f"Vehicle-{self.vehicle_id} must be at Node-{node_id} to execute service task."
             )
 
-    def recover(self, *, engine: "SimulationEngine", reason: str = "manual_recovery") -> None:
+    def recover(
+        self,
+        *,
+        engine: "SimulationEngine",
+        reason: str = "manual_recovery",
+    ) -> None:
         """Return a failed process to idle through the explicit FSM path."""
 
         self._transition_behavior(

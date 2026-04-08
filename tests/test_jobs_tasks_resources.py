@@ -7,6 +7,7 @@ from autonomous_ops_sim.operations.resources import SharedResource
 from autonomous_ops_sim.operations.tasks import LoadTask, MoveTask, UnloadTask
 from autonomous_ops_sim.routing import Router
 from autonomous_ops_sim.simulation import SimulationEngine, TraceEventType, WorldState
+from autonomous_ops_sim.vehicles.vehicle import Vehicle
 
 
 def build_job_engine(*, resources: tuple[SharedResource, ...] = ()) -> SimulationEngine:
@@ -221,3 +222,37 @@ def test_repeated_runs_with_same_job_and_resources_are_deterministic():
 
     assert final_time_a == final_time_b
     assert trace_a == trace_b
+
+
+def test_vehicle_backed_job_execution_remains_deterministic():
+    def run_once() -> tuple[float, int, float, tuple[object, ...]]:
+        engine = build_job_engine()
+        vehicle = Vehicle(
+            id=505,
+            current_node_id=1,
+            position=engine.map.get_position(1),
+            velocity=0.0,
+            payload=0.0,
+            max_payload=10.0,
+            max_speed=5.0,
+        )
+        job = Job(
+            id="vehicle-job",
+            tasks=(
+                MoveTask(destination_node_id=2),
+                LoadTask(node_id=2, amount=4.0, service_duration_s=2.0),
+                MoveTask(destination_node_id=3),
+                UnloadTask(node_id=3, amount=4.0, service_duration_s=1.0),
+            ),
+        )
+
+        result = engine.execute_job(vehicle=vehicle, job=job)
+
+        return (
+            engine.simulated_time_s,
+            result.final_node_id,
+            result.final_payload,
+            engine.trace.events,
+        )
+
+    assert run_once() == run_once()

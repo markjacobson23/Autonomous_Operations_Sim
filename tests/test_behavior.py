@@ -15,6 +15,7 @@ from autonomous_ops_sim.simulation.behavior import (
     VehicleOperationalState,
 )
 from autonomous_ops_sim.simulation.vehicle_process import VehicleProcess
+from autonomous_ops_sim.vehicles.vehicle import Vehicle
 
 
 def build_behavior_engine(*, resources: tuple[SharedResource, ...] = ()) -> SimulationEngine:
@@ -97,11 +98,15 @@ def test_vehicle_behavior_controller_rejects_invalid_transitions_clearly():
 def test_process_failure_and_explicit_recovery_are_tracked_through_behavior_state():
     engine = build_behavior_engine()
     process = VehicleProcess(
-        vehicle_id=101,
-        current_node_id=1,
-        max_speed=5.0,
-        payload=0.0,
-        max_payload=5.0,
+        vehicle=Vehicle(
+            id=101,
+            current_node_id=1,
+            position=engine.map.get_position(1),
+            velocity=0.0,
+            payload=0.0,
+            max_payload=5.0,
+            max_speed=5.0,
+        )
     )
     failing_job = Job(
         id="bad-unload",

@@ -25,6 +25,7 @@ from autonomous_ops_sim.simulation.trace import Trace
 from autonomous_ops_sim.simulation.trace import TraceEventType
 from autonomous_ops_sim.simulation.vehicle_process import VehicleProcess
 from autonomous_ops_sim.simulation.world_state import WorldState
+from autonomous_ops_sim.vehicles.vehicle import Vehicle
 
 if TYPE_CHECKING:
     from autonomous_ops_sim.routing.router import Router
@@ -76,8 +77,10 @@ class SimulationEngine:
         router: "Router",
         seed: int,
         resources: Iterable[SharedResource] = (),
+        vehicles: Iterable[Vehicle] = (),
     ):
         resources_tuple = tuple(resources)
+        vehicles_tuple = tuple(vehicles)
 
         self._map = simulation_map
         self._world_state = world_state
@@ -89,8 +92,11 @@ class SimulationEngine:
         self._resources = {
             resource.resource_id: resource for resource in resources_tuple
         }
+        self._vehicles = {vehicle.id: vehicle for vehicle in vehicles_tuple}
         if len(self._resources) != len(resources_tuple):
             raise ValueError("resource ids must be unique")
+        if len(self._vehicles) != len(vehicles_tuple):
+            raise ValueError("vehicle ids must be unique")
 
     @property
     def map(self) -> Map:
@@ -135,6 +141,15 @@ class SimulationEngine:
         return tuple(self._resources.values())
 
     @property
+    def vehicles(self) -> tuple[Vehicle, ...]:
+        """Return runtime vehicles available during this run."""
+
+        return tuple(
+            vehicle
+            for _, vehicle in sorted(self._vehicles.items(), key=lambda item: item[0])
+        )
+
+    @property
     def simulated_time_s(self) -> float:
         """Return the current simulated time."""
 
@@ -158,18 +173,21 @@ class SimulationEngine:
     def execute_vehicle_route(
         self,
         *,
-        vehicle_id: int,
-        start_node_id: int,
+        vehicle: Vehicle | None = None,
+        vehicle_id: int | None = None,
+        start_node_id: int | None = None,
         destination_node_id: int,
-        max_speed: float,
+        max_speed: float | None = None,
     ) -> tuple[int, ...]:
         """Execute one vehicle over one routed path."""
 
-        process = VehicleProcess(
+        runtime_vehicle = self._resolve_runtime_vehicle(
+            vehicle=vehicle,
             vehicle_id=vehicle_id,
-            current_node_id=start_node_id,
+            start_node_id=start_node_id,
             max_speed=max_speed,
         )
+        process = VehicleProcess(vehicle=runtime_vehicle)
         return process.execute_route(
             destination_node_id=destination_node_id,
             engine=self,
@@ -245,25 +263,36 @@ class SimulationEngine:
         except KeyError as exc:
             raise KeyError(f"Unknown resource_id: {resource_id}") from exc
 
+    def get_vehicle(self, vehicle_id: int) -> Vehicle:
+        """Return a configured runtime vehicle by ID."""
+
+        try:
+            return self._vehicles[vehicle_id]
+        except KeyError as exc:
+            raise KeyError(f"Unknown vehicle_id: {vehicle_id}") from exc
+
     def execute_job(
         self,
         *,
-        vehicle_id: int,
-        start_node_id: int,
-        max_speed: float,
+        vehicle: Vehicle | None = None,
+        vehicle_id: int | None = None,
+        start_node_id: int | None = None,
+        max_speed: float | None = None,
         job: Job,
-        initial_payload: float = 0.0,
-        max_payload: float = math.inf,
+        initial_payload: float | None = None,
+        max_payload: float | None = None,
     ) -> JobExecutionResult:
         """Execute one ordered job sequence for one vehicle."""
 
-        process = VehicleProcess(
+        runtime_vehicle = self._resolve_runtime_vehicle(
+            vehicle=vehicle,
             vehicle_id=vehicle_id,
-            current_node_id=start_node_id,
+            start_node_id=start_node_id,
             max_speed=max_speed,
-            payload=initial_payload,
+            initial_payload=initial_payload,
             max_payload=max_payload,
         )
+        process = VehicleProcess(vehicle=runtime_vehicle)
         return process.execute_job(job=job, engine=self)
 
     def dispatch_job(
@@ -271,21 +300,24 @@ class SimulationEngine:
         *,
         dispatcher: Dispatcher,
         pending_jobs: Iterable[Job],
-        vehicle_id: int,
-        start_node_id: int,
-        max_speed: float,
-        initial_payload: float = 0.0,
-        max_payload: float = math.inf,
+        vehicle: Vehicle | None = None,
+        vehicle_id: int | None = None,
+        start_node_id: int | None = None,
+        max_speed: float | None = None,
+        initial_payload: float | None = None,
+        max_payload: float | None = None,
     ) -> DispatchExecutionResult | None:
         """Select and execute one pending job through the existing job path."""
 
-        request = DispatchRequest(
+        runtime_vehicle = self._resolve_runtime_vehicle(
+            vehicle=vehicle,
             vehicle_id=vehicle_id,
             start_node_id=start_node_id,
             max_speed=max_speed,
             initial_payload=initial_payload,
             max_payload=max_payload,
         )
+        request = DispatchRequest(vehicle=runtime_vehicle)
         assignment = dispatcher.assign_job(
             pending_jobs=tuple(pending_jobs),
             engine=self,
@@ -295,16 +327,72 @@ class SimulationEngine:
             return None
 
         job_result = self.execute_job(
-            vehicle_id=vehicle_id,
-            start_node_id=start_node_id,
-            max_speed=max_speed,
+            vehicle=runtime_vehicle,
             job=assignment.job,
-            initial_payload=initial_payload,
-            max_payload=max_payload,
         )
         return DispatchExecutionResult(
             assignment=assignment,
             job_result=job_result,
+        )
+
+    def _resolve_runtime_vehicle(
+        self,
+        *,
+        vehicle: Vehicle | None,
+        vehicle_id: int | None,
+        start_node_id: int | None,
+        max_speed: float | None,
+        initial_payload: float | None = None,
+        max_payload: float | None = None,
+    ) -> Vehicle:
+        if vehicle is not None:
+            provided_scalars = (
+                vehicle_id,
+                start_node_id,
+                max_speed,
+                initial_payload,
+                max_payload,
+            )
+            if any(value is not None for value in provided_scalars):
+                raise ValueError(
+                    "vehicle-backed execution does not accept duplicate "
+                    "scalar vehicle inputs"
+                )
+            existing_vehicle = self._vehicles.get(vehicle.id)
+            if existing_vehicle is not None and existing_vehicle is not vehicle:
+                raise ValueError(
+                    f"vehicle_id {vehicle.id} is already registered to a different vehicle"
+                )
+            self._vehicles.setdefault(vehicle.id, vehicle)
+            return self._vehicles[vehicle.id]
+
+        missing_fields = [
+            name
+            for name, value in (
+                ("vehicle_id", vehicle_id),
+                ("start_node_id", start_node_id),
+                ("max_speed", max_speed),
+            )
+            if value is None
+        ]
+        if missing_fields:
+            missing_str = ", ".join(missing_fields)
+            raise ValueError(
+                "scalar vehicle execution requires explicit values for: "
+                f"{missing_str}"
+            )
+
+        assert vehicle_id is not None
+        assert start_node_id is not None
+        assert max_speed is not None
+        return Vehicle(
+            id=vehicle_id,
+            current_node_id=start_node_id,
+            position=self.map.get_position(start_node_id),
+            velocity=0.0,
+            payload=0.0 if initial_payload is None else initial_payload,
+            max_payload=math.inf if max_payload is None else max_payload,
+            max_speed=max_speed,
         )
 
     def _plan_multi_vehicle_route(

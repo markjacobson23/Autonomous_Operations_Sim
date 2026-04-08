@@ -23,10 +23,10 @@ from autonomous_ops_sim.simulation.scenario import (
     Scenario,
     ScenarioTaskSpec,
     SingleVehicleJobExecutionSpec,
-    VehicleSpec,
     WorldStateSpec,
 )
 from autonomous_ops_sim.simulation.world_state import WorldState
+from autonomous_ops_sim.vehicles.vehicle import Vehicle, VehicleType
 
 
 @dataclass(frozen=True)
@@ -55,20 +55,18 @@ def execute_scenario(scenario: Scenario) -> ScenarioExecutionResult:
         router=Router(),
         seed=scenario.seed,
         resources=_build_resources(scenario.resources),
+        vehicles=_build_runtime_vehicles(
+            scenario=scenario,
+            simulation_map=simulation_map,
+        ),
     )
 
-    vehicle = _get_execution_vehicle(scenario=scenario)
-    start_node_id = _resolve_node_id(
-        simulation_map=simulation_map,
-        position=vehicle.position,
-        label=f"vehicle {vehicle.id} start position",
-    )
+    vehicle = _get_execution_vehicle(engine=engine, scenario=scenario)
     _execute_configured_work(
         engine=engine,
         scenario=scenario,
         simulation_map=simulation_map,
         vehicle=vehicle,
-        start_node_id=start_node_id,
     )
 
     if engine.simulated_time_s > scenario.duration_s:
@@ -130,15 +128,30 @@ def _build_resources(resource_specs: tuple[ResourceSpec, ...]) -> tuple[SharedRe
     )
 
 
-def _get_execution_vehicle(*, scenario: Scenario) -> VehicleSpec:
+def _build_runtime_vehicles(*, scenario: Scenario, simulation_map) -> tuple[Vehicle, ...]:
+    return tuple(
+        Vehicle(
+            id=vehicle_spec.id,
+            current_node_id=_resolve_node_id(
+                simulation_map=simulation_map,
+                position=vehicle_spec.position,
+                label=f"vehicle {vehicle_spec.id} start position",
+            ),
+            position=vehicle_spec.position,
+            velocity=vehicle_spec.velocity,
+            payload=vehicle_spec.payload,
+            max_payload=vehicle_spec.max_payload,
+            max_speed=vehicle_spec.max_speed,
+            vehicle_type=vehicle_spec.vehicle_type or VehicleType.GENERIC,
+        )
+        for vehicle_spec in scenario.vehicles
+    )
+
+
+def _get_execution_vehicle(*, engine: SimulationEngine, scenario: Scenario) -> Vehicle:
     assert scenario.execution is not None
 
-    for vehicle in scenario.vehicles:
-        if vehicle.id == scenario.execution.vehicle_id:
-            return vehicle
-    raise ValueError(
-        f"Scenario execution vehicle_id {scenario.execution.vehicle_id} was not found."
-    )
+    return engine.get_vehicle(scenario.execution.vehicle_id)
 
 
 def _execute_configured_work(
@@ -146,19 +159,14 @@ def _execute_configured_work(
     engine: SimulationEngine,
     scenario: Scenario,
     simulation_map,
-    vehicle: VehicleSpec,
-    start_node_id: int,
+    vehicle: Vehicle,
 ) -> None:
     assert scenario.execution is not None
 
     execution = scenario.execution
     if isinstance(execution, SingleVehicleJobExecutionSpec):
         engine.execute_job(
-            vehicle_id=vehicle.id,
-            start_node_id=start_node_id,
-            max_speed=vehicle.max_speed,
-            initial_payload=vehicle.payload,
-            max_payload=vehicle.max_payload,
+            vehicle=vehicle,
             job=_build_job(
                 simulation_map=simulation_map,
                 job_spec=execution.job,
@@ -175,11 +183,7 @@ def _execute_configured_work(
             _build_job(simulation_map=simulation_map, job_spec=job_spec)
             for job_spec in execution.jobs
         ),
-        vehicle_id=vehicle.id,
-        start_node_id=start_node_id,
-        max_speed=vehicle.max_speed,
-        initial_payload=vehicle.payload,
-        max_payload=vehicle.max_payload,
+        vehicle=vehicle,
     )
     if dispatch_result is None:
         raise ValueError("Scenario dispatcher did not assign a feasible job.")

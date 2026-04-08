@@ -17,6 +17,7 @@ def test_scenario_execution_runs_end_to_end_through_existing_engine_surfaces():
     scenario = load_scenario(SCENARIO_PATH)
 
     result = execute_scenario(scenario)
+    runtime_vehicle = result.engine.get_vehicle(7)
 
     assert result.engine.seed == 212
     assert result.summary.seed == 212
@@ -26,6 +27,10 @@ def test_scenario_execution_runs_end_to_end_through_existing_engine_surfaces():
     assert result.summary.route_count == 2
     assert result.summary.vehicle_ids == (7,)
     assert result.summary.trace_event_count > 0
+    assert runtime_vehicle.id == 7
+    assert runtime_vehicle.current_node_id == 6
+    assert runtime_vehicle.payload == 0.0
+    assert runtime_vehicle.operational_state == "idle"
     assert json.loads(result.export_json)["summary"]["completed_job_count"] == 1
 
 
@@ -37,6 +42,10 @@ def test_repeated_scenario_execution_produces_identical_export_output():
 
     assert first_result.summary == second_result.summary
     assert first_result.export_json == second_result.export_json
+    assert first_result.engine.get_vehicle(7).current_node_id == (
+        second_result.engine.get_vehicle(7).current_node_id
+    )
+    assert first_result.engine.get_vehicle(7).payload == second_result.engine.get_vehicle(7).payload
 
 
 def test_scenario_execution_export_output_is_stable():

@@ -12,6 +12,7 @@ from autonomous_ops_sim.operations import (
 )
 from autonomous_ops_sim.routing import Router
 from autonomous_ops_sim.simulation import SimulationEngine, TraceEventType, WorldState
+from autonomous_ops_sim.vehicles.vehicle import Vehicle
 
 
 def build_job_engine() -> SimulationEngine:
@@ -47,10 +48,15 @@ def test_first_feasible_dispatcher_selects_jobs_deterministically():
     engine = build_job_engine()
     dispatcher = FirstFeasibleDispatcher()
     request = DispatchRequest(
-        vehicle_id=501,
-        start_node_id=1,
-        max_speed=5.0,
-        max_payload=5.0,
+        vehicle=Vehicle(
+            id=501,
+            current_node_id=1,
+            position=engine.map.get_position(1),
+            velocity=0.0,
+            payload=0.0,
+            max_payload=5.0,
+            max_speed=5.0,
+        )
     )
     pending_jobs = (
         Job(
@@ -95,10 +101,15 @@ def test_dispatch_assignment_carries_selected_job_and_vehicle():
     engine = build_job_engine()
     dispatcher = FirstFeasibleDispatcher()
     request = DispatchRequest(
-        vehicle_id=601,
-        start_node_id=1,
-        max_speed=5.0,
-        max_payload=10.0,
+        vehicle=Vehicle(
+            id=601,
+            current_node_id=1,
+            position=engine.map.get_position(1),
+            velocity=0.0,
+            payload=0.0,
+            max_payload=10.0,
+            max_speed=5.0,
+        )
     )
     job = Job(
         id="assigned-haul",
@@ -201,3 +212,47 @@ def test_repeated_dispatch_runs_with_same_setup_produce_same_choice_and_outcome(
     assert assignment_a == assignment_b
     assert final_time_a == final_time_b
     assert trace_a == trace_b
+
+
+def test_vehicle_backed_dispatch_execution_remains_deterministic():
+    def run_once() -> tuple[str, float, float, tuple[object, ...]]:
+        engine = build_job_engine()
+        vehicle = Vehicle(
+            id=901,
+            current_node_id=1,
+            position=engine.map.get_position(1),
+            velocity=0.0,
+            payload=0.0,
+            max_payload=10.0,
+            max_speed=5.0,
+        )
+
+        result = engine.dispatch_job(
+            dispatcher=FirstFeasibleDispatcher(),
+            pending_jobs=(
+                Job(
+                    id="not-feasible",
+                    tasks=(UnloadTask(node_id=1, amount=1.0, service_duration_s=1.0),),
+                ),
+                Job(
+                    id="vehicle-backed",
+                    tasks=(
+                        MoveTask(destination_node_id=2),
+                        LoadTask(node_id=2, amount=4.0, service_duration_s=2.0),
+                        MoveTask(destination_node_id=3),
+                        UnloadTask(node_id=3, amount=4.0, service_duration_s=1.0),
+                    ),
+                ),
+            ),
+            vehicle=vehicle,
+        )
+
+        assert result is not None
+        return (
+            result.assignment.job.id,
+            engine.simulated_time_s,
+            vehicle.payload,
+            engine.trace.events,
+        )
+
+    assert run_once() == run_once()

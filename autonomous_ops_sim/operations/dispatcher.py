@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from autonomous_ops_sim.operations.jobs import Job, JobExecutionResult
 from autonomous_ops_sim.operations.tasks import LoadTask, MoveTask
+from autonomous_ops_sim.vehicles.vehicle import Vehicle
 
 if TYPE_CHECKING:
     from autonomous_ops_sim.simulation.engine import SimulationEngine
@@ -13,11 +14,27 @@ if TYPE_CHECKING:
 class DispatchRequest:
     """Stable vehicle execution inputs used during dispatcher selection."""
 
-    vehicle_id: int
-    start_node_id: int
-    max_speed: float
-    initial_payload: float = 0.0
-    max_payload: float = math.inf
+    vehicle: Vehicle
+
+    @property
+    def vehicle_id(self) -> int:
+        return self.vehicle.id
+
+    @property
+    def start_node_id(self) -> int:
+        return self.vehicle.current_node_id
+
+    @property
+    def max_speed(self) -> float:
+        return self.vehicle.max_speed
+
+    @property
+    def initial_payload(self) -> float:
+        return self.vehicle.payload
+
+    @property
+    def max_payload(self) -> float:
+        return self.vehicle.max_payload
 
 
 @dataclass(frozen=True)
