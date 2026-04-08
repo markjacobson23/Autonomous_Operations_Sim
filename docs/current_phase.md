@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 11 — Scenario packs, metrics, visualization hooks, and optional external wrapper
+Step 12 — Executable scenario harness
 
 ## Step status summary
 - Step 1: complete
@@ -14,53 +14,62 @@ Step 11 — Scenario packs, metrics, visualization hooks, and optional external 
 - Step 8: complete
 - Step 9: complete
 - Step 10: complete
-- Step 11: active
+- Step 11: complete
+- Step 12: active
+- Step 13: not started
 
 ## What already exists
 The repository already has:
-- scenario/config spine
-- static map/topology separated from runtime blocked-edge state via `WorldState`
-- `CostModel` routing and `Router`
-- `SimulationEngine` with explicit simulated time
-- single-vehicle route execution and deterministic trace output
-- jobs, tasks, and shared resources
-- a baseline dispatcher
-- deterministic multi-vehicle conflict handling
-- a vehicle-centric behavior layer
+- scenario/config parsing and deterministic scenario summaries
+- static topology separated from runtime blocked-edge state via `WorldState`
+- graph-based routing with injectable cost models through `Router`
+- `SimulationEngine` with explicit simulated time and deterministic RNG
+- single-vehicle route execution with deterministic trace output
+- jobs, tasks, shared resources, and baseline dispatching
+- deterministic multi-vehicle reservation-based conflict handling
+- a vehicle behavior FSM with explicit transitions
+- stable metrics summaries, deterministic exports, and golden regression coverage
 
 ## Goal of the current phase
-Add stable outward-facing analysis surfaces so simulator runs can be measured, exported, and regression-tested.
+Turn scenario files into real executable simulator runs rather than validation-only inputs.
 
-The main Step 11 objective is:
-- add metrics summaries
-- add stable export formats
-- add a golden-scenario regression surface
-- optionally add minimal visualization hooks without overbuilding
+The main Step 12 objective is:
+- wire scenario input into end-to-end simulator execution
+- keep the execution path deterministic
+- produce stable export output directly from scenario-driven runs
+- establish the scenario-run harness that later steps can build on
 
 ## In-scope work
 Work that is allowed right now:
-- add metrics/summary modules
-- add export support such as JSON and/or CSV
-- add a stable golden-scenario regression test
-- add minimal visualization hooks if they stay small
-- small additive refactors that improve external usability without changing simulator scope
+- add a scenario execution/orchestration path
+- extend the CLI so a scenario can drive a real simulation run
+- convert parsed scenario data into instantiated map/world-state/engine/runtime setup
+- add deterministic export output for scenario-driven runs
+- add at least one golden regression fixture for a scenario-driven run
+- perform small additive refactors that make scenario execution cleaner without changing simulator scope
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- build a large dashboard or UI
-- build a broad RL framework unless it stays clearly optional and minimal
-- overbuild rendering/animation systems
-- turn this step into general cleanup without a clear metrics/export/regression goal
+- add real-time visualization
+- add interactive live control surfaces
+- promote a full persistent `Vehicle` entity model yet
+- redesign the reservation/conflict algorithm
+- add richer map import formats beyond what Step 12 strictly needs
+- build a dashboard, viewer, or UI
+- add broad command/replay infrastructure
 
 ## Architectural guidance for this phase
-- Prefer derived metrics as the main stable outward-facing surface.
-- Keep export formats simple and stable.
-- Favor regression-friendly outputs over flashy presentation.
-- Keep visualization hooks minimal and decoupled.
+- Keep the current deterministic trace/export surface as the source of truth.
+- Prefer orchestration code that reuses existing engine/job/dispatch APIs over new parallel execution paths.
+- Keep schema expansion minimal and only introduce fields needed to support real scenario execution.
+- Separate parsing from runtime instantiation cleanly.
+- Do not smuggle in later-step visualization or interaction architecture.
+- Avoid large rewrites.
 
-## Completion criteria for Step 11
-Step 11 is complete when:
-- stable metrics summaries exist
-- at least one structured export format exists
-- at least one golden-scenario regression test exists
+## Completion criteria for Step 12
+Step 12 is complete when:
+- a scenario file can drive a real simulator run, not just validation/summary
+- the CLI can produce deterministic export output from a scenario-driven run
+- repeated runs with the same scenario produce identical output
+- at least one scenario-run golden regression fixture exists
 - tests/lint/type checks pass
