@@ -34,6 +34,19 @@ def make_valid_scenario_data():
                 "vehicle_type": "GENERIC",
             }
         ],
+        "execution": {
+            "kind": "single_vehicle_job",
+            "vehicle_id": 1,
+            "job": {
+                "id": "demo-job",
+                "tasks": [
+                    {
+                        "kind": "move",
+                        "destination": [1, 0, 0],
+                    }
+                ],
+            },
+        },
     }
 
 @pytest.fixture
@@ -64,6 +77,11 @@ def test_load_scenario_parses_valid_grid_scenario(tmp_path, valid_scenario_data)
     assert vehicle.max_payload == 100.0
     assert vehicle.max_speed == 25.0
     assert vehicle.vehicle_type == VehicleType.GENERIC
+    assert scenario.execution is not None
+    assert scenario.execution.kind == "single_vehicle_job"
+    assert scenario.execution.vehicle_id == 1
+    assert scenario.execution.job.id == "demo-job"
+    assert len(scenario.execution.job.tasks) == 1
 
 
 def test_load_scenario_raises_for_missing_name(tmp_path, valid_scenario_data):
@@ -232,6 +250,16 @@ def test_load_scenario_accepts_missing_vehicle_type(tmp_path, valid_scenario_dat
     scenario = load_scenario(scenario_path)
     assert scenario.vehicles[0].vehicle_type is None
 
+
+def test_load_scenario_accepts_missing_execution_section(tmp_path, valid_scenario_data):
+    data = valid_scenario_data
+    del data["execution"]
+    scenario_path = write_scenario(tmp_path, data)
+
+    scenario = load_scenario(scenario_path)
+
+    assert scenario.execution is None
+
 def test_load_scenario_raises_for_invalid_vehicle_type(tmp_path, valid_scenario_data):
     data = valid_scenario_data
     data["vehicles"][0]["vehicle_type"] = "INVALID"
@@ -258,6 +286,15 @@ def test_load_scenario_converts_numeric_vehicle_fields_to_float(tmp_path, valid_
     assert isinstance(scenario.vehicles[0].payload, float)
     assert isinstance(scenario.vehicles[0].max_payload, float)
     assert isinstance(scenario.vehicles[0].max_speed, float)
+
+
+def test_load_scenario_raises_for_unknown_execution_vehicle_id(tmp_path, valid_scenario_data):
+    data = valid_scenario_data
+    data["execution"]["vehicle_id"] = 99
+    scenario_path = write_scenario(tmp_path, data)
+
+    with pytest.raises(ValueError, match="vehicle_id"):
+        load_scenario(scenario_path)
 
 def test_load_scenario_preserves_seed_value(tmp_path, valid_scenario_data):
     data = valid_scenario_data

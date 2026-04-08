@@ -4,6 +4,7 @@ from pathlib import Path
 
 from autonomous_ops_sim.io.scenario_loader import load_scenario
 from autonomous_ops_sim.io.scenario_summary import format_scenario_summary
+from autonomous_ops_sim.simulation.scenario_executor import execute_scenario
 
 
 def _run_scenario_command(scenario_path: str) -> int:
@@ -14,6 +15,26 @@ def _run_scenario_command(scenario_path: str) -> int:
         return 1
 
     print(format_scenario_summary(scenario))
+    return 0
+
+
+def _execute_scenario_command(scenario_path: str) -> int:
+    try:
+        scenario = load_scenario(Path(scenario_path))
+    except (OSError, ValueError, TypeError, KeyError, OverflowError) as exc:
+        print(f"Error: failed to load scenario '{scenario_path}': {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        result = execute_scenario(scenario)
+    except (ValueError, KeyError, RuntimeError) as exc:
+        print(
+            f"Error: failed to execute scenario '{scenario_path}': {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(result.export_json, end="")
     return 0
 
 
@@ -30,8 +51,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command")
 
-    run_parser = subparsers.add_parser("run", help="Load and validate a scenario JSON file.")
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Load and summarize a scenario JSON file.",
+    )
     run_parser.add_argument("scenario_path", help="Path to a scenario JSON file.")
+
+    execute_parser = subparsers.add_parser(
+        "execute",
+        help="Execute a scenario JSON file and emit deterministic export JSON.",
+    )
+    execute_parser.add_argument("scenario_path", help="Path to a scenario JSON file.")
 
     return parser
 
@@ -42,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         return _run_scenario_command(args.scenario_path)
+    if args.command == "execute":
+        return _execute_scenario_command(args.scenario_path)
 
     parser.print_help()
     return 0

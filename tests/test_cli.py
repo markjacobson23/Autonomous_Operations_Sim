@@ -58,3 +58,33 @@ def test_module_cli_run_command_works():
 
     assert result.returncode == 0
     assert "scenario: basic_grid_demo" in result.stdout
+
+
+def test_cli_execute_runs_scenario_and_emits_export_json(capsys):
+    exit_code = main(["execute", "scenarios/step_12_single_vehicle_job.json"])
+
+    captured = capsys.readouterr()
+    export_record = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert captured.err == ""
+    assert export_record["seed"] == 212
+    assert export_record["summary"]["completed_job_count"] == 1
+
+
+def test_module_cli_execute_command_works():
+    result = subprocess.run(
+        [
+            "python3",
+            "-m",
+            "autonomous_ops_sim.cli",
+            "execute",
+            "scenarios/step_12_single_vehicle_job.json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert json.loads(result.stdout)["final_time_s"] == 6.0
