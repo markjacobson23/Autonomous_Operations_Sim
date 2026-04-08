@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 8 — Simple dispatcher
+Step 9 — Multi-vehicle conflict handling
 
 ## Step status summary
 - Step 1: complete
@@ -11,55 +11,55 @@ Step 8 — Simple dispatcher
 - Step 5: complete
 - Step 6: complete
 - Step 7: complete
-- Step 8: active
-- Step 9: not started
+- Step 8: complete
+- Step 9: active
+- Step 10: not started
 
 ## What already exists
 The repository already has:
-- working package structure
 - scenario/config spine
 - static map/topology separated from runtime blocked-edge state via `WorldState`
 - `CostModel` routing and `Router`
 - `SimulationEngine` with explicit simulated time
-- single-vehicle route execution
-- deterministic trace output
+- single-vehicle route execution and deterministic trace output
 - jobs, tasks, and shared resources
+- a baseline dispatcher
 
 ## Goal of the current phase
-Add a baseline dispatcher that chooses which job a vehicle should execute next.
+Add safe multi-vehicle movement coordination so conflicting occupancy is prevented deterministically.
 
-The main Step 8 objective is:
-- introduce a dispatcher interface
-- add one deterministic baseline dispatch policy
-- connect dispatch selection to existing job execution
-- support job completion under simple load
+The main Step 9 objective is:
+- introduce a reservation/conflict mechanism
+- support deterministic multi-vehicle planning/execution
+- prevent double occupancy under the supported reservation model
+- support simple waiting or replanning behavior when conflicts occur
 
 ## In-scope work
 Work that is allowed right now:
-- add `operations/dispatcher.py`
-- add a dispatcher interface/protocol
-- add one concrete baseline dispatcher
-- integrate dispatch choice with existing engine/job execution
-- add tests for assignment correctness and repeated deterministic execution
-- small additive refactors that make Step 8 cleaner without introducing Step 9 concepts
+- add a reservation table such as `simulation/reservations.py`
+- add deterministic multi-vehicle coordination for a small supported case
+- use priority order for initial conflict resolution
+- support waiting and/or simple replanning as conflict response
+- add tests for no double occupancy and deterministic conflict handling
+- small additive refactors that make Step 9 cleaner without introducing Step 10 concepts
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- add multi-vehicle road conflict handling
-- add advanced optimization or search
-- add behavior systems
-- add learning-based dispatch
+- add behavior systems / FSM / BT layers
+- add advanced MAPF optimization frameworks
 - add broad planning frameworks
+- add Step 10 behavior logic
+- add Step 11 visualization/metrics expansion
 
 ## Architectural guidance for this phase
-- Keep the dispatcher interface small.
-- Keep the baseline policy simple and deterministic.
-- Reuse existing jobs/tasks/resources execution instead of duplicating it.
-- Do not overbuild dispatch abstractions yet.
+- Keep the reservation model explicit and testable.
+- Prefer a narrow deterministic baseline over a clever but sprawling conflict system.
+- Use graph-level reservation concepts that match the current abstraction level.
+- Do not overbuild the first multi-vehicle implementation.
 
-## Completion criteria for Step 8
-Step 8 is complete when:
-- a dispatcher interface exists
-- a baseline dispatcher can select a job deterministically
-- selected jobs execute correctly through the existing engine/job path
+## Completion criteria for Step 9
+Step 9 is complete when:
+- multiple vehicles can be coordinated safely under the supported conflict model
+- no double occupancy occurs under the tested cases
+- deterministic priority handling works
 - tests/lint/type checks pass
