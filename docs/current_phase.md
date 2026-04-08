@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 16 — Richer operations realism
+Step 17 — Coordination upgrade
 
 ## Step status summary
 - Step 1: complete
@@ -19,8 +19,9 @@ Step 16 — Richer operations realism
 - Step 13: complete
 - Step 14: complete
 - Step 15: complete
-- Step 16: active
-- Step 17: not started
+- Step 16: complete
+- Step 17: active
+- Step 18: not started
 
 ## What already exists
 The repository already has:
@@ -29,53 +30,56 @@ The repository already has:
 - scenario-defined resources, blocked-edge runtime setup, and dispatcher config
 - a persistent runtime-facing `Vehicle` entity integrated into execution
 - deterministic scenario-pack / batch execution with stable aggregate outputs
+- a narrow richer-operations workload path for repeated dispatch over time
 - static topology separated from runtime blocked-edge state via `WorldState`
 - graph-based routing with injectable cost models
 - deterministic simulated-time execution through `SimulationEngine`
-- jobs, tasks, shared resources, baseline dispatch, and multi-vehicle conflict handling
+- jobs, tasks, shared resources, baseline dispatch, and narrow multi-vehicle conflict handling
 - vehicle behavior FSM with explicit transitions
 - trace-centered metrics, exports, and golden regression coverage
 
 ## Goal of the current phase
-Move from isolated one-job execution toward richer operations realism with multiple jobs over time and more meaningful fleet-style workload studies.
+Upgrade multi-vehicle coordination beyond the current narrow reservation baseline while preserving determinism and clear runtime boundaries.
 
-The main Step 16 objective is:
-- support repeated or sequential operational work in one run
-- make longer-lived workload execution possible without hand-stitching isolated single-job runs
-- improve realism around ongoing work assignment and utilization-oriented studies
-- preserve determinism and the existing trace/export surfaces
+The main Step 17 objective is:
+- strengthen coordination logic for multi-vehicle movement
+- improve conflict handling realism and observability
+- add bounded coordination upgrades without destabilizing the simulator
+- preserve deterministic trace/export behavior
 
 ## In-scope work
 Work that is allowed right now:
-- add a narrow repeated-work / multi-job-over-time execution path
-- support sequential job execution for a persistent vehicle within one scenario/run
-- add scenario support for richer ongoing workload definitions only if needed for the chosen execution path
-- extend metrics in narrow ways needed to summarize longer-lived operational runs
-- add deterministic tests and at least one richer long-running scenario fixture/golden regression surface
-- perform additive refactors and targeted normal refactors needed to keep workload execution clean
+- strengthen reservation/conflict handling in a narrow, explicit way
+- improve multi-vehicle coordination semantics such as:
+  - clearer wait behavior
+  - better reservation conflict reasoning
+  - bounded deadlock prevention or observability
+  - narrow corridor/intersection-style handling if it stays small
+- add deterministic multi-vehicle regression scenarios and fixtures
+- extend metrics/trace only where needed to support the coordination upgrade
+- perform additive refactors and targeted normal refactors needed to keep coordination logic clean
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- redesign multi-vehicle coordination
 - add visualization
 - add interactive control/command surfaces
-- add richer map import formats
-- build a fleet optimization framework
-- add stochastic demand generation unless it is tightly controlled and deterministic
-- overbuild a scheduling/planning platform beyond the narrow richer-operations goal
+- build a full MAPF or optimal planner framework
+- redesign the simulator into an event-scheduling platform
+- add broad map realism/import work
+- overbuild coordination abstractions beyond the narrow upgrade needed now
 
 ## Architectural guidance for this phase
-- Reuse the persistent vehicle model and existing engine/job/dispatch paths.
-- Prefer a narrow, clearly deterministic longer-run execution path over broad operational ambition.
-- Keep workload orchestration separate from low-level task execution.
-- Preserve trace-centered observability and stable exports.
-- Extend metrics only where they help characterize richer operations runs.
+- Keep coordination logic deterministic and explicit.
+- Prefer bounded upgrades to the existing reservation model over wholesale replacement.
+- Preserve trace-centered observability; coordination changes should remain inspectable in trace/metrics.
+- Reuse the current engine/runtime surfaces rather than creating a separate multi-agent subsystem.
+- Add only the minimum new semantics needed to improve realism and safety.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 16
-Step 16 is complete when:
-- a persistent vehicle can execute multiple jobs over time within one coherent run
-- richer operational workload behavior is scenario-driven or otherwise cleanly orchestrated
-- deterministic summaries/exports remain stable for repeated runs
-- at least one richer long-run regression fixture exists
+## Completion criteria for Step 17
+Step 17 is complete when:
+- multi-vehicle coordination is meaningfully stronger than the Step 9 baseline
+- the upgraded coordination behavior is deterministic
+- at least one stronger multi-vehicle regression scenario/fixture exists
+- trace/metrics remain stable or are intentionally updated with coverage
 - tests/lint/type checks pass
