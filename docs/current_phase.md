@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 17 — Coordination upgrade
+Step 18 — Control-command surface
 
 ## Step status summary
 - Step 1: complete
@@ -20,8 +20,9 @@ Step 17 — Coordination upgrade
 - Step 14: complete
 - Step 15: complete
 - Step 16: complete
-- Step 17: active
-- Step 18: not started
+- Step 17: complete
+- Step 18: active
+- Step 19: not started
 
 ## What already exists
 The repository already has:
@@ -31,55 +32,56 @@ The repository already has:
 - a persistent runtime-facing `Vehicle` entity integrated into execution
 - deterministic scenario-pack / batch execution with stable aggregate outputs
 - a narrow richer-operations workload path for repeated dispatch over time
+- upgraded corridor-aware deterministic coordination
 - static topology separated from runtime blocked-edge state via `WorldState`
 - graph-based routing with injectable cost models
 - deterministic simulated-time execution through `SimulationEngine`
-- jobs, tasks, shared resources, baseline dispatch, and narrow multi-vehicle conflict handling
+- jobs, tasks, shared resources, dispatch, and multi-vehicle coordination
 - vehicle behavior FSM with explicit transitions
 - trace-centered metrics, exports, and golden regression coverage
 
 ## Goal of the current phase
-Upgrade multi-vehicle coordination beyond the current narrow reservation baseline while preserving determinism and clear runtime boundaries.
+Add a replayable control-command surface that can drive simulation changes through explicit commands rather than ad hoc direct mutation.
 
-The main Step 17 objective is:
-- strengthen coordination logic for multi-vehicle movement
-- improve conflict handling realism and observability
-- add bounded coordination upgrades without destabilizing the simulator
-- preserve deterministic trace/export behavior
+The main Step 18 objective is:
+- introduce explicit simulation commands
+- support deterministic command application and replayability
+- create a clean bridge between the deterministic simulator core and future interactive tooling
+- preserve trace/export stability and small public interfaces
 
 ## In-scope work
 Work that is allowed right now:
-- strengthen reservation/conflict handling in a narrow, explicit way
-- improve multi-vehicle coordination semantics such as:
-  - clearer wait behavior
-  - better reservation conflict reasoning
-  - bounded deadlock prevention or observability
-  - narrow corridor/intersection-style handling if it stays small
-- add deterministic multi-vehicle regression scenarios and fixtures
-- extend metrics/trace only where needed to support the coordination upgrade
-- perform additive refactors and targeted normal refactors needed to keep coordination logic clean
+- add a command/control module for simulation actions
+- support a narrow initial command set, such as:
+  - pause/resume/step-oriented control state
+  - assign destination
+  - inject blocked edge / closure
+  - reposition vehicle
+- define how commands are validated and applied to runtime state
+- add deterministic command application tests
+- add at least one regression fixture or exact-output comparison for command-driven execution
+- perform additive refactors and targeted normal refactors needed to keep the command surface clean
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
 - add visualization
-- add interactive control/command surfaces
-- build a full MAPF or optimal planner framework
-- redesign the simulator into an event-scheduling platform
-- add broad map realism/import work
-- overbuild coordination abstractions beyond the narrow upgrade needed now
+- add a full interactive UI
+- redesign the simulator around async or a new runtime framework
+- overbuild a generic command bus/event-sourcing platform
+- add broad environment/map realism work
+- redesign the entire engine lifecycle beyond what is needed for a narrow command surface
 
 ## Architectural guidance for this phase
-- Keep coordination logic deterministic and explicit.
-- Prefer bounded upgrades to the existing reservation model over wholesale replacement.
-- Preserve trace-centered observability; coordination changes should remain inspectable in trace/metrics.
-- Reuse the current engine/runtime surfaces rather than creating a separate multi-agent subsystem.
-- Add only the minimum new semantics needed to improve realism and safety.
+- Commands should be explicit inputs to the simulator, not arbitrary direct state mutation.
+- Keep the initial command set small and useful.
+- Preserve deterministic ordering and replayability.
+- Reuse existing engine/runtime/vehicle/world-state surfaces where possible.
+- Keep command handling separate from visualization concerns.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 17
-Step 17 is complete when:
-- multi-vehicle coordination is meaningfully stronger than the Step 9 baseline
-- the upgraded coordination behavior is deterministic
-- at least one stronger multi-vehicle regression scenario/fixture exists
-- trace/metrics remain stable or are intentionally updated with coverage
+## Completion criteria for Step 18
+Step 18 is complete when:
+- the simulator has a narrow explicit control-command surface
+- command application is deterministic and replayable
+- at least one meaningful runtime change can be driven through commands
 - tests/lint/type checks pass
