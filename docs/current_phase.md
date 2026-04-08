@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 15 — Evaluation and scenario-pack harness
+Step 16 — Richer operations realism
 
 ## Step status summary
 - Step 1: complete
@@ -18,8 +18,9 @@ Step 15 — Evaluation and scenario-pack harness
 - Step 12: complete
 - Step 13: complete
 - Step 14: complete
-- Step 15: active
-- Step 16: not started
+- Step 15: complete
+- Step 16: active
+- Step 17: not started
 
 ## What already exists
 The repository already has:
@@ -27,6 +28,7 @@ The repository already has:
 - executable scenario-driven runs
 - scenario-defined resources, blocked-edge runtime setup, and dispatcher config
 - a persistent runtime-facing `Vehicle` entity integrated into execution
+- deterministic scenario-pack / batch execution with stable aggregate outputs
 - static topology separated from runtime blocked-edge state via `WorldState`
 - graph-based routing with injectable cost models
 - deterministic simulated-time execution through `SimulationEngine`
@@ -35,47 +37,45 @@ The repository already has:
 - trace-centered metrics, exports, and golden regression coverage
 
 ## Goal of the current phase
-Add an evaluation and scenario-pack harness so the simulator can run multiple canonical scenarios deterministically and compare their results in a stable batch-oriented way.
+Move from isolated one-job execution toward richer operations realism with multiple jobs over time and more meaningful fleet-style workload studies.
 
-The main Step 15 objective is:
-- support scenario packs / batch execution
-- generate stable per-scenario summary outputs
-- create deterministic aggregate reporting across a pack
-- strengthen the simulator as a benchmark and regression platform
+The main Step 16 objective is:
+- support repeated or sequential operational work in one run
+- make longer-lived workload execution possible without hand-stitching isolated single-job runs
+- improve realism around ongoing work assignment and utilization-oriented studies
+- preserve determinism and the existing trace/export surfaces
 
 ## In-scope work
 Work that is allowed right now:
-- add a scenario-pack runner / benchmark harness
-- define a narrow scenario-pack manifest or discovery convention
-- batch-execute multiple scenario files deterministically
-- collect stable per-scenario summaries and aggregate results
-- add deterministic output conventions for pack-level results
-- add tests for repeated deterministic batch execution
-- add at least one scenario-pack regression fixture or equivalent stable comparison surface
-- make small additive refactors that keep evaluation logic clean
+- add a narrow repeated-work / multi-job-over-time execution path
+- support sequential job execution for a persistent vehicle within one scenario/run
+- add scenario support for richer ongoing workload definitions only if needed for the chosen execution path
+- extend metrics in narrow ways needed to summarize longer-lived operational runs
+- add deterministic tests and at least one richer long-running scenario fixture/golden regression surface
+- perform additive refactors and targeted normal refactors needed to keep workload execution clean
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
+- redesign multi-vehicle coordination
 - add visualization
 - add interactive control/command surfaces
-- redesign multi-vehicle coordination
 - add richer map import formats
-- build a dashboard or large reporting UI
-- add optimization frameworks
-- overbuild a full experiment platform beyond the narrow benchmark harness needed now
+- build a fleet optimization framework
+- add stochastic demand generation unless it is tightly controlled and deterministic
+- overbuild a scheduling/planning platform beyond the narrow richer-operations goal
 
 ## Architectural guidance for this phase
-- Keep the trace/export surface as the source of truth.
-- Reuse existing scenario execution, metrics, and export paths.
-- Prefer simple deterministic filesystem/ordering rules.
-- Keep pack execution/reporting separate from simulator runtime logic.
-- Favor stable machine-readable outputs over presentation-heavy reporting.
+- Reuse the persistent vehicle model and existing engine/job/dispatch paths.
+- Prefer a narrow, clearly deterministic longer-run execution path over broad operational ambition.
+- Keep workload orchestration separate from low-level task execution.
+- Preserve trace-centered observability and stable exports.
+- Extend metrics only where they help characterize richer operations runs.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 15
-Step 15 is complete when:
-- multiple scenarios can be executed deterministically through a batch/pack harness
-- stable per-scenario summaries are produced
-- deterministic aggregate pack output is produced
-- repeated runs of the same scenario pack produce identical output
+## Completion criteria for Step 16
+Step 16 is complete when:
+- a persistent vehicle can execute multiple jobs over time within one coherent run
+- richer operational workload behavior is scenario-driven or otherwise cleanly orchestrated
+- deterministic summaries/exports remain stable for repeated runs
+- at least one richer long-run regression fixture exists
 - tests/lint/type checks pass
