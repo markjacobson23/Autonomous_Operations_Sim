@@ -512,7 +512,9 @@ class SimulationEngine:
 
         active_node_id = request.start_node_id
 
-        for start_node_id, end_node_id in zip(route, route[1:]):
+        for segment_index, (start_node_id, end_node_id) in enumerate(
+            zip(route, route[1:])
+        ):
             edge = self.map.get_edge_between(start_node_id, end_node_id)
             if edge is None:
                 raise RuntimeError(
@@ -521,11 +523,24 @@ class SimulationEngine:
                 )
 
             travel_time_s = edge.distance / min(request.max_speed, edge.speed_limit)
+            corridor_node_ids = self._resolve_corridor_node_ids(
+                route=route,
+                segment_index=segment_index,
+            )
+            corridor_travel_time_s = None
+            if corridor_node_ids is not None:
+                corridor_travel_time_s = self._calculate_path_travel_time(
+                    node_ids=corridor_node_ids,
+                    max_speed=request.max_speed,
+                )
             departure_time_s = reservations.earliest_departure_time(
+                vehicle_id=request.vehicle_id,
                 current_node_id=start_node_id,
                 next_node_id=end_node_id,
                 not_before_s=current_time_s,
                 travel_time_s=travel_time_s,
+                corridor_node_ids=corridor_node_ids,
+                corridor_travel_time_s=corridor_travel_time_s,
             )
 
             if departure_time_s > current_time_s:
@@ -585,6 +600,13 @@ class SimulationEngine:
                 )
 
             arrival_time_s = departure_time_s + travel_time_s
+            if corridor_node_ids is not None and corridor_travel_time_s is not None:
+                reservations.reserve_corridor(
+                    vehicle_id=request.vehicle_id,
+                    node_ids=corridor_node_ids,
+                    start_time_s=departure_time_s,
+                    end_time_s=departure_time_s + corridor_travel_time_s,
+                )
             reservations.reserve_edge(
                 vehicle_id=request.vehicle_id,
                 edge_id=edge.id,
@@ -643,3 +665,67 @@ class SimulationEngine:
             completion_time_s=current_time_s,
             waits=tuple(waits),
         )
+
+    def _resolve_corridor_node_ids(
+        self,
+        *,
+        route: tuple[int, ...],
+        segment_index: int,
+    ) -> tuple[int, ...] | None:
+        corridor_end_index = segment_index + 1
+
+        while corridor_end_index < len(route) - 1 and self._is_corridor_internal_node(
+            previous_node_id=route[corridor_end_index - 1],
+            node_id=route[corridor_end_index],
+            next_node_id=route[corridor_end_index + 1],
+        ):
+            corridor_end_index += 1
+
+        corridor_node_ids = route[segment_index : corridor_end_index + 1]
+        if len(corridor_node_ids) < 3:
+            return None
+        return corridor_node_ids
+
+    def _is_corridor_internal_node(
+        self,
+        *,
+        previous_node_id: int,
+        node_id: int,
+        next_node_id: int,
+    ) -> bool:
+        if previous_node_id == next_node_id:
+            return False
+
+        undirected_neighbors = self._get_undirected_neighbor_ids(node_id)
+        return len(undirected_neighbors) == 2 and undirected_neighbors == {
+            previous_node_id,
+            next_node_id,
+        }
+
+    def _get_undirected_neighbor_ids(self, node_id: int) -> set[int]:
+        neighbor_ids = set(self.map.get_neighbors(node_id))
+        for candidate_node_id in self.map.get_all_node_ids():
+            if candidate_node_id == node_id:
+                continue
+            if self.map.get_edge_between(candidate_node_id, node_id) is not None:
+                neighbor_ids.add(candidate_node_id)
+        return neighbor_ids
+
+    def _calculate_path_travel_time(
+        self,
+        *,
+        node_ids: tuple[int, ...],
+        max_speed: float,
+    ) -> float:
+        travel_time_s = 0.0
+
+        for start_node_id, end_node_id in zip(node_ids, node_ids[1:]):
+            edge = self.map.get_edge_between(start_node_id, end_node_id)
+            if edge is None:
+                raise RuntimeError(
+                    "Router returned a path containing a missing map edge: "
+                    f"{start_node_id} -> {end_node_id}."
+                )
+            travel_time_s += edge.distance / min(max_speed, edge.speed_limit)
+
+        return travel_time_s
