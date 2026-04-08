@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 14 — Persistent vehicle entity model
+Step 15 — Evaluation and scenario-pack harness
 
 ## Step status summary
 - Step 1: complete
@@ -17,14 +17,16 @@ Step 14 — Persistent vehicle entity model
 - Step 11: complete
 - Step 12: complete
 - Step 13: complete
-- Step 14: active
-- Step 15: not started
+- Step 14: complete
+- Step 15: active
+- Step 16: not started
 
 ## What already exists
 The repository already has:
 - deterministic scenario parsing and summaries
 - executable scenario-driven runs
 - scenario-defined resources, blocked-edge runtime setup, and dispatcher config
+- a persistent runtime-facing `Vehicle` entity integrated into execution
 - static topology separated from runtime blocked-edge state via `WorldState`
 - graph-based routing with injectable cost models
 - deterministic simulated-time execution through `SimulationEngine`
@@ -33,22 +35,24 @@ The repository already has:
 - trace-centered metrics, exports, and golden regression coverage
 
 ## Goal of the current phase
-Promote a real persistent vehicle/entity model so execution flows stop relying primarily on threaded scalar vehicle parameters.
+Add an evaluation and scenario-pack harness so the simulator can run multiple canonical scenarios deterministically and compare their results in a stable batch-oriented way.
 
-The main Step 14 objective is:
-- make `Vehicle` a meaningful execution-facing runtime entity
-- connect vehicle state cleanly to `VehicleProcess`, behavior, trace, and scenario execution
-- reduce scalar threading for things like speed, payload, and location
-- preserve determinism and existing trace/export surfaces
+The main Step 15 objective is:
+- support scenario packs / batch execution
+- generate stable per-scenario summary outputs
+- create deterministic aggregate reporting across a pack
+- strengthen the simulator as a benchmark and regression platform
 
 ## In-scope work
 Work that is allowed right now:
-- expand `autonomous_ops_sim/vehicles/vehicle.py` into a real runtime-facing entity
-- refactor execution paths to accept/use a `Vehicle` object where appropriate
-- define clear ownership between vehicle state, behavior state, and process execution
-- update scenario execution to instantiate runtime vehicles from `VehicleSpec`
-- add tests proving the vehicle entity is integrated into execution without changing behavior semantics
-- perform additive refactors and targeted normal refactors needed to reduce scalar parameter threading
+- add a scenario-pack runner / benchmark harness
+- define a narrow scenario-pack manifest or discovery convention
+- batch-execute multiple scenario files deterministically
+- collect stable per-scenario summaries and aggregate results
+- add deterministic output conventions for pack-level results
+- add tests for repeated deterministic batch execution
+- add at least one scenario-pack regression fixture or equivalent stable comparison surface
+- make small additive refactors that keep evaluation logic clean
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
@@ -56,22 +60,22 @@ Do not do any of the following in the current phase:
 - add interactive control/command surfaces
 - redesign multi-vehicle coordination
 - add richer map import formats
-- build a fleet-management optimization framework
-- overbuild a large domain model around vehicles
-- rewrite the simulator around ECS/actor frameworks
+- build a dashboard or large reporting UI
+- add optimization frameworks
+- overbuild a full experiment platform beyond the narrow benchmark harness needed now
 
 ## Architectural guidance for this phase
-- Keep the vehicle model small, explicit, and execution-facing.
-- Avoid duplicating the same runtime truth across `Vehicle`, `VehicleProcess`, and behavior state.
-- Preserve trace-centered observability and deterministic behavior.
-- Reuse existing engine/job/dispatch paths instead of creating parallel vehicle execution flows.
-- Prefer one clear runtime ownership model over convenience duplication.
+- Keep the trace/export surface as the source of truth.
+- Reuse existing scenario execution, metrics, and export paths.
+- Prefer simple deterministic filesystem/ordering rules.
+- Keep pack execution/reporting separate from simulator runtime logic.
+- Favor stable machine-readable outputs over presentation-heavy reporting.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 14
-Step 14 is complete when:
-- a persistent `Vehicle` entity is meaningfully used in runtime execution
-- key scalar vehicle parameters are no longer threaded everywhere they do not need to be
-- scenario execution instantiates runtime vehicles cleanly
-- existing behavior/trace/export semantics remain stable or are intentionally updated with test coverage
+## Completion criteria for Step 15
+Step 15 is complete when:
+- multiple scenarios can be executed deterministically through a batch/pack harness
+- stable per-scenario summaries are produced
+- deterministic aggregate pack output is produced
+- repeated runs of the same scenario pack produce identical output
 - tests/lint/type checks pass
