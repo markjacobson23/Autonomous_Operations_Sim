@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 20 — Interactive manipulation layer
+Step 21 — Environment/map realism expansion
 
 ## Step status summary
 - Step 1: complete
@@ -23,8 +23,9 @@ Step 20 — Interactive manipulation layer
 - Step 17: complete
 - Step 18: complete
 - Step 19: complete
-- Step 20: active
-- Step 21: not started
+- Step 20: complete
+- Step 21: active
+- Step 22: not started
 
 ## What already exists
 The repository already has:
@@ -38,6 +39,7 @@ The repository already has:
 - a typed control-command surface with deterministic command history
 - a visualization state surface with replay frames
 - a first text-based viewer consuming visualization state
+- a thin interaction layer translating viewer-facing actions into commands
 - static topology separated from runtime blocked-edge state via `WorldState`
 - graph-based routing with injectable cost models
 - deterministic simulated-time execution through `SimulationEngine`
@@ -46,47 +48,42 @@ The repository already has:
 - trace-centered metrics, exports, and golden regression coverage
 
 ## Goal of the current phase
-Add a narrow interactive manipulation layer so the simulator can accept viewer-facing runtime actions through the existing command/control architecture.
+Expand environment and map realism beyond the current narrow grid-first assumptions while preserving deterministic runtime behavior and clean topology/runtime boundaries.
 
-The main Step 20 objective is:
-- connect interaction intent to the command surface
-- support a small set of meaningful interactive actions
-- preserve deterministic command ordering and replayability
-- make the simulator feel manipulable without introducing a heavy UI framework
+The main Step 21 objective is:
+- add richer map/environment semantics
+- support a more realistic topology representation than the current grid-only focus
+- preserve compatibility with the existing routing, execution, visualization, and command surfaces
+- avoid destabilizing the simulator with a giant map/import rewrite
 
 ## In-scope work
 Work that is allowed right now:
-- add an interaction layer or viewer-facing control adapter
-- support a narrow initial interactive action set such as:
-  - assign destination
-  - reposition vehicle
-  - inject blocked edge
-- connect those actions to the existing typed command/controller surface
-- extend the viewer in a narrow way if needed to accept user-directed actions
-- add deterministic tests for interaction-to-command behavior
-- add at least one regression fixture or exact-output comparison for an interaction-driven run
-- perform additive refactors and targeted normal refactors needed to keep the interaction layer clean
+- add a narrow richer map/environment model or map kind
+- add explicit environment/site semantics where they map cleanly to existing runtime concepts
+- extend scenario schema and map construction as needed for the chosen realism improvement
+- adapt routing/execution surfaces only where necessary to support the richer topology
+- add deterministic tests and at least one richer environment scenario fixture/regression surface
+- perform additive refactors and targeted normal refactors needed to keep map/environment ownership clean
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- build a heavy graphical UI framework
-- redesign the simulator around an event loop or async runtime
-- add free-form direct engine mutation from the viewer
-- overbuild a full product UI or dashboard
-- redesign scenario execution, coordination, or visualization foundations
-- add broad environment/map realism work
+- redesign the simulator around GIS or a heavy map framework
+- add a giant import pipeline for many map formats
+- build a full world editor
+- redesign command/control, visualization, or workload foundations
+- overbuild zone/site semantics beyond the narrow realism gain chosen for this step
 
 ## Architectural guidance for this phase
-- Interactions should translate into explicit commands, not bypass them.
-- Preserve deterministic ordering and replayability.
-- Keep viewer concerns separate from runtime ownership logic.
-- Start with a small set of interactions that map directly to existing command types.
-- Prefer a thin adapter layer over a large UI-control framework.
+- Keep static topology and runtime state separate.
+- Prefer one narrow environment/map realism improvement and implement it well.
+- Reuse existing `Map`, routing, scenario, visualization, and execution surfaces where possible.
+- Avoid turning this into a broad asset/import framework prematurely.
+- Preserve deterministic behavior and stable regression surfaces.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 20
-Step 20 is complete when:
-- a narrow set of viewer-facing interactions can drive the simulator through the command surface
-- interaction-driven runs remain deterministic and replayable
-- at least one interaction-driven regression/demo surface exists
+## Completion criteria for Step 21
+Step 21 is complete when:
+- the simulator supports one meaningful map/environment realism improvement beyond the current baseline
+- the improvement is scenario-driven or otherwise cleanly integrated
+- routing/execution/visualization still work over the richer map model
 - tests/lint/type checks pass
