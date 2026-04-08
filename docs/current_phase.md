@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 6 — Single-vehicle execution and trace
+Step 7 — Jobs, tasks, and resources
 
 ## Step status summary
 - Step 1: complete
@@ -9,59 +9,57 @@ Step 6 — Single-vehicle execution and trace
 - Step 3: complete
 - Step 4: complete
 - Step 5: complete
-- Step 6: active
-- Step 7: not started
+- Step 6: complete
+- Step 7: active
+- Step 8: not started
 
 ## What already exists
 The repository already has:
 - working package structure
-- `pyproject.toml`
-- CLI entry point
-- pytest / Ruff / mypy baseline
-- CI workflow
 - scenario/config spine
 - static map/topology separated from runtime blocked-edge state via `WorldState`
-- `CostModel` routing
-- `Router` as the public routing surface
-- `SimulationEngine` with explicit simulated time and deterministic run control
+- `CostModel` routing and `Router`
+- `SimulationEngine` with explicit simulated time
+- single-vehicle route execution
+- deterministic trace output
 
 ## Goal of the current phase
-Add single-vehicle execution over simulated time and record a deterministic trace.
+Add task/job primitives and shared resources so the simulator can model operational work rather than only route traversal.
 
-The main Step 6 objective is:
-- execute one vehicle over a route
-- advance simulated time correctly
-- emit trace events in deterministic order
-- prepare a clean foundation for later jobs/resources without implementing Step 7 yet
+The main Step 7 objective is:
+- introduce tasks such as move/load/unload
+- introduce jobs as ordered sequences of tasks
+- introduce shared resources with limited capacity
+- support waiting/service timing in simulated time
 
 ## In-scope work
 Work that is allowed right now:
-- add `simulation/trace.py`
-- add a single-vehicle execution module such as `simulation/vehicle_process.py`
-- integrate single-vehicle execution with `SimulationEngine`
-- advance simulated time according to traversal timing
-- add tests for trace monotonicity, event ordering, and arrival timing
-- small additive refactors that make Step 6 cleaner without introducing Step 7 concepts
+- add `operations/tasks.py`
+- add `operations/jobs.py`
+- add `operations/resources.py`
+- integrate tasks/jobs/resources with the existing engine and trace
+- add tests for queueing/service timing and ordered task execution
+- small additive refactors that make Step 7 cleaner without introducing Step 8 concepts
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- add jobs/tasks/resources
-- add queues or service resources
 - add dispatcher logic
-- add multi-vehicle logic
-- add behavior systems beyond what is strictly needed for one vehicle following a route
-- add rich visualization systems
+- add multi-vehicle road-network conflict handling
+- add behavior systems
+- add optimization frameworks
+- add rich scheduling policies
 
 ## Architectural guidance for this phase
-- Keep the engine as the run coordinator.
-- Keep vehicle execution logic separate from engine core.
-- Keep trace types small and explicit.
-- Prefer event records over overbuilt telemetry frameworks.
-- Do not overbuild an agent architecture yet.
+- Keep tasks small and explicit.
+- Keep jobs as ordered collections of tasks.
+- Keep resources limited and concrete.
+- Do not overbuild workflow abstractions.
+- Keep engine as the coordinator, not the home of every operation concept.
 
-## Completion criteria for Step 6
-Step 6 is complete when:
-- one vehicle can follow a route over simulated time
-- trace events are emitted in monotone time order
-- arrival timing matches expected traversal timing
+## Completion criteria for Step 7
+Step 7 is complete when:
+- move/load/unload task primitives exist
+- jobs can execute ordered task sequences
+- shared resources can cause waiting
+- service timing is represented in simulated time
 - tests/lint/type checks pass
