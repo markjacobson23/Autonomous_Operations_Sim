@@ -1,3 +1,16 @@
+from autonomous_ops_sim.visualization.interactions import (
+    AssignDestinationInteraction,
+    BlockEdgeInteraction,
+    InteractionValidationError,
+    RepositionVehicleInteraction,
+    VisualizationInteraction,
+    apply_interaction,
+    apply_interactions,
+    build_visualization_state_from_interactions,
+    interaction_to_command,
+    interaction_to_dict,
+    translate_interactions,
+)
 from autonomous_ops_sim.visualization.replay import (
     ReplayStep,
     get_replay_frame,
@@ -20,20 +33,31 @@ from autonomous_ops_sim.visualization.state import (
 )
 
 __all__ = [
+    "AssignDestinationInteraction",
+    "BlockEdgeInteraction",
     "EdgeSurface",
     "FrameTrigger",
+    "InteractionValidationError",
     "MapSurface",
     "NodeSurface",
     "ReplayFrame",
     "ReplayStep",
+    "RepositionVehicleInteraction",
     "VISUALIZATION_SCHEMA_VERSION",
+    "VisualizationInteraction",
     "VehicleSurfaceState",
     "VisualizationState",
+    "apply_interaction",
+    "apply_interactions",
     "build_visualization_state",
     "build_visualization_state_from_controller",
+    "build_visualization_state_from_interactions",
     "export_visualization_json",
     "get_replay_frame",
+    "interaction_to_command",
+    "interaction_to_dict",
     "iter_replay_steps",
     "load_visualization_json",
+    "translate_interactions",
     "visualization_state_to_dict",
 ]
