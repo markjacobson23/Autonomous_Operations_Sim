@@ -92,7 +92,18 @@ class DispatchVehicleJobsExecutionSpec:
     jobs: tuple[JobSpec, ...]
 
 
-ExecutionSpec = SingleVehicleJobExecutionSpec | DispatchVehicleJobsExecutionSpec
+@dataclass(frozen=True)
+class DispatchVehicleJobQueueExecutionSpec:
+    kind: str
+    vehicle_id: int
+    jobs: tuple[JobSpec, ...]
+
+
+ExecutionSpec = (
+    SingleVehicleJobExecutionSpec
+    | DispatchVehicleJobsExecutionSpec
+    | DispatchVehicleJobQueueExecutionSpec
+)
 
 
 @dataclass(frozen=True)

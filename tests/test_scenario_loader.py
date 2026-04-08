@@ -4,6 +4,7 @@ import pytest
 
 from autonomous_ops_sim.io.scenario_loader import load_scenario
 from autonomous_ops_sim.simulation.scenario import (
+    DispatchVehicleJobQueueExecutionSpec,
     DispatchVehicleJobsExecutionSpec,
     Scenario,
     SingleVehicleJobExecutionSpec,
@@ -365,6 +366,35 @@ def test_load_scenario_parses_resources_world_state_and_dispatcher(tmp_path, val
     assert tuple(job.id for job in scenario.execution.jobs) == ("selected-job",)
 
 
+def test_load_scenario_parses_dispatch_job_queue_execution(tmp_path, valid_scenario_data):
+    data = valid_scenario_data
+    data["dispatcher"] = {"kind": "first_feasible"}
+    data["execution"] = {
+        "kind": "dispatch_vehicle_job_queue",
+        "vehicle_id": 1,
+        "jobs": [
+            data["execution"]["job"],
+            {
+                "id": "follow-up",
+                "tasks": [
+                    {
+                        "kind": "move",
+                        "destination": [0, 1, 0],
+                    }
+                ],
+            },
+        ],
+    }
+
+    scenario = load_scenario(write_scenario(tmp_path, data))
+
+    assert isinstance(scenario.execution, DispatchVehicleJobQueueExecutionSpec)
+    assert tuple(job.id for job in scenario.execution.jobs) == (
+        "demo-job",
+        "follow-up",
+    )
+
+
 def test_load_scenario_raises_for_unknown_resource_reference(tmp_path, valid_scenario_data):
     data = valid_scenario_data
     data["execution"]["job"]["tasks"].append(
@@ -388,6 +418,21 @@ def test_load_scenario_raises_for_dispatch_execution_without_dispatcher(
     data = valid_scenario_data
     data["execution"] = {
         "kind": "dispatch_vehicle_jobs",
+        "vehicle_id": 1,
+        "jobs": [data["execution"]["job"]],
+    }
+
+    with pytest.raises(ValueError, match="dispatcher"):
+        load_scenario(write_scenario(tmp_path, data))
+
+
+def test_load_scenario_raises_for_dispatch_job_queue_without_dispatcher(
+    tmp_path,
+    valid_scenario_data,
+):
+    data = valid_scenario_data
+    data["execution"] = {
+        "kind": "dispatch_vehicle_job_queue",
         "vehicle_id": 1,
         "jobs": [data["execution"]["job"]],
     }

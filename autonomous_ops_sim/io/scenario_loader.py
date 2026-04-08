@@ -3,6 +3,7 @@ import math
 from pathlib import Path
 
 from autonomous_ops_sim.simulation.scenario import (
+    DispatchVehicleJobQueueExecutionSpec,
     BlockedEdgeSpec,
     DispatchVehicleJobsExecutionSpec,
     DispatcherSpec,
@@ -123,13 +124,19 @@ def _parse_scenario(
             f"{unknown_str}"
         )
 
-    if isinstance(execution, DispatchVehicleJobsExecutionSpec) and dispatcher is None:
+    if isinstance(
+        execution,
+        (DispatchVehicleJobsExecutionSpec, DispatchVehicleJobQueueExecutionSpec),
+    ) and dispatcher is None:
         raise ValueError(
             "Scenario dispatch execution requires a configured 'dispatcher' section."
         )
-    if dispatcher is not None and not isinstance(execution, DispatchVehicleJobsExecutionSpec):
+    if dispatcher is not None and not isinstance(
+        execution,
+        (DispatchVehicleJobsExecutionSpec, DispatchVehicleJobQueueExecutionSpec),
+    ):
         raise ValueError(
-            "Scenario 'dispatcher' is only supported with 'dispatch_vehicle_jobs' execution."
+            "Scenario 'dispatcher' is only supported with dispatch-based execution."
         )
 
     return Scenario(
@@ -273,7 +280,11 @@ def _parse_execution_spec(data: dict[str, object]) -> ExecutionSpec:
     kind = data["kind"]
     vehicle_id = data["vehicle_id"]
 
-    if kind not in {"single_vehicle_job", "dispatch_vehicle_jobs"}:
+    if kind not in {
+        "single_vehicle_job",
+        "dispatch_vehicle_jobs",
+        "dispatch_vehicle_job_queue",
+    }:
         raise ValueError(f"Unsupported execution kind: {kind!r}")
     if not isinstance(vehicle_id, int):
         raise ValueError("Scenario execution 'vehicle_id' must be an int.")
@@ -293,10 +304,17 @@ def _parse_execution_spec(data: dict[str, object]) -> ExecutionSpec:
         raise ValueError("Scenario execution 'jobs' must be a list.")
     if not jobs_data:
         raise ValueError("Scenario dispatch execution must contain at least one job.")
-    return DispatchVehicleJobsExecutionSpec(
+    dispatch_jobs = tuple(_parse_job_spec(job_data) for job_data in jobs_data)
+    if kind == "dispatch_vehicle_jobs":
+        return DispatchVehicleJobsExecutionSpec(
+            kind=kind,
+            vehicle_id=vehicle_id,
+            jobs=dispatch_jobs,
+        )
+    return DispatchVehicleJobQueueExecutionSpec(
         kind=kind,
         vehicle_id=vehicle_id,
-        jobs=tuple(_parse_job_spec(job_data) for job_data in jobs_data),
+        jobs=dispatch_jobs,
     )
 
 

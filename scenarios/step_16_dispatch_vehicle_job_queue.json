@@ -1,0 +1,78 @@
+{
+  "name": "step_16_dispatch_vehicle_job_queue",
+  "seed": 416,
+  "duration_s": 20.0,
+  "map": {
+    "kind": "grid",
+    "params": {
+      "grid_size": 3
+    }
+  },
+  "vehicles": [
+    {
+      "id": 16,
+      "position": [0, 0, 0],
+      "velocity": 0.0,
+      "payload": 0.0,
+      "max_payload": 10.0,
+      "max_speed": 1.0,
+      "vehicle_type": "GENERIC"
+    }
+  ],
+  "resources": [
+    {
+      "id": "loader-16",
+      "capacity": 1,
+      "initial_available_times_s": [2.0]
+    }
+  ],
+  "dispatcher": {
+    "kind": "first_feasible"
+  },
+  "execution": {
+    "kind": "dispatch_vehicle_job_queue",
+    "vehicle_id": 16,
+    "jobs": [
+      {
+        "id": "yard-dropoff",
+        "tasks": [
+          {
+            "kind": "unload",
+            "position": [0, 0, 0],
+            "amount": 2.0,
+            "service_duration_s": 1.0
+          }
+        ]
+      },
+      {
+        "id": "pickup-cycle",
+        "tasks": [
+          {
+            "kind": "move",
+            "destination": [1, 0, 0]
+          },
+          {
+            "kind": "load",
+            "position": [1, 0, 0],
+            "amount": 2.0,
+            "service_duration_s": 2.0,
+            "resource_id": "loader-16"
+          },
+          {
+            "kind": "move",
+            "destination": [0, 0, 0]
+          }
+        ]
+      },
+      {
+        "id": "reposition",
+        "tasks": [
+          {
+            "kind": "move",
+            "destination": [0, 1, 0]
+          }
+        ]
+      }
+    ]
+  }
+}

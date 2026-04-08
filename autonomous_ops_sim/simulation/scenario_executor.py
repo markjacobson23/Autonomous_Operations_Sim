@@ -13,6 +13,7 @@ from autonomous_ops_sim.simulation.metrics import (
     summarize_engine_execution,
 )
 from autonomous_ops_sim.simulation.scenario import (
+    DispatchVehicleJobQueueExecutionSpec,
     DispatchVehicleJobsExecutionSpec,
     DispatcherSpec,
     JobSpec,
@@ -25,6 +26,7 @@ from autonomous_ops_sim.simulation.scenario import (
     SingleVehicleJobExecutionSpec,
     WorldStateSpec,
 )
+from autonomous_ops_sim.simulation.workload_runner import run_dispatch_job_queue
 from autonomous_ops_sim.simulation.world_state import WorldState
 from autonomous_ops_sim.vehicles.vehicle import Vehicle, VehicleType
 
@@ -175,7 +177,25 @@ def _execute_configured_work(
         return
 
     if not isinstance(execution, DispatchVehicleJobsExecutionSpec):
-        raise ValueError(f"Unsupported scenario execution type: {type(execution)!r}")
+        if not isinstance(execution, DispatchVehicleJobQueueExecutionSpec):
+            raise ValueError(f"Unsupported scenario execution type: {type(execution)!r}")
+
+        workload_result = run_dispatch_job_queue(
+            engine=engine,
+            dispatcher=_build_dispatcher(dispatcher_spec=scenario.dispatcher),
+            pending_jobs=tuple(
+                _build_job(simulation_map=simulation_map, job_spec=job_spec)
+                for job_spec in execution.jobs
+            ),
+            vehicle=vehicle,
+        )
+        if workload_result.remaining_job_ids:
+            remaining_jobs_str = ", ".join(workload_result.remaining_job_ids)
+            raise ValueError(
+                "Scenario workload did not complete all pending jobs: "
+                f"{remaining_jobs_str}"
+            )
+        return
 
     dispatch_result = engine.dispatch_job(
         dispatcher=_build_dispatcher(dispatcher_spec=scenario.dispatcher),
