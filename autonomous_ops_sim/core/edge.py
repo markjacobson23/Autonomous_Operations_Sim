@@ -13,7 +13,6 @@ class Edge:
             end_node: Node,
             distance: float,
             speed_limit: float,
-            blocked: bool = False,
 
     ):  # Expected to be unique within a graph.
         self.id = id
@@ -30,12 +29,9 @@ class Edge:
         # Keep units consistent across a graph (ex: meters/second).
         self.speed_limit = speed_limit
 
-        # When True, routing/simulation will treat this edge as unavailable.
-        self.blocked = blocked
-
     def __repr__(self):
         return (
             f"Edge(id={self.id!r}, start_node={self.start_node!r}, "
             f"end_node={self.end_node!r}, distance={self.distance!r}, "
-            f"speed_limit={self.speed_limit!r}, blocked={self.blocked!r})"
+            f"speed_limit={self.speed_limit!r})"
         )

@@ -1,13 +1,20 @@
 from autonomous_ops_sim.core.graph import Graph
+from autonomous_ops_sim.simulation.world_state import WorldState
 import heapq
 import math
 
-def dijkstra(graph: Graph, start_id: int, end_id: int) -> tuple[float, list[int]]:
+def dijkstra(
+        graph: Graph,
+        start_id: int,
+        end_id: int,
+        world_state: WorldState | None = None
+) -> tuple[float, list[int]]:
 
     if not graph.has_node(start_id):
         raise ValueError(f"Node-{start_id} does not exist in graph.")
     if not graph.has_node(end_id):
         raise ValueError(f"Node-{end_id} does not exist in graph.")
+    runtime_state = world_state or WorldState(graph)
 
     prev: dict[int, int] = {}
     distance: dict[int, float] = {start_id: 0.0}
@@ -25,7 +32,7 @@ def dijkstra(graph: Graph, start_id: int, end_id: int) -> tuple[float, list[int]
 
         for edge in graph.get_outgoing_edges(node):
 
-            if edge.blocked:
+            if runtime_state.is_edge_blocked(edge.id):
                 continue
 
             neighbor = edge.end_node.id
