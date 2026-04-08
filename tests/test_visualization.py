@@ -1,0 +1,224 @@
+import json
+from pathlib import Path
+
+from autonomous_ops_sim.core.edge import Edge
+from autonomous_ops_sim.core.graph import Graph
+from autonomous_ops_sim.core.node import Node
+from autonomous_ops_sim.maps.map import Map
+from autonomous_ops_sim.routing import Router
+from autonomous_ops_sim.simulation import (
+    AssignVehicleDestinationCommand,
+    BlockEdgeCommand,
+    RepositionVehicleCommand,
+    SimulationController,
+    SimulationEngine,
+    WorldState,
+)
+from autonomous_ops_sim.vehicles.vehicle import Vehicle
+from autonomous_ops_sim.visualization import (
+    build_visualization_state,
+    build_visualization_state_from_controller,
+    export_visualization_json,
+    iter_replay_steps,
+    load_visualization_json,
+)
+from autonomous_ops_sim.visualization.viewer import main as viewer_main
+
+
+def build_visualization_route_engine() -> SimulationEngine:
+    graph = Graph()
+
+    node_1 = Node(1, (0.0, 0.0, 0.0))
+    node_2 = Node(2, (10.0, 0.0, 0.0))
+    node_3 = Node(3, (18.0, 0.0, 0.0))
+
+    graph.add_node(node_1)
+    graph.add_node(node_2)
+    graph.add_node(node_3)
+    graph.add_edge(Edge(1, node_1, node_2, 10.0, 5.0))
+    graph.add_edge(Edge(2, node_2, node_3, 8.0, 4.0))
+
+    simulation_map = Map(
+        graph,
+        coord_to_id={
+            (0.0, 0.0, 0.0): 1,
+            (10.0, 0.0, 0.0): 2,
+            (18.0, 0.0, 0.0): 3,
+        },
+    )
+    return SimulationEngine(
+        simulation_map=simulation_map,
+        world_state=WorldState(graph),
+        router=Router(),
+        seed=11,
+    )
+
+
+def run_visualization_route_engine() -> SimulationEngine:
+    engine = build_visualization_route_engine()
+    route = engine.execute_vehicle_route(
+        vehicle_id=101,
+        start_node_id=1,
+        destination_node_id=3,
+        max_speed=20.0,
+    )
+    assert route == (1, 2, 3)
+    return engine
+
+
+def build_visualization_controller() -> tuple[SimulationController, Vehicle]:
+    graph = Graph()
+
+    node_1 = Node(1, (0.0, 0.0, 0.0))
+    node_2 = Node(2, (1.0, 0.0, 0.0))
+    node_3 = Node(3, (2.0, 0.0, 0.0))
+    node_4 = Node(4, (1.0, 1.0, 0.0))
+
+    for node in (node_1, node_2, node_3, node_4):
+        graph.add_node(node)
+
+    graph.add_edge(Edge(1, node_1, node_2, 1.0, 10.0))
+    graph.add_edge(Edge(2, node_2, node_3, 1.0, 10.0))
+    graph.add_edge(Edge(3, node_1, node_4, 1.0, 10.0))
+    graph.add_edge(Edge(4, node_4, node_3, 1.0, 10.0))
+    graph.add_edge(Edge(5, node_2, node_4, 1.5, 10.0))
+
+    simulation_map = Map(
+        graph,
+        coord_to_id={
+            (0.0, 0.0, 0.0): 1,
+            (1.0, 0.0, 0.0): 2,
+            (2.0, 0.0, 0.0): 3,
+            (1.0, 1.0, 0.0): 4,
+        },
+    )
+    vehicle = Vehicle(
+        id=77,
+        current_node_id=1,
+        position=(0.0, 0.0, 0.0),
+        velocity=0.0,
+        payload=0.0,
+        max_payload=10.0,
+        max_speed=5.0,
+    )
+    engine = SimulationEngine(
+        simulation_map=simulation_map,
+        world_state=WorldState(graph),
+        router=Router(),
+        seed=180,
+        vehicles=(vehicle,),
+    )
+    controller = SimulationController(engine)
+    controller.apply_all(
+        (
+            BlockEdgeCommand(edge_id=2),
+            AssignVehicleDestinationCommand(vehicle_id=77, destination_node_id=3),
+            RepositionVehicleCommand(vehicle_id=77, node_id=2),
+            AssignVehicleDestinationCommand(vehicle_id=77, destination_node_id=3),
+        )
+    )
+    return controller, vehicle
+
+
+def test_visualization_state_generation_is_deterministic() -> None:
+    state_a = build_visualization_state(run_visualization_route_engine())
+    state_b = build_visualization_state(run_visualization_route_engine())
+
+    assert state_a == state_b
+    assert export_visualization_json(state_a) == export_visualization_json(state_b)
+
+
+def test_replay_frame_ordering_is_deterministic_for_command_driven_run() -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+
+    assert [
+        (
+            step.index,
+            step.frame.timestamp_s,
+            step.frame.trigger.source,
+            step.frame.trigger.event_name,
+        )
+        for step in iter_replay_steps(state)
+    ] == [
+        (0, 0.0, "initial", "initial_state"),
+        (1, 0.0, "command", "block_edge"),
+        (2, 0.0, "trace", "behavior_transition"),
+        (3, 0.0, "trace", "route_start"),
+        (4, 0.0, "trace", "edge_enter"),
+        (5, 0.2, "trace", "node_arrival"),
+        (6, 0.2, "trace", "edge_enter"),
+        (7, 0.4, "trace", "node_arrival"),
+        (8, 0.4, "trace", "route_complete"),
+        (9, 0.4, "trace", "behavior_transition"),
+        (10, 0.4, "command", "reposition_vehicle"),
+        (11, 0.4, "trace", "behavior_transition"),
+        (12, 0.4, "trace", "route_start"),
+        (13, 0.4, "trace", "edge_enter"),
+        (14, 0.7, "trace", "node_arrival"),
+        (15, 0.7, "trace", "edge_enter"),
+        (16, 0.8999999999999999, "trace", "node_arrival"),
+        (17, 0.8999999999999999, "trace", "route_complete"),
+        (18, 0.8999999999999999, "trace", "behavior_transition"),
+    ]
+
+
+def test_vehicle_and_map_projection_are_stable_for_single_route() -> None:
+    state = build_visualization_state(run_visualization_route_engine())
+
+    assert [(node.node_id, node.position) for node in state.map_surface.nodes] == [
+        (1, (0.0, 0.0, 0.0)),
+        (2, (10.0, 0.0, 0.0)),
+        (3, (18.0, 0.0, 0.0)),
+    ]
+    assert [
+        (edge.edge_id, edge.start_node_id, edge.end_node_id)
+        for edge in state.map_surface.edges
+    ] == [(1, 1, 2), (2, 2, 3)]
+    assert state.frames[0].vehicles == (
+        state.frames[0].vehicles[0].__class__(
+            vehicle_id=101,
+            node_id=1,
+            position=(0.0, 0.0, 0.0),
+            operational_state="idle",
+        ),
+    )
+    assert state.frames[4].vehicles[0].node_id == 2
+    assert state.frames[4].vehicles[0].operational_state == "moving"
+    assert state.frames[8].vehicles[0].node_id == 3
+    assert state.frames[8].vehicles[0].operational_state == "idle"
+
+
+def test_visualization_state_export_matches_golden_fixture() -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+    export_json = export_visualization_json(state)
+
+    golden_path = Path(__file__).parent / "golden" / "step_19_visualization_state.json"
+
+    assert json.loads(export_json) == json.loads(golden_path.read_text())
+    assert export_json == golden_path.read_text()
+
+
+def test_text_viewer_consumes_visualization_state_json(tmp_path, capsys) -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+    visualization_path = tmp_path / "visualization.json"
+    visualization_path.write_text(
+        export_visualization_json(state),
+        encoding="utf-8",
+    )
+
+    exit_code = viewer_main([str(visualization_path), "--frame-index", "0"])
+    captured = capsys.readouterr()
+    loaded_state = load_visualization_json(visualization_path)
+
+    assert exit_code == 0
+    assert loaded_state == state
+    assert captured.out == (
+        "Visualization Replay seed=180 final_time_s=0.8999999999999999 frames=19\n"
+        "Map nodes=4 edges=5\n"
+        "Frame 0 @ 0.0s initial:initial_state\n"
+        "blocked_edges=[]\n"
+        "vehicle 77 node=1 state=idle position=(0.0, 0.0, 0.0)\n"
+    )
