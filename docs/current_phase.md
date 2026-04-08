@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 19 — Visualization state surface and first viewer
+Step 20 — Interactive manipulation layer
 
 ## Step status summary
 - Step 1: complete
@@ -22,8 +22,9 @@ Step 19 — Visualization state surface and first viewer
 - Step 16: complete
 - Step 17: complete
 - Step 18: complete
-- Step 19: active
-- Step 20: not started
+- Step 19: complete
+- Step 20: active
+- Step 21: not started
 
 ## What already exists
 The repository already has:
@@ -35,6 +36,8 @@ The repository already has:
 - a narrow richer-operations workload path for repeated dispatch over time
 - upgraded corridor-aware deterministic coordination
 - a typed control-command surface with deterministic command history
+- a visualization state surface with replay frames
+- a first text-based viewer consuming visualization state
 - static topology separated from runtime blocked-edge state via `WorldState`
 - graph-based routing with injectable cost models
 - deterministic simulated-time execution through `SimulationEngine`
@@ -43,44 +46,47 @@ The repository already has:
 - trace-centered metrics, exports, and golden regression coverage
 
 ## Goal of the current phase
-Add a visualization state surface and a first narrow viewer so simulator runs can be watched without making the UI the source of simulator truth.
+Add a narrow interactive manipulation layer so the simulator can accept viewer-facing runtime actions through the existing command/control architecture.
 
-The main Step 19 objective is:
-- expose stable visualization-oriented state derived from the simulator
-- support replay/viewing of runs in a deterministic way
-- add a minimal first viewer that consumes the visualization state surface
-- preserve clean separation between simulator logic and presentation
+The main Step 20 objective is:
+- connect interaction intent to the command surface
+- support a small set of meaningful interactive actions
+- preserve deterministic command ordering and replayability
+- make the simulator feel manipulable without introducing a heavy UI framework
 
 ## In-scope work
 Work that is allowed right now:
-- add a visualization-state module or export surface
-- derive stable frame/snapshot data from map + vehicles + world state + trace and/or command history
-- add a minimal first viewer, likely text/CLI or very lightweight local viewer, that consumes the visualization state surface
-- support deterministic playback of completed runs
-- add tests for visualization-state generation and stable replay order
-- add at least one regression fixture or exact-output comparison for visualization state output
-- perform additive refactors and targeted normal refactors needed to keep the visualization surface clean
+- add an interaction layer or viewer-facing control adapter
+- support a narrow initial interactive action set such as:
+  - assign destination
+  - reposition vehicle
+  - inject blocked edge
+- connect those actions to the existing typed command/controller surface
+- extend the viewer in a narrow way if needed to accept user-directed actions
+- add deterministic tests for interaction-to-command behavior
+- add at least one regression fixture or exact-output comparison for an interaction-driven run
+- perform additive refactors and targeted normal refactors needed to keep the interaction layer clean
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- add full live interactive manipulation
-- add a heavy web app or dashboard
-- redesign the simulator around a render loop
-- make the viewer own runtime truth
-- overbuild animation/rendering infrastructure
-- redesign the command/control layer beyond what a viewer minimally needs
+- build a heavy graphical UI framework
+- redesign the simulator around an event loop or async runtime
+- add free-form direct engine mutation from the viewer
+- overbuild a full product UI or dashboard
+- redesign scenario execution, coordination, or visualization foundations
+- add broad environment/map realism work
 
 ## Architectural guidance for this phase
-- The viewer must consume simulator state; it must not become the source of truth.
-- Prefer a stable visualization-state surface over direct engine introspection inside UI code.
-- Start with deterministic replay of completed runs, not a full live interactive UI.
-- Keep the first viewer narrow and lightweight.
-- Reuse existing map, vehicle, trace, export, and command-history surfaces where possible.
+- Interactions should translate into explicit commands, not bypass them.
+- Preserve deterministic ordering and replayability.
+- Keep viewer concerns separate from runtime ownership logic.
+- Start with a small set of interactions that map directly to existing command types.
+- Prefer a thin adapter layer over a large UI-control framework.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 19
-Step 19 is complete when:
-- a stable visualization-oriented state surface exists
-- at least one narrow viewer can consume that surface to show vehicle/map/run state
-- playback/viewing is deterministic for the same run
+## Completion criteria for Step 20
+Step 20 is complete when:
+- a narrow set of viewer-facing interactions can drive the simulator through the command surface
+- interaction-driven runs remain deterministic and replayable
+- at least one interaction-driven regression/demo surface exists
 - tests/lint/type checks pass
