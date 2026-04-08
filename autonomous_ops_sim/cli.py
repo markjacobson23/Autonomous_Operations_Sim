@@ -8,13 +8,12 @@ from autonomous_ops_sim.io.scenario_summary import format_scenario_summary
 
 def _run_scenario_command(scenario_path: str) -> int:
     try:
-        source_path = Path(scenario_path)
-        scenario = load_scenario(source_path)
+        scenario = load_scenario(Path(scenario_path))
     except (OSError, ValueError, TypeError, KeyError, OverflowError) as exc:
         print(f"Error: failed to load scenario '{scenario_path}': {exc}", file=sys.stderr)
         return 1
 
-    print(format_scenario_summary(scenario, source_path))
+    print(format_scenario_summary(scenario))
     return 0
 
 
