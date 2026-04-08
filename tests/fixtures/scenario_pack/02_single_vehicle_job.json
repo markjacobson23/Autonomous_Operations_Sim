@@ -1,0 +1,51 @@
+{
+  "name": "step_12_single_vehicle_job",
+  "seed": 212,
+  "duration_s": 20.0,
+  "map": {
+    "kind": "grid",
+    "params": {
+      "grid_size": 3
+    }
+  },
+  "vehicles": [
+    {
+      "id": 7,
+      "position": [0, 0, 0],
+      "velocity": 0.0,
+      "payload": 0.0,
+      "max_payload": 10.0,
+      "max_speed": 2.0,
+      "vehicle_type": "GENERIC"
+    }
+  ],
+  "execution": {
+    "kind": "single_vehicle_job",
+    "vehicle_id": 7,
+    "job": {
+      "id": "step-12-demo-job",
+      "tasks": [
+        {
+          "kind": "move",
+          "destination": [1, 0, 0]
+        },
+        {
+          "kind": "load",
+          "position": [1, 0, 0],
+          "amount": 4.0,
+          "service_duration_s": 3.0
+        },
+        {
+          "kind": "move",
+          "destination": [2, 0, 0]
+        },
+        {
+          "kind": "unload",
+          "position": [2, 0, 0],
+          "amount": 4.0,
+          "service_duration_s": 1.0
+        }
+      ]
+    }
+  }
+}
