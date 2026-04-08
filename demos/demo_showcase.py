@@ -22,10 +22,10 @@ from autonomous_ops_sim.simulation import (
     RepositionVehicleCommand,
     SimulationController,
     SimulationEngine,
-    VehicleRouteRequest,
     WorldState,
     summarize_engine_execution,
 )
+from autonomous_ops_sim.simulation.reservations import VehicleRouteRequest
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
 
 
