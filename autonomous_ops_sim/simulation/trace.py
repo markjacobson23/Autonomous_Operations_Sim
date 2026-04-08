@@ -12,6 +12,8 @@ class TraceEventType(str, Enum):
     ROUTE_COMPLETE = "route_complete"
     JOB_START = "job_start"
     TASK_START = "task_start"
+    CONFLICT_WAIT_START = "conflict_wait_start"
+    CONFLICT_WAIT_COMPLETE = "conflict_wait_complete"
     RESOURCE_WAIT_START = "resource_wait_start"
     RESOURCE_WAIT_COMPLETE = "resource_wait_complete"
     SERVICE_START = "service_start"
