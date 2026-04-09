@@ -656,6 +656,36 @@ h3 {
   filter: drop-shadow(0 0.12px 0.12px rgba(255, 255, 255, 0.45));
 }
 
+.scene-lane {
+  fill: none;
+  stroke: rgba(255, 252, 247, 0.92);
+  stroke-width: 0.12;
+  stroke-dasharray: 0.6 0.45;
+  pointer-events: stroke;
+}
+
+.scene-lane-reverse {
+  stroke: rgba(245, 232, 208, 0.92);
+}
+
+.scene-turn-connector {
+  fill: none;
+  stroke: rgba(36, 83, 199, 0.6);
+  stroke-width: 0.14;
+  stroke-dasharray: 0.45 0.3;
+}
+
+.scene-stop-line {
+  stroke: rgba(178, 74, 59, 0.9);
+  stroke-width: 0.18;
+}
+
+.scene-merge-zone {
+  fill: rgba(36, 83, 199, 0.08);
+  stroke: rgba(36, 83, 199, 0.22);
+  stroke-width: 0.08;
+}
+
 .scene-road-primary {
   stroke: rgba(29, 78, 216, 0.78);
 }

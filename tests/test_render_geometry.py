@@ -33,6 +33,11 @@ def test_render_geometry_surface_preserves_graph_and_visual_layers_separately() 
     ]
     assert surface.roads[1].centerline[1] == (4.4, 0.3, 0.0)
     assert surface.roads[2].directionality == "two_way"
+    assert len(surface.lanes) >= len(surface.roads)
+    assert surface.lanes[0].lane_id.startswith("depot-arterial:lane:")
+    assert surface.turn_connectors != ()
+    assert surface.stop_lines != ()
+    assert surface.merge_zones != ()
     assert surface.intersections[0].intersection_type == "yard_junction"
     assert [area.kind for area in surface.areas] == [
         "depot",

@@ -4,6 +4,12 @@ from dataclasses import dataclass
 import math
 from typing import Any
 
+from autonomous_ops_sim.simulation.kinematics import (
+    KinematicTraversalProfile,
+    build_kinematic_profile,
+    sample_profile_distance,
+    sample_profile_speed,
+)
 from autonomous_ops_sim.vehicles.vehicle import Position
 from autonomous_ops_sim.visualization.state import (
     MapSurface,
@@ -29,6 +35,9 @@ class VehicleMotionSegment:
     heading_rad: float
     nominal_speed: float
     peak_speed: float
+    acceleration_mps2: float
+    deceleration_mps2: float
+    profile_kind: str
 
 
 @dataclass(frozen=True)
@@ -96,11 +105,13 @@ def build_vehicle_motion_segments(
         duration_s = max(0.0, arrival_frame.timestamp_s - frame.timestamp_s)
         heading_rad = _heading_rad(start_position, end_position)
         edge = edge_lookup.get(edge_id)
-        distance = edge.distance if edge is not None else _distance(
-            start_position,
-            end_position,
-        )
+        distance = edge.distance if edge is not None else _distance(start_position, end_position)
         nominal_speed = distance / duration_s if duration_s > 0.0 else 0.0
+        profile = _segment_profile(
+            distance=distance,
+            duration_s=duration_s,
+            speed_limit=edge.speed_limit if edge is not None else nominal_speed,
+        )
         segment_index = segment_count_by_vehicle.get(vehicle_id, 0)
         segment_count_by_vehicle[vehicle_id] = segment_index + 1
         segments.append(
@@ -118,7 +129,10 @@ def build_vehicle_motion_segments(
                 end_position=end_position,
                 heading_rad=heading_rad,
                 nominal_speed=nominal_speed,
-                peak_speed=nominal_speed * 1.5 if nominal_speed > 0.0 else 0.0,
+                peak_speed=profile.peak_speed_mps,
+                acceleration_mps2=profile.acceleration_mps2,
+                deceleration_mps2=profile.deceleration_mps2,
+                profile_kind=profile.profile_kind,
             )
         )
 
@@ -162,14 +176,19 @@ def sample_motion(
             continue
         if segment.duration_s <= 0.0:
             continue
-        progress = _progress(segment, bounded_timestamp_s)
-        eased_progress = _smoothstep(progress)
-        speed = segment.nominal_speed * _smoothstep_derivative(progress)
-        position = _lerp_position(
-            segment.start_position,
-            segment.end_position,
-            eased_progress,
+        elapsed_s = bounded_timestamp_s - segment.start_time_s
+        profile = _segment_profile(
+            distance=segment.distance,
+            duration_s=segment.duration_s,
+            speed_limit=segment.nominal_speed,
         )
+        traversed_distance = sample_profile_distance(profile, elapsed_s)
+        progress = min(
+            1.0,
+            max(0.0, traversed_distance / segment.distance if segment.distance > 0.0 else 1.0),
+        )
+        speed = sample_profile_speed(profile, elapsed_s)
+        position = _lerp_position(segment.start_position, segment.end_position, progress)
         vehicles[segment.vehicle_id] = InterpolatedVehicleState(
             vehicle_id=segment.vehicle_id,
             node_id=segment.start_node_id,
@@ -180,7 +199,7 @@ def sample_motion(
             active_edge_id=segment.edge_id,
             start_node_id=segment.start_node_id,
             end_node_id=segment.end_node_id,
-            motion_progress=eased_progress,
+            motion_progress=progress,
             is_interpolated=True,
         )
 
@@ -210,6 +229,9 @@ def motion_segment_to_dict(segment: VehicleMotionSegment) -> dict[str, Any]:
         "heading_rad": segment.heading_rad,
         "nominal_speed": segment.nominal_speed,
         "peak_speed": segment.peak_speed,
+        "acceleration_mps2": segment.acceleration_mps2,
+        "deceleration_mps2": segment.deceleration_mps2,
+        "profile_kind": segment.profile_kind,
     }
 
 
@@ -302,26 +324,32 @@ def _heading_rad(start: Position, end: Position) -> float:
     return math.atan2(dy, dx)
 
 
-def _progress(segment: VehicleMotionSegment, timestamp_s: float) -> float:
-    return min(
-        1.0,
-        max(0.0, (timestamp_s - segment.start_time_s) / segment.duration_s),
-    )
-
-
-def _smoothstep(progress: float) -> float:
-    return progress * progress * (3.0 - 2.0 * progress)
-
-
-def _smoothstep_derivative(progress: float) -> float:
-    return 6.0 * progress * (1.0 - progress)
-
-
 def _lerp_position(start: Position, end: Position, progress: float) -> Position:
     return (
         start[0] + (end[0] - start[0]) * progress,
         start[1] + (end[1] - start[1]) * progress,
         start[2] + (end[2] - start[2]) * progress,
+    )
+
+
+def _segment_profile(
+    *,
+    distance: float,
+    duration_s: float,
+    speed_limit: float,
+) -> KinematicTraversalProfile:
+    if duration_s <= 0.0:
+        return build_kinematic_profile(
+            distance_m=distance,
+            speed_limit_mps=max(speed_limit, 0.001),
+            vehicle_max_speed_mps=max(speed_limit, 0.001),
+            duration_s=0.0,
+        )
+    return build_kinematic_profile(
+        distance_m=distance,
+        speed_limit_mps=max(speed_limit, 0.001),
+        vehicle_max_speed_mps=max(speed_limit, 0.001),
+        duration_s=duration_s,
     )
 
 

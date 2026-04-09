@@ -94,6 +94,12 @@ def test_motion_segments_follow_edge_traversal_order_deterministically() -> None
         (0.4, 0.7),
         (0.7, 0.8999999999999999),
     ]
+    assert [segment.profile_kind for segment in segments] == [
+        "triangle_authoritative",
+        "triangle_authoritative",
+        "triangle_authoritative",
+        "triangle_authoritative",
+    ]
 
 
 def test_motion_sampling_interpolates_position_heading_and_speed() -> None:
@@ -109,7 +115,7 @@ def test_motion_sampling_interpolates_position_heading_and_speed() -> None:
     assert vehicle.end_node_id == 4
     assert vehicle.position == (0.5, 0.5, 0.0)
     assert math.isclose(vehicle.heading_rad, math.pi / 4.0)
-    assert math.isclose(vehicle.speed, 7.5)
+    assert math.isclose(vehicle.speed, 10.0)
 
 
 def test_motion_sampling_clamps_to_authoritative_endpoints_outside_segments() -> None:

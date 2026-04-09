@@ -325,6 +325,10 @@ def _validate_graph_render_geometry(
     roads = value.get("roads", [])
     intersections = value.get("intersections", [])
     areas = value.get("areas", [])
+    lanes = value.get("lanes", [])
+    turn_connectors = value.get("turn_connectors", [])
+    stop_lines = value.get("stop_lines", [])
+    merge_zones = value.get("merge_zones", [])
 
     if not isinstance(roads, list):
         raise ValueError("Graph map 'params.render_geometry.roads' must be a list.")
@@ -334,6 +338,16 @@ def _validate_graph_render_geometry(
         )
     if not isinstance(areas, list):
         raise ValueError("Graph map 'params.render_geometry.areas' must be a list.")
+    if not isinstance(lanes, list):
+        raise ValueError("Graph map 'params.render_geometry.lanes' must be a list.")
+    if not isinstance(turn_connectors, list):
+        raise ValueError(
+            "Graph map 'params.render_geometry.turn_connectors' must be a list."
+        )
+    if not isinstance(stop_lines, list):
+        raise ValueError("Graph map 'params.render_geometry.stop_lines' must be a list.")
+    if not isinstance(merge_zones, list):
+        raise ValueError("Graph map 'params.render_geometry.merge_zones' must be a list.")
 
     road_ids: set[str] = set()
     for index, road in enumerate(roads):
@@ -448,6 +462,138 @@ def _validate_graph_render_geometry(
             _parse_position_value(
                 point,
                 context=f"Graph map render area[{index}].polygon[{point_index}]",
+            )
+
+    lane_ids: set[str] = set()
+    for index, lane in enumerate(lanes):
+        if not isinstance(lane, dict):
+            raise ValueError(f"Graph map render lane[{index}] must be an object.")
+        lane_id = lane.get("id")
+        road_id = lane.get("road_id")
+        centerline = lane.get("centerline")
+        lane_index = lane.get("lane_index", 0)
+        directionality = lane.get("directionality", "forward")
+        if not isinstance(lane_id, str) or not lane_id:
+            raise ValueError(
+                f"Graph map render lane[{index}].id must be a non-empty string."
+            )
+        if lane_id in lane_ids:
+            raise ValueError("Graph map render lane ids must be unique.")
+        lane_ids.add(lane_id)
+        if road_id not in road_ids:
+            raise ValueError(
+                f"Graph map render lane[{index}].road_id must reference a configured road."
+            )
+        if not isinstance(centerline, list) or len(centerline) < 2:
+            raise ValueError(
+                f"Graph map render lane[{index}].centerline must contain at least 2 positions."
+            )
+        for point_index, point in enumerate(centerline):
+            _parse_position_value(
+                point,
+                context=f"Graph map render lane[{index}].centerline[{point_index}]",
+            )
+        if not isinstance(lane_index, int) or lane_index < 0:
+            raise ValueError(
+                f"Graph map render lane[{index}].lane_index must be a non-negative int."
+            )
+        if directionality not in {"forward", "reverse"}:
+            raise ValueError(
+                f"Graph map render lane[{index}].directionality must be 'forward' or 'reverse'."
+            )
+
+    connector_ids: set[str] = set()
+    for index, connector in enumerate(turn_connectors):
+        if not isinstance(connector, dict):
+            raise ValueError(
+                f"Graph map render turn_connector[{index}] must be an object."
+            )
+        connector_id = connector.get("id")
+        from_lane_id = connector.get("from_lane_id")
+        to_lane_id = connector.get("to_lane_id")
+        centerline = connector.get("centerline")
+        if not isinstance(connector_id, str) or not connector_id:
+            raise ValueError(
+                f"Graph map render turn_connector[{index}].id must be a non-empty string."
+            )
+        if connector_id in connector_ids:
+            raise ValueError("Graph map render turn connector ids must be unique.")
+        connector_ids.add(connector_id)
+        if from_lane_id not in lane_ids or to_lane_id not in lane_ids:
+            raise ValueError(
+                f"Graph map render turn_connector[{index}] must reference configured lanes."
+            )
+        if not isinstance(centerline, list) or len(centerline) < 2:
+            raise ValueError(
+                f"Graph map render turn_connector[{index}].centerline must contain at least 2 positions."
+            )
+        for point_index, point in enumerate(centerline):
+            _parse_position_value(
+                point,
+                context=(
+                    f"Graph map render turn_connector[{index}].centerline[{point_index}]"
+                ),
+            )
+
+    stop_line_ids: set[str] = set()
+    for index, stop_line in enumerate(stop_lines):
+        if not isinstance(stop_line, dict):
+            raise ValueError(f"Graph map render stop_line[{index}] must be an object.")
+        stop_line_id = stop_line.get("id")
+        lane_id = stop_line.get("lane_id")
+        segment = stop_line.get("segment")
+        if not isinstance(stop_line_id, str) or not stop_line_id:
+            raise ValueError(
+                f"Graph map render stop_line[{index}].id must be a non-empty string."
+            )
+        if stop_line_id in stop_line_ids:
+            raise ValueError("Graph map render stop line ids must be unique.")
+        stop_line_ids.add(stop_line_id)
+        if lane_id not in lane_ids:
+            raise ValueError(
+                f"Graph map render stop_line[{index}].lane_id must reference a configured lane."
+            )
+        if not isinstance(segment, list) or len(segment) != 2:
+            raise ValueError(
+                f"Graph map render stop_line[{index}].segment must contain exactly 2 positions."
+            )
+        for point_index, point in enumerate(segment):
+            _parse_position_value(
+                point,
+                context=f"Graph map render stop_line[{index}].segment[{point_index}]",
+            )
+
+    merge_zone_ids: set[str] = set()
+    for index, zone in enumerate(merge_zones):
+        if not isinstance(zone, dict):
+            raise ValueError(f"Graph map render merge_zone[{index}] must be an object.")
+        zone_id = zone.get("id")
+        lane_id_values = zone.get("lane_ids")
+        polygon = zone.get("polygon")
+        if not isinstance(zone_id, str) or not zone_id:
+            raise ValueError(
+                f"Graph map render merge_zone[{index}].id must be a non-empty string."
+            )
+        if zone_id in merge_zone_ids:
+            raise ValueError("Graph map render merge zone ids must be unique.")
+        merge_zone_ids.add(zone_id)
+        if not isinstance(lane_id_values, list) or not lane_id_values:
+            raise ValueError(
+                f"Graph map render merge_zone[{index}].lane_ids must be a non-empty list."
+            )
+        for lane_id in lane_id_values:
+            if lane_id not in lane_ids:
+                raise ValueError(
+                    f"Graph map render merge_zone[{index}].lane_ids must reference configured lanes."
+                )
+        if not isinstance(polygon, list) or len(polygon) < 3:
+            raise ValueError(
+                f"Graph map render merge_zone[{index}].polygon must contain at least 3 positions."
+            )
+        for point_index, point in enumerate(polygon):
+            _parse_position_value(
+                point,
+                context=f"Graph map render merge_zone[{index}].polygon[{point_index}]",
             )
 
 

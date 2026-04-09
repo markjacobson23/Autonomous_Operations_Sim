@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from autonomous_ops_sim.io.exports import trace_event_to_dict
+from autonomous_ops_sim.simulation.kinematics import estimate_edge_travel_time_s
 from autonomous_ops_sim.simulation import LiveSimulationSession, command_to_dict
 
 
@@ -536,7 +537,11 @@ def _estimate_eta_s(
     vehicle = session.engine.get_vehicle(route_preview.vehicle_id)
     for edge_id in route_preview.edge_ids:
         edge = session.engine.map.graph.edges[edge_id]
-        travel_time_s += edge.distance / min(vehicle.max_speed, edge.speed_limit)
+        travel_time_s += estimate_edge_travel_time_s(
+            distance_m=edge.distance,
+            speed_limit_mps=edge.speed_limit,
+            vehicle_max_speed_mps=vehicle.max_speed,
+        )
     return travel_time_s
 
 

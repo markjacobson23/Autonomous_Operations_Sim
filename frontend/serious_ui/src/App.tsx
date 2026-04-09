@@ -110,10 +110,46 @@ type AreaPayload = {
   label?: string | null;
 };
 
+type LanePayload = {
+  lane_id?: string;
+  road_id?: string;
+  lane_index?: number;
+  directionality?: string;
+  lane_role?: string;
+  centerline?: Position3[];
+  width_m?: number;
+};
+
+type TurnConnectorPayload = {
+  connector_id?: string;
+  from_lane_id?: string;
+  to_lane_id?: string;
+  connector_type?: string;
+  centerline?: Position3[];
+};
+
+type StopLinePayload = {
+  stop_line_id?: string;
+  lane_id?: string;
+  control_kind?: string;
+  segment?: Position3[];
+};
+
+type MergeZonePayload = {
+  merge_zone_id?: string;
+  lane_ids?: string[];
+  kind?: string;
+  polygon?: Position3[];
+};
+
 type RenderGeometryPayload = {
   roads?: RoadPayload[];
   intersections?: IntersectionPayload[];
   areas?: AreaPayload[];
+  lanes?: LanePayload[];
+  turn_connectors?: TurnConnectorPayload[];
+  stop_lines?: StopLinePayload[];
+  merge_zones?: MergeZonePayload[];
 };
 
 type NodePayload = {
@@ -773,13 +809,13 @@ function App(): JSX.Element {
       <div className="shell-accent shell-accent-right" aria-hidden="true" />
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 50 Live Map Editing Baseline</p>
+          <p className="eyebrow">Step 52 Lane Geometry and Kinematics Baseline</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
-            The serious frontend now carries the first real authoring loop:
-            edit handles for graph nodes, road centerlines, and zone polygons,
-            with deterministic Python-side validation and a live save/reload
-            workflow layered onto the existing operator shell.
+            The serious frontend now layers explicit lanes, turn connectors,
+            stop lines, and merge zones onto the authored road network while
+            the motion surface samples vehicles through a shared kinematics
+            profile instead of plain viewer-only interpolation.
           </p>
         </div>
         <div className="masthead-meta">
@@ -981,6 +1017,69 @@ function App(): JSX.Element {
                       />
                     ))}
 
+                  {layers.roads &&
+                    (bundle?.render_geometry?.lanes ?? []).map((lane, index) => (
+                      <polyline
+                        key={lane.lane_id ?? `lane-${index}`}
+                        points={toPointString(lane.centerline)}
+                        className={`scene-lane scene-lane-${lane.directionality ?? "forward"}`}
+                        onMouseEnter={() =>
+                          setHoverTarget({
+                            label: lane.lane_id ?? "lane",
+                            detail: `${lane.lane_role ?? "travel"} · ${lane.directionality ?? "forward"}`,
+                          })
+                        }
+                      />
+                    ))}
+
+                  {layers.roads &&
+                    (bundle?.render_geometry?.turn_connectors ?? []).map((connector, index) => (
+                      <polyline
+                        key={connector.connector_id ?? `connector-${index}`}
+                        points={toPointString(connector.centerline)}
+                        className="scene-turn-connector"
+                        onMouseEnter={() =>
+                          setHoverTarget({
+                            label: connector.connector_id ?? "connector",
+                            detail: connector.connector_type ?? "turn connector",
+                          })
+                        }
+                      />
+                    ))}
+
+                  {layers.roads &&
+                    (bundle?.render_geometry?.stop_lines ?? []).map((stopLine, index) => (
+                      <line
+                        key={stopLine.stop_line_id ?? `stop-line-${index}`}
+                        x1={stopLine.segment?.[0]?.[0] ?? 0}
+                        y1={stopLine.segment?.[0]?.[1] ?? 0}
+                        x2={stopLine.segment?.[1]?.[0] ?? 0}
+                        y2={stopLine.segment?.[1]?.[1] ?? 0}
+                        className="scene-stop-line"
+                        onMouseEnter={() =>
+                          setHoverTarget({
+                            label: stopLine.stop_line_id ?? "stop line",
+                            detail: stopLine.control_kind ?? "stop control",
+                          })
+                        }
+                      />
+                    ))}
+
+                  {layers.roads &&
+                    (bundle?.render_geometry?.merge_zones ?? []).map((zone, index) => (
+                      <polygon
+                        key={zone.merge_zone_id ?? `merge-zone-${index}`}
+                        points={toPointString(zone.polygon)}
+                        className="scene-merge-zone"
+                        onMouseEnter={() =>
+                          setHoverTarget({
+                            label: zone.merge_zone_id ?? "merge zone",
+                            detail: `${zone.kind ?? "merge"} · ${(zone.lane_ids ?? []).length} lane(s)`,
+                          })
+                        }
+                      />
+                    ))}
+
                   {layers.intersections &&
                     (bundle?.render_geometry?.intersections ?? []).map((intersection, index) => (
                       <polygon
@@ -1170,11 +1269,12 @@ function App(): JSX.Element {
                 </svg>
 
                 <div className="focus-card">
-                  <strong>Live map editing is now staged through Python authority</strong>
+                  <strong>Lane semantics and kinematics are now live in the scene</strong>
                   <p>
-                    Drag node, road, and zone handles to assemble geometry edits.
-                    Draft changes stay in the frontend until the simulator-owned
-                    authoring endpoint validates and saves them into the working scenario.
+                    Lane centerlines, connectors, stop lines, and merge zones now
+                    sit on top of the authored geometry, while motion sampling uses
+                    a deterministic kinematic profile that keeps headings and speeds
+                    aligned with the simulator-side assumptions.
                   </p>
                 </div>
                 <div className="scene-legend">

@@ -1,4 +1,15 @@
 {
+  "authoring": {
+    "editable_area_count": 5,
+    "editable_node_count": 8,
+    "editable_road_count": 8,
+    "mode": "live_geometry_editing",
+    "reload_endpoint": "/api/authoring/reload",
+    "save_endpoint": "/api/authoring/save",
+    "source_scenario_path": "scenarios/showpiece_pack/01_mine_ore_shift.json",
+    "validate_endpoint": "/api/authoring/validate",
+    "working_scenario_path": "live_output/editable_scenario.json"
+  },
   "command_center": {
     "ai_assist": {
       "anomalies": [],

@@ -1,3 +1,5 @@
+import math
+
 from autonomous_ops_sim.core.edge import Edge
 from autonomous_ops_sim.core.graph import Graph
 from autonomous_ops_sim.core.node import Node
@@ -138,7 +140,8 @@ def test_vehicle_inspection_surface_exposes_payload_route_history_and_diagnostic
     assert inspection.wait_reason is None
     assert inspection.route_ahead_node_ids == (1, 4, 3)
     assert inspection.route_ahead_edge_ids == (3, 4)
-    assert inspection.eta_s == 0.4
+    assert inspection.eta_s is not None
+    assert math.isclose(inspection.eta_s, 1.632993161855452)
     assert inspection.recent_commands == ({"command_type": "block_edge", "edge_id": 2},)
     assert inspection.recent_trace_events == ()
     assert [diagnostic.code for diagnostic in inspection.diagnostics] == [
