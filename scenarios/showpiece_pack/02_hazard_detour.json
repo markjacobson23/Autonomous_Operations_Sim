@@ -1,0 +1,219 @@
+{
+  "name": "mine_showpiece_hazard_detour",
+  "seed": 3802,
+  "duration_s": 80.0,
+  "map": {
+    "kind": "graph",
+    "params": {
+      "nodes": [
+        {"id": 100, "position": [0.0, 0.0, 0.0], "node_type": "DEPOT"},
+        {"id": 110, "position": [3.0, 0.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 120, "position": [6.0, 2.0, 0.0], "node_type": "LOADING_ZONE"},
+        {"id": 130, "position": [9.0, 2.5, 0.0], "node_type": "INTERSECTION"},
+        {"id": 140, "position": [12.0, 0.5, 0.0], "node_type": "UNLOADING_ZONE"},
+        {"id": 150, "position": [7.0, -2.0, 0.0], "node_type": "JOB_SITE"},
+        {"id": 160, "position": [10.0, -2.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 170, "position": [1.5, -2.0, 0.0], "node_type": "JOB_SITE"}
+      ],
+      "edges": [
+        {"id": 1000, "start_node_id": 100, "end_node_id": 110, "distance": 3.0, "speed_limit": 3.0},
+        {"id": 1001, "start_node_id": 110, "end_node_id": 100, "distance": 3.0, "speed_limit": 3.0},
+        {"id": 1002, "start_node_id": 110, "end_node_id": 120, "distance": 4.0, "speed_limit": 2.2},
+        {"id": 1003, "start_node_id": 120, "end_node_id": 110, "distance": 4.0, "speed_limit": 2.2},
+        {"id": 1004, "start_node_id": 120, "end_node_id": 130, "distance": 3.0, "speed_limit": 1.8},
+        {"id": 1005, "start_node_id": 130, "end_node_id": 120, "distance": 3.0, "speed_limit": 1.8},
+        {"id": 1006, "start_node_id": 130, "end_node_id": 140, "distance": 3.4, "speed_limit": 2.5},
+        {"id": 1007, "start_node_id": 140, "end_node_id": 130, "distance": 3.4, "speed_limit": 2.5},
+        {"id": 1008, "start_node_id": 110, "end_node_id": 170, "distance": 2.5, "speed_limit": 1.5},
+        {"id": 1009, "start_node_id": 170, "end_node_id": 110, "distance": 2.5, "speed_limit": 1.5},
+        {"id": 1010, "start_node_id": 110, "end_node_id": 150, "distance": 4.5, "speed_limit": 1.6},
+        {"id": 1011, "start_node_id": 150, "end_node_id": 110, "distance": 4.5, "speed_limit": 1.6},
+        {"id": 1012, "start_node_id": 150, "end_node_id": 160, "distance": 3.0, "speed_limit": 1.4},
+        {"id": 1013, "start_node_id": 160, "end_node_id": 150, "distance": 3.0, "speed_limit": 1.4},
+        {"id": 1014, "start_node_id": 160, "end_node_id": 140, "distance": 2.8, "speed_limit": 1.7},
+        {"id": 1015, "start_node_id": 140, "end_node_id": 160, "distance": 2.8, "speed_limit": 1.7},
+        {"id": 1016, "start_node_id": 120, "end_node_id": 150, "distance": 4.8, "speed_limit": 1.5},
+        {"id": 1017, "start_node_id": 150, "end_node_id": 120, "distance": 4.8, "speed_limit": 1.5}
+      ],
+      "render_geometry": {
+        "roads": [
+          {
+            "id": "dispatch-spine",
+            "edge_ids": [1000, 1001],
+            "centerline": [[0.0, 0.0, 0.0], [1.6, 0.1, 0.0], [3.0, 0.0, 0.0]],
+            "road_class": "haul_road",
+            "directionality": "two_way",
+            "lane_count": 2,
+            "width_m": 1.8
+          },
+          {
+            "id": "pit-approach",
+            "edge_ids": [1002, 1003],
+            "centerline": [[3.0, 0.0, 0.0], [4.1, 0.4, 0.0], [5.0, 1.2, 0.0], [6.0, 2.0, 0.0]],
+            "road_class": "service_road",
+            "directionality": "two_way",
+            "lane_count": 2,
+            "width_m": 1.6
+          },
+          {
+            "id": "cut-ramp",
+            "edge_ids": [1004, 1005],
+            "centerline": [[6.0, 2.0, 0.0], [7.0, 2.2, 0.0], [8.0, 2.5, 0.0], [9.0, 2.5, 0.0]],
+            "road_class": "ramp",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.3
+          },
+          {
+            "id": "crusher-run",
+            "edge_ids": [1006, 1007],
+            "centerline": [[9.0, 2.5, 0.0], [10.1, 2.2, 0.0], [11.0, 1.5, 0.0], [12.0, 0.5, 0.0]],
+            "road_class": "haul_road",
+            "directionality": "two_way",
+            "lane_count": 2,
+            "width_m": 1.9
+          },
+          {
+            "id": "fuel-branch",
+            "edge_ids": [1008, 1009],
+            "centerline": [[3.0, 0.0, 0.0], [2.5, -0.7, 0.0], [2.0, -1.3, 0.0], [1.5, -2.0, 0.0]],
+            "road_class": "yard_lane",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.0
+          },
+          {
+            "id": "maintenance-link",
+            "edge_ids": [1010, 1011],
+            "centerline": [[3.0, 0.0, 0.0], [4.4, -0.4, 0.0], [5.8, -1.3, 0.0], [7.0, -2.0, 0.0]],
+            "road_class": "service_road",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.1
+          },
+          {
+            "id": "south-bypass",
+            "edge_ids": [1012, 1013, 1014, 1015],
+            "centerline": [[7.0, -2.0, 0.0], [8.6, -2.1, 0.0], [10.0, -2.0, 0.0], [11.0, -1.1, 0.0], [12.0, 0.5, 0.0]],
+            "road_class": "bypass",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.2
+          },
+          {
+            "id": "escape-ramp",
+            "edge_ids": [1016, 1017],
+            "centerline": [[6.0, 2.0, 0.0], [6.4, 0.7, 0.0], [6.8, -0.5, 0.0], [7.0, -2.0, 0.0]],
+            "road_class": "ramp",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.0
+          }
+        ],
+        "intersections": [
+          {
+            "id": "dispatch-hub",
+            "node_id": 110,
+            "polygon": [[2.4, -0.6, 0.0], [3.7, -0.5, 0.0], [3.8, 0.6, 0.0], [2.6, 0.8, 0.0]],
+            "intersection_type": "yard_junction"
+          },
+          {
+            "id": "pit-apron",
+            "node_id": 120,
+            "polygon": [[5.5, 1.4, 0.0], [6.8, 1.4, 0.0], [6.9, 2.7, 0.0], [5.7, 2.8, 0.0]],
+            "intersection_type": "loading_apron"
+          },
+          {
+            "id": "crusher-apron",
+            "node_id": 140,
+            "polygon": [[11.3, -0.2, 0.0], [12.7, -0.1, 0.0], [12.8, 1.1, 0.0], [11.4, 1.2, 0.0]],
+            "intersection_type": "yard_junction"
+          },
+          {
+            "id": "service-turn",
+            "node_id": 150,
+            "polygon": [[6.3, -2.6, 0.0], [7.6, -2.6, 0.0], [7.8, -1.4, 0.0], [6.5, -1.3, 0.0]],
+            "intersection_type": "service_turnout"
+          }
+        ],
+        "areas": [
+          {
+            "id": "dispatch-yard",
+            "kind": "depot",
+            "label": "Dispatch Yard",
+            "polygon": [[-0.9, -0.9, 0.0], [1.1, -0.9, 0.0], [1.1, 0.9, 0.0], [-0.9, 0.9, 0.0]]
+          },
+          {
+            "id": "ore-cut",
+            "kind": "loading_bay",
+            "label": "Ore Cut",
+            "polygon": [[5.0, 1.1, 0.0], [7.4, 1.1, 0.0], [7.4, 3.3, 0.0], [5.0, 3.3, 0.0]]
+          },
+          {
+            "id": "crusher-pad",
+            "kind": "loading_bay",
+            "label": "Crusher Pad",
+            "polygon": [[10.9, -0.5, 0.0], [12.9, -0.5, 0.0], [12.9, 1.6, 0.0], [10.9, 1.6, 0.0]]
+          },
+          {
+            "id": "service-yard",
+            "kind": "building",
+            "label": "Service Yard",
+            "polygon": [[5.8, -3.2, 0.0], [8.1, -3.2, 0.0], [8.1, -1.4, 0.0], [5.8, -1.4, 0.0]]
+          },
+          {
+            "id": "blast-buffer",
+            "kind": "no_go_zone",
+            "label": "Blast Buffer",
+            "polygon": [[8.7, 1.1, 0.0], [10.4, 1.1, 0.0], [10.4, 3.1, 0.0], [8.7, 3.1, 0.0]]
+          }
+        ]
+      }
+    }
+  },
+  "vehicles": [
+    {
+      "id": 302,
+      "position": [0.0, 0.0, 0.0],
+      "velocity": 0.0,
+      "payload": 0.0,
+      "max_payload": 24.0,
+      "max_speed": 8.0,
+      "vehicle_type": "GENERIC"
+    }
+  ],
+  "resources": [
+    {"id": "shovel-loader", "capacity": 1, "initial_available_times_s": [2.0]}
+  ],
+  "world_state": {
+    "blocked_edges": [
+      {"start": [6.0, 2.0, 0.0], "end": [9.0, 2.5, 0.0]},
+      {"start": [9.0, 2.5, 0.0], "end": [6.0, 2.0, 0.0]}
+    ]
+  },
+  "execution": {
+    "kind": "single_vehicle_job",
+    "vehicle_id": 302,
+    "job": {
+      "id": "hazard-haul",
+      "tasks": [
+        {"kind": "move", "destination": [6.0, 2.0, 0.0]},
+        {
+          "kind": "load",
+          "position": [6.0, 2.0, 0.0],
+          "amount": 10.0,
+          "service_duration_s": 2.0,
+          "resource_id": "shovel-loader"
+        },
+        {"kind": "move", "destination": [12.0, 0.5, 0.0]},
+        {
+          "kind": "unload",
+          "position": [12.0, 0.5, 0.0],
+          "amount": 10.0,
+          "service_duration_s": 1.5
+        },
+        {"kind": "move", "destination": [0.0, 0.0, 0.0]}
+      ]
+    }
+  }
+}

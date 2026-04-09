@@ -12,6 +12,7 @@ requires-python = ">=3.11"
 autonomous-ops-sim = "autonomous_ops_sim.cli:main"
 autonomous-ops-gui-viewer = "autonomous_ops_sim.visualization.gui_viewer:main"
 autonomous-ops-serious-viewer = "autonomous_ops_sim.visualization.serious_viewer:main"
+autonomous-ops-showcase = "autonomous_ops_sim.showcase:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

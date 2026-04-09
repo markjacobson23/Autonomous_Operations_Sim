@@ -5,6 +5,7 @@ from pathlib import Path
 from autonomous_ops_sim.io.scenario_loader import load_scenario
 from autonomous_ops_sim.io.scenario_summary import format_scenario_summary
 from autonomous_ops_sim.perf import export_benchmark_suite_json, run_default_benchmark_suite
+from autonomous_ops_sim.showcase import export_showcase_demo
 from autonomous_ops_sim.simulation.scenario_executor import execute_scenario
 
 
@@ -45,6 +46,21 @@ def _benchmark_command(*, repetitions: int, warmup_iterations: int) -> int:
         warmup_iterations=warmup_iterations,
     )
     print(export_benchmark_suite_json(result), end="")
+    return 0
+
+
+def _showcase_command(
+    *,
+    output_dir: str,
+    flagship_scenario: str,
+    pack_directory: str,
+) -> int:
+    artifacts = export_showcase_demo(
+        output_dir,
+        flagship_scenario_path=flagship_scenario,
+        pack_directory=pack_directory,
+    )
+    print(artifacts.manifest_path)
     return 0
 
 
@@ -90,6 +106,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Warmup iterations per benchmark case before measurement.",
     )
 
+    showcase_parser = subparsers.add_parser(
+        "showcase",
+        help="Export the Step 38 mining showpiece replay/live/viewer artifacts.",
+    )
+    showcase_parser.add_argument(
+        "--output-dir",
+        default="showcase_output",
+        help="Directory to receive the exported showcase artifacts.",
+    )
+    showcase_parser.add_argument(
+        "--flagship-scenario",
+        default="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        help="Optional flagship scenario JSON path override.",
+    )
+    showcase_parser.add_argument(
+        "--pack-directory",
+        default="scenarios/showpiece_pack",
+        help="Optional scenario pack directory override.",
+    )
+
     return parser
 
 
@@ -106,6 +142,12 @@ def main(argv: list[str] | None = None) -> int:
             repetitions=args.repetitions,
             warmup_iterations=args.warmup_iterations,
         )
+    if args.command == "showcase":
+        return _showcase_command(
+            output_dir=args.output_dir,
+            flagship_scenario=args.flagship_scenario,
+            pack_directory=args.pack_directory,
+        )
 
     parser.print_help()
     return 0
@@ -113,6 +155,5 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
 
 

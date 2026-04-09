@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import subprocess
 
 from autonomous_ops_sim.cli import main
@@ -88,3 +89,16 @@ def test_module_cli_execute_command_works():
 
     assert result.returncode == 0
     assert json.loads(result.stdout)["final_time_s"] == 6.0
+
+
+def test_cli_showcase_exports_showpiece_manifest(tmp_path, capsys):
+    exit_code = main(["showcase", "--output-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    manifest_path = Path(captured.out.strip())
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert manifest_path == tmp_path / "showcase_manifest.json"
+    assert manifest["flagship_scenario"]["name"] == "mine_showpiece_ore_shift"
+    assert manifest["scenario_pack"]["aggregate_summary"]["scenario_count"] == 3
