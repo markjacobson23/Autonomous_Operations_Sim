@@ -1,6 +1,7 @@
 from autonomous_ops_sim.core.node import Node
 from autonomous_ops_sim.core.edge import Edge
 
+
 class Graph:
     """Directed graph storing nodes, edges, and edge adjacency.
 
@@ -83,3 +84,10 @@ class Graph:
 
         return self.adjacency[node_id].copy()
 
+    def iter_outgoing_edges(self, node_id: int) -> tuple[Edge, ...] | list[Edge]:
+        """Return the live outgoing-edge sequence for internal read-only traversal."""
+
+        if node_id not in self.nodes:
+            raise KeyError(f"Node-{node_id} is not in the graph.")
+
+        return self.adjacency[node_id]

@@ -81,6 +81,13 @@ class ReservationTable:
         self._node_reservations: list[NodeReservation] = []
         self._edge_reservations: list[EdgeReservation] = []
         self._corridor_reservations: list[CorridorReservation] = []
+        self._node_reservations_by_node: dict[int, list[NodeReservation]] = {}
+        self._edge_reservations_by_segment: dict[
+            tuple[int, int], list[EdgeReservation]
+        ] = {}
+        self._corridor_reservations_by_path: dict[
+            tuple[int, ...], list[CorridorReservation]
+        ] = {}
 
     @property
     def node_reservations(self) -> tuple[NodeReservation, ...]:
@@ -114,6 +121,7 @@ class ReservationTable:
             reason=reason,
         )
         self._node_reservations.append(reservation)
+        self._node_reservations_by_node.setdefault(node_id, []).append(reservation)
         return reservation
 
     def reserve_edge(
@@ -138,6 +146,9 @@ class ReservationTable:
             end_time_s=end_time_s,
         )
         self._edge_reservations.append(reservation)
+        self._edge_reservations_by_segment.setdefault(
+            reservation.segment_key, []
+        ).append(reservation)
         return reservation
 
     def reserve_corridor(
@@ -162,6 +173,7 @@ class ReservationTable:
             end_time_s=end_time_s,
         )
         self._corridor_reservations.append(reservation)
+        self._corridor_reservations_by_path.setdefault(node_ids, []).append(reservation)
         return reservation
 
     def earliest_departure_time(
@@ -261,7 +273,7 @@ class ReservationTable:
         start_time_s: float,
         end_time_s: float,
     ) -> NodeReservation | None:
-        for reservation in self._node_reservations:
+        for reservation in self._node_reservations_by_node.get(node_id, ()):
             if reservation.vehicle_id == vehicle_id:
                 continue
             if reservation.node_id != node_id:
@@ -282,7 +294,7 @@ class ReservationTable:
         node_id: int,
         arrival_time_s: float,
     ) -> NodeReservation | None:
-        for reservation in self._node_reservations:
+        for reservation in self._node_reservations_by_node.get(node_id, ()):
             if reservation.vehicle_id == vehicle_id:
                 continue
             if reservation.node_id != node_id:
@@ -304,10 +316,8 @@ class ReservationTable:
             min(start_node_id, end_node_id),
             max(start_node_id, end_node_id),
         )
-        for reservation in self._edge_reservations:
+        for reservation in self._edge_reservations_by_segment.get(requested_segment, ()):
             if reservation.vehicle_id == vehicle_id:
-                continue
-            if reservation.segment_key != requested_segment:
                 continue
             if _windows_overlap(
                 start_a=start_time_s,
@@ -326,13 +336,18 @@ class ReservationTable:
         start_time_s: float,
         end_time_s: float,
     ) -> CorridorReservation | None:
-        requested_segment_keys = _segment_keys_for_nodes(node_ids)
-        requested_segments = set(requested_segment_keys)
+        candidate_reservations = self._corridor_reservations_by_path.get(node_ids)
+        if candidate_reservations is None:
+            requested_segment_keys = _segment_keys_for_nodes(node_ids)
+            requested_segments = set(requested_segment_keys)
+            candidate_reservations = [
+                reservation
+                for reservation in self._corridor_reservations
+                if not requested_segments.isdisjoint(reservation.segment_keys)
+            ]
 
-        for reservation in self._corridor_reservations:
+        for reservation in candidate_reservations:
             if reservation.vehicle_id == vehicle_id:
-                continue
-            if requested_segments.isdisjoint(reservation.segment_keys):
                 continue
             if _windows_overlap(
                 start_a=start_time_s,

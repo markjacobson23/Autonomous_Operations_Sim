@@ -38,8 +38,8 @@ def dijkstra(
         if node == end_id:
             break
 
-        for edge in graph.get_outgoing_edges(node):
-            if runtime_state.is_edge_blocked(edge.id):
+        for edge in graph.iter_outgoing_edges(node):
+            if runtime_state.has_blocked_edge(edge.id):
                 continue
 
             neighbor = edge.end_node.id

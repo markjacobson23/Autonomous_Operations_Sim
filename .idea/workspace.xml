@@ -5,8 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="80a83f02-da50-42e5-b2f5-61cccc1dbda7" name="Changes" comment="added simple demos">
-      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim.egg-info/SOURCES.txt" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim.egg-info/SOURCES.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim.egg-info/entry_points.txt" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim.egg-info/entry_points.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/core/graph.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/core/graph.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/routing/pathfinding.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/routing/pathfinding.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/simulation/reservations.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/simulation/reservations.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/simulation/world_state.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/simulation/world_state.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

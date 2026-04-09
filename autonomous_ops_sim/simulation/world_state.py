@@ -20,6 +20,11 @@ class WorldState:
         self._ensure_edge_exists(edge_id)
         return edge_id in self._blocked_edge_ids
 
+    def has_blocked_edge(self, edge_id: int) -> bool:
+        """Return blocked-edge membership for known graph edge ids without validation."""
+
+        return edge_id in self._blocked_edge_ids
+
     def block_edge(self, edge_id: int) -> None:
         """Block an edge for routing in this world state."""
 
