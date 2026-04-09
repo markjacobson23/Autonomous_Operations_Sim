@@ -128,6 +128,9 @@ def test_serious_viewer_html_renders_replay_bundle_controls_and_embedded_data() 
     assert "replay_bundle" in html_output
     assert "motion_segments" in html_output
     assert "render_geometry" in html_output
+    assert "traffic_baseline" in html_output
+    assert "sampleTrafficAtTime" in html_output
+    assert "Traffic controls" in html_output
 
 
 def test_serious_viewer_html_supports_live_session_and_live_sync_bundles() -> None:
@@ -151,6 +154,8 @@ def test_serious_viewer_html_supports_live_session_and_live_sync_bundles() -> No
     assert "live snapshot" in live_sync_html
     assert "motion_segments" in live_session_html
     assert "motion_segments" in live_sync_html
+    assert "traffic_baseline" in live_session_html
+    assert "traffic_baseline" in live_sync_html
 
 
 def test_serious_viewer_cli_loads_bundle_and_writes_html(tmp_path, capsys) -> None:

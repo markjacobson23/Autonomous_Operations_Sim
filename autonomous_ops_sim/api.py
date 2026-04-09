@@ -49,6 +49,11 @@ from autonomous_ops_sim.visualization.motion import (
     build_vehicle_motion_segments,
     motion_segment_to_dict,
 )
+from autonomous_ops_sim.visualization.traffic import (
+    TrafficBaselineSurface,
+    build_traffic_baseline_surface,
+    traffic_baseline_surface_to_dict,
+)
 from autonomous_ops_sim.visualization.state import (
     FrameTrigger,
     MapSurface,
@@ -60,9 +65,9 @@ from autonomous_ops_sim.visualization.state import (
 
 
 SIMULATION_API_VERSION = 1
-REPLAY_BUNDLE_SCHEMA_VERSION = 3
-LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 3
-LIVE_SYNC_BUNDLE_SCHEMA_VERSION = 3
+REPLAY_BUNDLE_SCHEMA_VERSION = 4
+LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 4
+LIVE_SYNC_BUNDLE_SCHEMA_VERSION = 4
 
 
 @dataclass(frozen=True)
@@ -106,6 +111,7 @@ class ReplayBundle:
     command_results: tuple[SimulationCommandResult, ...]
     session_history: tuple[SessionAdvanceRecord, ...]
     motion_segments: tuple[VehicleMotionSegment, ...]
+    traffic_baseline: TrafficBaselineSurface
 
 
 @dataclass(frozen=True)
@@ -123,6 +129,7 @@ class LiveSessionBundle:
     session_history: tuple[SessionAdvanceRecord, ...]
     command_results: tuple[SimulationCommandResult, ...]
     motion_segments: tuple[VehicleMotionSegment, ...]
+    traffic_baseline: TrafficBaselineSurface
 
 
 @dataclass(frozen=True)
@@ -137,6 +144,7 @@ class LiveSyncBundle:
     updates: tuple[LiveStateUpdate, ...]
     command_results: tuple[SimulationCommandResult, ...]
     motion_segments: tuple[VehicleMotionSegment, ...]
+    traffic_baseline: TrafficBaselineSurface
 
 
 def apply_command_with_result(
@@ -186,6 +194,7 @@ def build_replay_bundle(
         session_history=session_history,
     )
     motion_segments = build_vehicle_motion_segments(replay_state)
+    render_geometry = build_render_geometry_surface(engine.map)
     command_results = _build_replay_command_results(
         command_history=tuple(command_history),
         frames=replay_state.frames,
@@ -200,7 +209,7 @@ def build_replay_bundle(
         final_time_s=engine.simulated_time_s,
         summary=metrics_summary,
         map_surface=replay_state.map_surface,
-        render_geometry=build_render_geometry_surface(engine.map),
+        render_geometry=render_geometry,
         final_frame=replay_state.frames[-1],
         replay_timeline=replay_state.frames,
         trace_events=tuple(
@@ -209,6 +218,11 @@ def build_replay_bundle(
         command_results=command_results,
         session_history=tuple(session_history),
         motion_segments=motion_segments,
+        traffic_baseline=build_traffic_baseline_surface(
+            replay_state,
+            render_geometry=render_geometry,
+            motion_segments=motion_segments,
+        ),
     )
 
 
@@ -251,6 +265,7 @@ def build_live_session_bundle(
     metrics_summary = summary or summarize_engine_execution(session.engine)
     replay_state = build_visualization_state_from_live_session(session)
     motion_segments = build_vehicle_motion_segments(replay_state)
+    render_geometry = build_render_geometry_surface(session.engine.map)
     return LiveSessionBundle(
         metadata=SimulationApiMetadata(
             api_version=SIMULATION_API_VERSION,
@@ -261,7 +276,7 @@ def build_live_session_bundle(
         simulated_time_s=session.engine.simulated_time_s,
         summary=metrics_summary,
         map_surface=replay_state.map_surface,
-        render_geometry=build_render_geometry_surface(session.engine.map),
+        render_geometry=render_geometry,
         snapshot=build_live_runtime_snapshot(session),
         trace_events=tuple(
             trace_event_to_dict(event) for event in session.engine.trace.events
@@ -272,6 +287,11 @@ def build_live_session_bundle(
             frames=replay_state.frames,
         ),
         motion_segments=motion_segments,
+        traffic_baseline=build_traffic_baseline_surface(
+            replay_state,
+            render_geometry=render_geometry,
+            motion_segments=motion_segments,
+        ),
     )
 
 
@@ -280,6 +300,8 @@ def build_live_sync_bundle(session: LiveSimulationSession) -> LiveSyncBundle:
 
     surface = build_live_sync_surface(session)
     replay_state = build_visualization_state_from_live_session(session)
+    motion_segments = build_vehicle_motion_segments(replay_state)
+    render_geometry = build_render_geometry_surface(session.engine.map)
     return LiveSyncBundle(
         metadata=SimulationApiMetadata(
             api_version=SIMULATION_API_VERSION,
@@ -305,7 +327,12 @@ def build_live_sync_bundle(session: LiveSimulationSession) -> LiveSyncBundle:
             )
             for effect in surface.command_effects
         ),
-        motion_segments=build_vehicle_motion_segments(replay_state),
+        motion_segments=motion_segments,
+        traffic_baseline=build_traffic_baseline_surface(
+            replay_state,
+            render_geometry=render_geometry,
+            motion_segments=motion_segments,
+        ),
     )
 
 
@@ -367,6 +394,7 @@ def replay_bundle_to_dict(bundle: ReplayBundle) -> dict[str, Any]:
         "motion_segments": [
             motion_segment_to_dict(segment) for segment in bundle.motion_segments
         ],
+        "traffic_baseline": traffic_baseline_surface_to_dict(bundle.traffic_baseline),
     }
 
 
@@ -392,6 +420,7 @@ def live_session_bundle_to_dict(bundle: LiveSessionBundle) -> dict[str, Any]:
         "motion_segments": [
             motion_segment_to_dict(segment) for segment in bundle.motion_segments
         ],
+        "traffic_baseline": traffic_baseline_surface_to_dict(bundle.traffic_baseline),
     }
 
 
@@ -412,6 +441,7 @@ def live_sync_bundle_to_dict(bundle: LiveSyncBundle) -> dict[str, Any]:
         "motion_segments": [
             motion_segment_to_dict(segment) for segment in bundle.motion_segments
         ],
+        "traffic_baseline": traffic_baseline_surface_to_dict(bundle.traffic_baseline),
     }
 
 

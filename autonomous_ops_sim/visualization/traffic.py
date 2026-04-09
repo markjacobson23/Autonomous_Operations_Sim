@@ -1,0 +1,373 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from autonomous_ops_sim.visualization.geometry import (
+    RenderGeometrySurface,
+    RoadGeometrySurface,
+)
+from autonomous_ops_sim.visualization.motion import VehicleMotionSegment
+from autonomous_ops_sim.visualization.state import VisualizationState
+
+
+@dataclass(frozen=True)
+class TrafficControlPoint:
+    """Deterministic baseline control rule at one rendered intersection."""
+
+    control_id: str
+    node_id: int
+    control_type: str
+    controlled_road_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class TrafficQueueRecord:
+    """Deterministic queued wait derived from authoritative trace behavior."""
+
+    vehicle_id: int
+    node_id: int
+    road_id: str | None
+    queue_start_s: float
+    queue_end_s: float
+    reason: str
+
+
+@dataclass(frozen=True)
+class TrafficBaselineSurface:
+    """Static traffic baseline layer derived from replay, geometry, and waits."""
+
+    control_points: tuple[TrafficControlPoint, ...]
+    queue_records: tuple[TrafficQueueRecord, ...]
+
+
+@dataclass(frozen=True)
+class TrafficRoadState:
+    """Sampled road traffic state at one viewer time."""
+
+    road_id: str
+    active_vehicle_ids: tuple[int, ...]
+    queued_vehicle_ids: tuple[int, ...]
+    occupancy_count: int
+    min_spacing_m: float | None
+    congestion_level: str
+
+
+@dataclass(frozen=True)
+class TrafficSnapshot:
+    """Continuous traffic sample for one explicit time."""
+
+    timestamp_s: float
+    road_states: tuple[TrafficRoadState, ...]
+
+
+def build_traffic_baseline_surface(
+    state: VisualizationState,
+    *,
+    render_geometry: RenderGeometrySurface,
+    motion_segments: tuple[VehicleMotionSegment, ...],
+) -> TrafficBaselineSurface:
+    """Build deterministic baseline traffic semantics from existing replay data."""
+
+    return TrafficBaselineSurface(
+        control_points=_build_control_points(render_geometry),
+        queue_records=_build_queue_records(
+            state=state,
+            roads=render_geometry.roads,
+            motion_segments=motion_segments,
+        ),
+    )
+
+
+def sample_traffic_snapshot(
+    *,
+    timestamp_s: float,
+    render_geometry: RenderGeometrySurface,
+    motion_segments: tuple[VehicleMotionSegment, ...],
+    baseline: TrafficBaselineSurface,
+) -> TrafficSnapshot:
+    """Sample congestion and queue state at one explicit timestamp."""
+
+    road_states: list[TrafficRoadState] = []
+    for road in render_geometry.roads:
+        active_segments = [
+            segment
+            for segment in motion_segments
+            if segment.edge_id in road.edge_ids
+            and segment.start_time_s < timestamp_s < segment.end_time_s
+        ]
+        active_positions = [
+            _segment_position_at_time(segment, timestamp_s) for segment in active_segments
+        ]
+        queued_vehicle_ids = tuple(
+            sorted(
+                record.vehicle_id
+                for record in baseline.queue_records
+                if record.road_id == road.road_id
+                and record.queue_start_s <= timestamp_s < record.queue_end_s
+            )
+        )
+        active_vehicle_ids = tuple(
+            sorted(segment.vehicle_id for segment in active_segments)
+        )
+        min_spacing_m = _min_spacing_m(active_positions)
+        congestion_level = _congestion_level(
+            occupancy_count=len(active_vehicle_ids),
+            queue_count=len(queued_vehicle_ids),
+            min_spacing_m=min_spacing_m,
+        )
+        road_states.append(
+            TrafficRoadState(
+                road_id=road.road_id,
+                active_vehicle_ids=active_vehicle_ids,
+                queued_vehicle_ids=queued_vehicle_ids,
+                occupancy_count=len(active_vehicle_ids),
+                min_spacing_m=min_spacing_m,
+                congestion_level=congestion_level,
+            )
+        )
+
+    return TrafficSnapshot(
+        timestamp_s=timestamp_s,
+        road_states=tuple(road_states),
+    )
+
+
+def traffic_baseline_surface_to_dict(
+    surface: TrafficBaselineSurface,
+) -> dict[str, Any]:
+    """Convert baseline traffic semantics into a stable JSON-ready record."""
+
+    return {
+        "control_points": [
+            {
+                "control_id": control.control_id,
+                "node_id": control.node_id,
+                "control_type": control.control_type,
+                "controlled_road_ids": list(control.controlled_road_ids),
+            }
+            for control in surface.control_points
+        ],
+        "queue_records": [
+            {
+                "vehicle_id": record.vehicle_id,
+                "node_id": record.node_id,
+                "road_id": record.road_id,
+                "queue_start_s": record.queue_start_s,
+                "queue_end_s": record.queue_end_s,
+                "reason": record.reason,
+            }
+            for record in surface.queue_records
+        ],
+    }
+
+
+def traffic_snapshot_to_dict(snapshot: TrafficSnapshot) -> dict[str, Any]:
+    """Convert one sampled traffic snapshot into a stable JSON-ready record."""
+
+    return {
+        "timestamp_s": snapshot.timestamp_s,
+        "road_states": [
+            {
+                "road_id": road_state.road_id,
+                "active_vehicle_ids": list(road_state.active_vehicle_ids),
+                "queued_vehicle_ids": list(road_state.queued_vehicle_ids),
+                "occupancy_count": road_state.occupancy_count,
+                "min_spacing_m": road_state.min_spacing_m,
+                "congestion_level": road_state.congestion_level,
+            }
+            for road_state in snapshot.road_states
+        ],
+    }
+
+
+def _build_control_points(
+    render_geometry: RenderGeometrySurface,
+) -> tuple[TrafficControlPoint, ...]:
+    controls: list[TrafficControlPoint] = []
+    for intersection in render_geometry.intersections:
+        min_x = min(point[0] for point in intersection.polygon)
+        max_x = max(point[0] for point in intersection.polygon)
+        min_y = min(point[1] for point in intersection.polygon)
+        max_y = max(point[1] for point in intersection.polygon)
+        connected_road_ids = tuple(
+            sorted(
+                road.road_id
+                for road in render_geometry.roads
+                if _road_touches_intersection_bounds(
+                    road,
+                    min_x=min_x,
+                    max_x=max_x,
+                    min_y=min_y,
+                    max_y=max_y,
+                )
+            )
+        )
+        if len(connected_road_ids) < 2:
+            continue
+        if len(connected_road_ids) >= 4:
+            control_type = "signalized"
+        elif len(connected_road_ids) >= 2:
+            control_type = "yield"
+        else:
+            control_type = "uncontrolled"
+        controls.append(
+            TrafficControlPoint(
+                control_id=f"control-{intersection.intersection_id}",
+                node_id=intersection.node_id,
+                control_type=control_type,
+                controlled_road_ids=connected_road_ids,
+            )
+        )
+    return tuple(controls)
+
+
+def _build_queue_records(
+    *,
+    state: VisualizationState,
+    roads: tuple[RoadGeometrySurface, ...],
+    motion_segments: tuple[VehicleMotionSegment, ...],
+) -> tuple[TrafficQueueRecord, ...]:
+    queue_start_events: dict[int, dict[str, Any]] = {}
+    records: list[TrafficQueueRecord] = []
+    road_by_edge_id = {
+        edge_id: road.road_id
+        for road in roads
+        for edge_id in road.edge_ids
+    }
+
+    for frame in state.frames:
+        event = frame.trigger.trace_event
+        if frame.trigger.source != "trace" or event is None:
+            continue
+        event_type = event.get("event_type")
+        vehicle_id = event.get("vehicle_id")
+        if not isinstance(vehicle_id, int):
+            continue
+
+        if event_type == "conflict_wait_start":
+            node_id = event.get("node_id")
+            queue_start_events[vehicle_id] = {
+                "node_id": int(node_id) if isinstance(node_id, int) else -1,
+                "queue_start_s": frame.timestamp_s,
+                "reason": "conflict_wait",
+            }
+            continue
+
+        if event_type != "conflict_wait_complete":
+            continue
+        started = queue_start_events.pop(vehicle_id, None)
+        if started is None:
+            continue
+        road_id = _road_id_after_queue(
+            vehicle_id=vehicle_id,
+            wait_end_s=frame.timestamp_s,
+            motion_segments=motion_segments,
+            road_by_edge_id=road_by_edge_id,
+        )
+        records.append(
+            TrafficQueueRecord(
+                vehicle_id=vehicle_id,
+                node_id=started["node_id"],
+                road_id=road_id,
+                queue_start_s=started["queue_start_s"],
+                queue_end_s=frame.timestamp_s,
+                reason=started["reason"],
+            )
+        )
+
+    return tuple(records)
+
+
+def _road_id_after_queue(
+    *,
+    vehicle_id: int,
+    wait_end_s: float,
+    motion_segments: tuple[VehicleMotionSegment, ...],
+    road_by_edge_id: dict[int, str],
+) -> str | None:
+    for segment in motion_segments:
+        if segment.vehicle_id != vehicle_id:
+            continue
+        if segment.start_time_s < wait_end_s:
+            continue
+        return road_by_edge_id.get(segment.edge_id)
+    return None
+
+
+def _road_touches_intersection_bounds(
+    road: RoadGeometrySurface,
+    *,
+    min_x: float,
+    max_x: float,
+    min_y: float,
+    max_y: float,
+) -> bool:
+    return any(
+        min_x <= point[0] <= max_x and min_y <= point[1] <= max_y
+        for point in (road.centerline[0], road.centerline[-1])
+    )
+
+
+def _min_spacing_m(active_positions: list[tuple[float, float, float]]) -> float | None:
+    if len(active_positions) < 2:
+        return None
+    minimum: float | None = None
+    for index, previous in enumerate(active_positions):
+        for current in active_positions[index + 1 :]:
+            distance = (
+                (current[0] - previous[0]) ** 2
+                + (current[1] - previous[1]) ** 2
+                + (current[2] - previous[2]) ** 2
+            ) ** 0.5
+            if minimum is None or distance < minimum:
+                minimum = distance
+    return minimum
+
+
+def _segment_position_at_time(
+    segment: VehicleMotionSegment,
+    timestamp_s: float,
+) -> tuple[float, float, float]:
+    if segment.duration_s <= 0.0:
+        return segment.end_position
+    progress = min(
+        1.0,
+        max(0.0, (timestamp_s - segment.start_time_s) / segment.duration_s),
+    )
+    return (
+        segment.start_position[0]
+        + (segment.end_position[0] - segment.start_position[0]) * progress,
+        segment.start_position[1]
+        + (segment.end_position[1] - segment.start_position[1]) * progress,
+        segment.start_position[2]
+        + (segment.end_position[2] - segment.start_position[2]) * progress,
+    )
+
+
+def _congestion_level(
+    *,
+    occupancy_count: int,
+    queue_count: int,
+    min_spacing_m: float | None,
+) -> str:
+    if queue_count > 0:
+        return "queued"
+    if occupancy_count >= 2 and min_spacing_m is not None and min_spacing_m <= 1.5:
+        return "congested"
+    if occupancy_count >= 1:
+        return "active"
+    return "free"
+
+
+__all__ = [
+    "TrafficBaselineSurface",
+    "TrafficControlPoint",
+    "TrafficQueueRecord",
+    "TrafficRoadState",
+    "TrafficSnapshot",
+    "build_traffic_baseline_surface",
+    "sample_traffic_snapshot",
+    "traffic_baseline_surface_to_dict",
+    "traffic_snapshot_to_dict",
+]

@@ -100,6 +100,17 @@ from autonomous_ops_sim.visualization.state import (
     load_visualization_json,
     visualization_state_to_dict,
 )
+from autonomous_ops_sim.visualization.traffic import (
+    TrafficBaselineSurface,
+    TrafficControlPoint,
+    TrafficQueueRecord,
+    TrafficRoadState,
+    TrafficSnapshot,
+    build_traffic_baseline_surface,
+    sample_traffic_snapshot,
+    traffic_baseline_surface_to_dict,
+    traffic_snapshot_to_dict,
+)
 
 __all__ = [
     "AreaGeometrySurface",
@@ -139,6 +150,11 @@ __all__ = [
     "SelectVehicleViewerAction",
     "SERIOUS_VIEWER_FOUNDATION_VERSION",
     "RoadGeometrySurface",
+    "TrafficBaselineSurface",
+    "TrafficControlPoint",
+    "TrafficQueueRecord",
+    "TrafficRoadState",
+    "TrafficSnapshot",
     "VehicleMotionSegment",
     "VisualizationInteraction",
     "ViewerFoundationPlan",
@@ -153,6 +169,7 @@ __all__ = [
     "build_live_state_updates",
     "build_live_sync_surface",
     "build_render_geometry_surface",
+    "build_traffic_baseline_surface",
     "build_vehicle_motion_segments",
     "build_serious_viewer_html",
     "build_viewer_foundation_plan",
@@ -183,6 +200,9 @@ __all__ = [
     "render_geometry_surface_to_dict",
     "resolve_live_click_action",
     "sample_motion",
+    "sample_traffic_snapshot",
+    "traffic_baseline_surface_to_dict",
+    "traffic_snapshot_to_dict",
     "translate_live_viewer_action",
     "translate_interactions",
     "visualization_state_to_dict",

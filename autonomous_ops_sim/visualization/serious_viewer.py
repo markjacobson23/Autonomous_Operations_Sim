@@ -388,6 +388,7 @@ def build_serious_viewer_html(
     const surfaceName = metadata.surface_name;
     const mapSurface = bundle.map_surface;
     const renderGeometry = bundle.render_geometry || {{ roads: [], intersections: [], areas: [] }};
+    const trafficBaseline = bundle.traffic_baseline || {{ control_points: [], queue_records: [] }};
     const motionSegments = Array.isArray(bundle.motion_segments) ? bundle.motion_segments : [];
     const timelineEntries = buildTimelineEntries(bundle);
     let selectedVehicleId = null;
@@ -537,6 +538,7 @@ def build_serious_viewer_html(
       const nodeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
       const vehicleGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
       const blockedEdges = new Set(current.blocked_edge_ids);
+      const trafficSnapshot = sampleTrafficAtTime(currentTimeS);
 
       for (const area of renderGeometry.areas || []) {{
         const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
@@ -565,6 +567,7 @@ def build_serious_viewer_html(
       }}
 
       for (const road of renderGeometry.roads || []) {{
+        const roadTraffic = trafficSnapshot.road_states.find((roadState) => roadState.road_id === road.road_id);
         const points = road.centerline.map((position) => project(position, bounds));
         const path = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
         path.setAttribute(
@@ -572,7 +575,7 @@ def build_serious_viewer_html(
           points.map((point) => `${{point.x}},${{point.y}}`).join(" "),
         );
         path.setAttribute("fill", "none");
-        path.setAttribute("stroke", road.directionality === "two_way" ? "#73818a" : "#81929b");
+        path.setAttribute("stroke", roadStrokeColor(roadTraffic?.congestion_level || "free", road.directionality));
         path.setAttribute("stroke-width", String(Math.max(8, Number(road.width_m) * 7)));
         path.setAttribute("stroke-linecap", "round");
         path.setAttribute("stroke-linejoin", "round");
@@ -634,7 +637,7 @@ def build_serious_viewer_html(
         group.setAttribute("class", "vehicle-chip");
         group.addEventListener("click", () => {{
           selectedVehicleId = vehicle.vehicle_id;
-          renderInspector(current);
+          renderInspector(sampledVehicles);
           render();
         }});
 
@@ -676,7 +679,7 @@ def build_serious_viewer_html(
       }}`;
       slider.value = String(Math.round(currentTimeS * 1000.0));
 
-      renderOverlay(current);
+      renderOverlay(current, trafficSnapshot);
       renderInspector(sampledVehicles);
       if (selectedVehicleId === null && sampledVehicles.length > 0) {{
         selectedVehicleId = sampledVehicles[0].vehicle_id;
@@ -684,7 +687,7 @@ def build_serious_viewer_html(
       }}
     }}
 
-    function renderOverlay(current) {{
+    function renderOverlay(current, trafficSnapshot) {{
       const overlayList = document.getElementById("overlayList");
       const commandCount = Array.isArray(bundle.command_results) ? bundle.command_results.length : 0;
       const traceCount = Array.isArray(bundle.trace_events) ? bundle.trace_events.length : 0;
@@ -701,6 +704,19 @@ def build_serious_viewer_html(
         {{
           label: "Areas",
           value: String((renderGeometry.areas || []).length),
+        }},
+        {{
+          label: "Queued vehicles",
+          value: String(
+            trafficSnapshot.road_states.reduce(
+              (count, roadState) => count + roadState.queued_vehicle_ids.length,
+              0,
+            ),
+          ),
+        }},
+        {{
+          label: "Traffic controls",
+          value: String((trafficBaseline.control_points || []).length),
         }},
         {{
           label: "Command results",
@@ -750,6 +766,57 @@ def build_serious_viewer_html(
           </button>
         `;
       }}).join("");
+    }}
+
+    function sampleTrafficAtTime(timestampS) {{
+      const roadStates = (renderGeometry.roads || []).map((road) => {{
+        const activeSegments = motionSegments.filter((segment) =>
+          road.edge_ids.includes(segment.edge_id)
+          && Number(segment.start_time_s) < timestampS
+          && timestampS < Number(segment.end_time_s)
+        );
+        const queuedVehicleIds = trafficBaseline.queue_records
+          .filter((record) =>
+            record.road_id === road.road_id
+            && Number(record.queue_start_s) <= timestampS
+            && timestampS < Number(record.queue_end_s)
+          )
+          .map((record) => record.vehicle_id)
+          .sort((left, right) => left - right);
+        const activeVehicleIds = activeSegments
+          .map((segment) => segment.vehicle_id)
+          .sort((left, right) => left - right);
+        return {{
+          road_id: road.road_id,
+          active_vehicle_ids: activeVehicleIds,
+          queued_vehicle_ids: queuedVehicleIds,
+          occupancy_count: activeVehicleIds.length,
+          congestion_level: queuedVehicleIds.length > 0
+            ? "queued"
+            : activeVehicleIds.length > 1
+              ? "congested"
+              : activeVehicleIds.length > 0
+                ? "active"
+                : "free",
+        }};
+      }});
+      return {{
+        timestamp_s: timestampS,
+        road_states: roadStates,
+      }};
+    }}
+
+    function roadStrokeColor(congestionLevel, directionality) {{
+      if (congestionLevel === "queued") {{
+        return "#c65b3d";
+      }}
+      if (congestionLevel === "congested") {{
+        return "#d28b26";
+      }}
+      if (congestionLevel === "active") {{
+        return directionality === "two_way" ? "#4d6977" : "#67808d";
+      }}
+      return directionality === "two_way" ? "#73818a" : "#81929b";
     }}
 
     function sampleVehiclesAtTime(timestampS, baseVehicles) {{
