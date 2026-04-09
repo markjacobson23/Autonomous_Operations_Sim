@@ -4,6 +4,12 @@ from pathlib import Path
 
 from autonomous_ops_sim.io.scenario_loader import load_scenario
 from autonomous_ops_sim.io.scenario_summary import format_scenario_summary
+from autonomous_ops_sim.live_app import (
+    DEFAULT_LIVE_FRONTEND_DIST_DIRECTORY,
+    DEFAULT_LIVE_OUTPUT_DIRECTORY,
+    export_live_app_artifacts,
+    launch_live_app,
+)
 from autonomous_ops_sim.perf import export_benchmark_suite_json, run_default_benchmark_suite
 from autonomous_ops_sim.showcase import export_showcase_demo
 from autonomous_ops_sim.simulation.scenario_executor import execute_scenario
@@ -61,6 +67,44 @@ def _showcase_command(
         pack_directory=pack_directory,
     )
     print(artifacts.manifest_path)
+    return 0
+
+
+def _live_command(
+    *,
+    scenario_path: str,
+    output_dir: str,
+    frontend_dist_dir: str,
+    open_browser: bool,
+    host: str,
+    port: int,
+    serve_seconds: float | None,
+) -> int:
+    try:
+        artifacts = export_live_app_artifacts(
+            scenario_path=scenario_path,
+            output_directory=output_dir,
+            frontend_dist_directory=frontend_dist_dir,
+        )
+    except (OSError, ValueError, TypeError, KeyError, OverflowError) as exc:
+        print(
+            f"Error: failed to prepare live app for scenario '{scenario_path}': {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not open_browser:
+        print(artifacts.launch_path)
+        return 0
+
+    launch_result = launch_live_app(
+        artifacts,
+        open_browser=True,
+        host=host,
+        port=port,
+        serve_seconds=serve_seconds,
+    )
+    print(launch_result.launch_target)
     return 0
 
 
@@ -126,6 +170,48 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional scenario pack directory override.",
     )
 
+    live_parser = subparsers.add_parser(
+        "live",
+        help="Prepare a live session and open the serious frontend launch path.",
+    )
+    live_parser.add_argument(
+        "--scenario",
+        required=True,
+        help="Scenario JSON path to bootstrap into a live session.",
+    )
+    live_parser.add_argument(
+        "--output-dir",
+        default=str(DEFAULT_LIVE_OUTPUT_DIRECTORY),
+        help="Directory to receive live app bootstrap artifacts.",
+    )
+    live_parser.add_argument(
+        "--frontend-dist-dir",
+        default=str(DEFAULT_LIVE_FRONTEND_DIST_DIRECTORY),
+        help="Optional serious UI build directory override.",
+    )
+    live_parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Prepare artifacts but do not open a browser or serve the app.",
+    )
+    live_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Local host to bind when serving a built serious UI.",
+    )
+    live_parser.add_argument(
+        "--port",
+        type=int,
+        default=0,
+        help="Local port to bind when serving a built serious UI. Use 0 for auto.",
+    )
+    live_parser.add_argument(
+        "--serve-seconds",
+        type=float,
+        default=None,
+        help="Optional finite serve duration when a built serious UI is launched.",
+    )
+
     return parser
 
 
@@ -148,6 +234,16 @@ def main(argv: list[str] | None = None) -> int:
             flagship_scenario=args.flagship_scenario,
             pack_directory=args.pack_directory,
         )
+    if args.command == "live":
+        return _live_command(
+            scenario_path=args.scenario,
+            output_dir=args.output_dir,
+            frontend_dist_dir=args.frontend_dist_dir,
+            open_browser=not args.no_browser,
+            host=args.host,
+            port=args.port,
+            serve_seconds=args.serve_seconds,
+        )
 
     parser.print_help()
     return 0
@@ -155,5 +251,4 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
 

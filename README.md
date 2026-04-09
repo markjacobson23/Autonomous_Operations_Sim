@@ -25,6 +25,14 @@ npm install
 npm run dev
 ```
 
+Step 42 adds a built-in live launch path:
+
+```bash
+python3 -m autonomous_ops_sim.cli live --scenario scenarios/showpiece_pack/01_mine_ore_shift.json
+```
+
+That command prepares a live-session bundle, prefers the built serious frontend when `frontend/serious_ui/dist/` exists, and otherwise falls back to the standalone serious viewer without requiring a handwritten glue script.
+
 ## Current status
 
 What the project can do today:
@@ -314,6 +322,7 @@ The native path is intentionally narrow:
 autonomous_ops_sim/
   api.py                    # Versioned replay/live/live-sync Simulation API bundles
   cli.py                    # Main CLI: run, execute, benchmark, showcase
+  live_app.py               # Step 42 live app bootstrap and launch helpers
   core/                     # Graph primitives: Node, Edge, Graph
   io/                       # Scenario loading, summaries, exports, scenario-pack support
   maps/                     # Map facade and generators/builders
@@ -368,6 +377,7 @@ The project remains heavily test-driven around deterministic behavior. Coverage 
 - scenario parsing and validation
 - scenario execution
 - CLI run/execute/benchmark/showcase paths
+- CLI live-launch path
 - world-state behavior
 - routing and cost-model behavior
 - simulation engine time behavior
