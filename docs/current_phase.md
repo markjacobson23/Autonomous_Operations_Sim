@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 24 — Playback control maturity
+Step 25 — Live control loop bridge
 
 ## Step status summary
 - Step 1: complete
@@ -27,60 +27,58 @@ Step 24 — Playback control maturity
 - Step 21: complete
 - Step 22: complete
 - Step 23: complete
-- Step 24: active
-- Step 25: not started
+- Step 24: complete
+- Step 25: active
+- Step 26: not started
 
 ## What already exists
 The repository already has:
 - deterministic scenario parsing and execution
 - operational jobs/resources/dispatch/workloads
-- command/control surfaces with deterministic history
-- visualization replay state and text viewer
-- interaction translation into commands
+- typed command/control surfaces with deterministic history
+- visualization replay state
+- text and graphical replay viewers
+- viewer-facing interactions translated into commands
 - graph-map realism
-- research comparison tooling
-- a first graphical replay viewer consuming visualization state
+- optional research comparison tooling
 
 ## Goal of the current phase
-Strengthen playback control for the graphical replay viewer so replay becomes easier to inspect and navigate before introducing live runtime interaction.
+Bridge the existing command/control surfaces into a more realistic live runtime control loop without breaking determinism or making the viewer the source of simulator truth.
 
-The main Step 24 objective is:
-- improve replay navigation and control
-- support richer deterministic playback UX
-- preserve the viewer as a consumer of completed replay state
-- prepare the viewer for later live-control integration
+The main Step 25 objective is:
+- introduce a narrow live runtime session concept
+- support command application during an active controlled session
+- preserve deterministic ordering and replayability
+- prepare the architecture for later live interactive viewer actions
 
 ## In-scope work
 Work that is allowed right now:
-- extend replay controls with features such as:
-  - previous frame
-  - jump to first / last frame
-  - jump to specific frame index
-  - optional speed controls
-  - current-frame metadata display improvements
-- keep playback deterministic over completed replay frames
-- extend the graphical viewer in a narrow way
-- add tests for replay navigation and stable controller behavior
-- perform additive refactors and targeted normal refactors needed to keep playback logic clean
+- add a runtime session / live control bridge layer
+- support controlled stepping or bounded live progression of a session
+- allow typed commands to be applied during that active session
+- ensure resulting trace/command/replay surfaces remain coherent
+- add deterministic tests for session progression and command timing/order
+- perform additive refactors and targeted normal refactors needed to keep the live control bridge clean
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- add live runtime manipulation
-- inject commands during an active graphical session
-- redesign the simulator around a live event loop
-- add networking/streaming yet
-- bypass replay state to reach directly into engine internals
-- build a heavy product UI
+- add full viewer-side click interaction yet
+- bypass the command surface
+- redesign the simulator around async/event-loop infrastructure
+- build streaming/network architecture yet
+- overbuild a generic runtime framework
+- turn the graphical viewer into the owner of live state
 
 ## Architectural guidance for this phase
-- The viewer still consumes completed replay state only.
-- Playback features should remain deterministic and frame-based.
-- Keep playback logic separate from future live-runtime control.
-- Improve inspectability without overbuilding UI complexity.
+- The simulator core remains authoritative.
+- Commands must remain explicit and validated.
+- A live session should still be deterministic for the same starting state and command sequence.
+- Keep the live control bridge separate from future viewer UX concerns.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 24
-Step 24 is complete when:
-- replay controls are meaningfully stronger than the Step 23 baseline
-- playback/navigation remains deterministic
+## Completion criteria for Step 25
+Step 25 is complete when:
+- a narrow live runtime session/control bridge exists
+- typed commands can be applied coherently during a controlled active session
+- deterministic replay/export behavior remains intact
 - tests/lint/type checks pass
