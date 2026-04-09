@@ -1,42 +1,50 @@
 # autonomous_ops_sim
 
-`autonomous_ops_sim` is a Python project for building a production-quality autonomous operations and vehicle simulator. The repository has moved well past its initial scenario-loading spine: it now includes deterministic routing, explicit runtime world state, simulated-time execution, jobs and shared resources, baseline dispatching, multi-vehicle conflict handling, a vehicle behavior layer, and stable metrics/export surfaces.
+`autonomous_ops_sim` is a production-structured Python simulator for autonomous operations and vehicle workflows. It has moved far beyond early scenario loading and grid routing: the repository now includes deterministic scenario execution, jobs and shared resources, multi-vehicle reservation-based coordination, stable replay/live API bundles, a serious viewer/export path, command-center and vehicle-inspection surfaces, AI-assist read models, benchmark tooling, a mining showcase flow, and optional native acceleration for reservation departure scans.
 
-The current active roadmap step is Step 11: scenario packs, metrics, visualization hooks, and outward-facing analysis/export support. The codebase already contains the core simulator layers that Step 11 builds on.
+This README is intended to reflect the project through **Step 40** of the roadmap.
 
 ## Current status
 
 What the project can do today:
 
 - Load and validate JSON scenarios into typed dataclasses.
-- Build and query directed graph-backed maps, including a grid-map generator for early/testing use.
-- Keep immutable map topology separate from runtime blocked-edge state via `WorldState`.
-- Compute routes with Dijkstra through a public `Router` surface and injectable cost models.
-- Run a deterministic simulation clock through `SimulationEngine`.
-- Execute single-vehicle routes and emit ordered trace events.
-- Execute jobs made of move/load/unload tasks.
-- Model shared operational resources with deterministic waiting behavior.
-- Dispatch pending jobs with a baseline deterministic dispatcher.
+- Build graph-backed maps, including both simple grid maps and richer graph maps with render geometry.
+- Keep immutable topology separate from runtime blocked-edge state through `WorldState`.
+- Route with Dijkstra through a public `Router` surface and multiple cost models.
+- Execute deterministic simulated-time runs through `SimulationEngine`.
+- Execute jobs built from move/load/unload tasks.
+- Model shared operational resources and deterministic waiting.
+- Dispatch pending jobs with baseline deterministic dispatch logic.
 - Coordinate narrow multi-vehicle route sets with reservation-based conflict avoidance.
-- Track vehicle operational state through an explicit FSM-style behavior controller.
-- Derive stable execution metrics and export deterministic JSON results.
-- Regression-test exports against a golden fixture.
+- Track operational behavior through explicit vehicle state transitions and trace events.
+- Build stable execution metrics and deterministic JSON exports.
+- Execute scenario files from the CLI and emit deterministic export JSON.
+- Run scenario packs and aggregate their results.
+- Build stable replay, live-session, and live-sync **Simulation API** bundles.
+- Derive render geometry, motion segments, traffic baseline state, command-center state, vehicle inspections, and AI-assist read models from authoritative simulator truth.
+- Export standalone serious-viewer HTML files from Simulation API bundles.
+- Generate a mining showpiece package with replay/live/live-sync viewers and a manifest.
+- Run a repeatable benchmark suite from the CLI.
+- Use an optional native accelerator for reservation departure scanning when the toolchain supports it.
 
 Important current boundary:
 
-- The CLI currently exposes scenario loading/validation and summary output.
-- Simulation execution, jobs, dispatcher behavior, conflict handling, metrics, and exports are available through Python APIs and are covered by tests, but they are not yet exposed as first-class CLI subcommands.
+- The simulator backend is already substantial.
+- The serious viewer and showcase flow are real and useful, but they are still a **foundation-stage frontend**, not yet the final high-end live UI described in the longer-term roadmap.
+- Traffic, AI assist, command center, and inspection are present as strong baseline layers, but not yet the final depth of realism or UX the project ultimately aims for.
 
 ## Design goals
 
-The codebase is organized around a few consistent design choices:
+The codebase is organized around a few consistent choices:
 
-- Determinism is a first-class requirement. Seeds are explicit, trace ordering is stable, and repeated runs with the same setup are expected to match.
-- Static topology is separate from runtime state. `Map` and `Graph` describe the reusable world asset, while `WorldState` owns dynamic blocked-edge conditions.
-- Routing is injectable. The simulator does not hardcode a single cost assumption into the public routing surface.
-- Execution is driven by simulated time, not wall clock time.
-- Operational layers are additive. Jobs, resources, dispatch, conflict handling, and behavior build on the same core engine and trace surface instead of duplicating execution logic.
-- Metrics and exports are derived from stable trace data, which keeps outward-facing analysis surfaces small and regression-friendly.
+- **Determinism first.** Seeds are explicit, trace ordering is stable, and repeated runs should match.
+- **Topology is separate from runtime state.** `Map` and `Graph` describe reusable world structure; `WorldState` owns dynamic blocked-edge conditions.
+- **Simulator authority stays centralized.** Replay/live/viewer surfaces are derived from authoritative execution rather than becoming competing runtime models.
+- **Execution is simulated time, not wall clock.**
+- **Operational layers are additive.** Jobs, resources, dispatch, reservations, behavior, visualization, command-center state, and AI-assist layers all build on the same engine and trace surfaces.
+- **Public surfaces are versioned.** Viewer-facing and tool-facing bundle surfaces are treated as explicit contracts.
+- **Performance work should be measured.** Python-side optimizations come first; native acceleration is narrow, optional, and benchmark-justified.
 
 ## Architecture overview
 
@@ -46,176 +54,160 @@ The foundational graph model lives in `autonomous_ops_sim/core/`:
 
 - `Node` and `NodeType` define graph locations and semantic roles.
 - `Edge` defines directed traversable segments with `distance` and `speed_limit`.
-- `Graph` stores nodes, edges, and adjacency lists, and enforces basic graph integrity.
+- `Graph` stores nodes, edges, and adjacency, and enforces basic graph integrity.
 
-This is the simulator’s low-level topology layer. It is intentionally local and project-owned; core graph logic does not depend on an external graph library.
+This is intentionally local, project-owned infrastructure rather than an external graph dependency.
 
-### 2. Map layer
+### 2. Map and geometry layers
 
-The spatial facade lives in `autonomous_ops_sim/maps/`:
+Spatial structure lives in `autonomous_ops_sim/maps/` and `autonomous_ops_sim/visualization/geometry.py`:
 
-- `Map` wraps a `Graph` with coordinate-based lookup, node-type queries, region queries, neighbor lookup, edge lookup, and path validation.
-- `make_grid_map()` in `grid_map.py` produces a simple bidirectional grid map for early/testing use.
-
-The grid map is useful today, but it is not treated as the long-term identity of the simulator.
+- `Map` wraps a `Graph` with coordinate-based lookup, neighbor queries, edge lookup, and path validation.
+- `make_grid_map()` remains available for early/testing use.
+- Graph-backed scenarios can now carry richer render geometry such as roads, intersections, and areas.
+- Visualization geometry is deliberately separated from routing truth so the map can become visually richer without corrupting operational semantics.
 
 ### 3. Scenario/config layer
 
-The scenario/config surface lives across `autonomous_ops_sim/io/` and `autonomous_ops_sim/simulation/scenario.py`:
+Scenario/config support lives across `autonomous_ops_sim/io/` and `autonomous_ops_sim/simulation/scenario.py`:
 
-- `Scenario`, `MapSpec`, and `VehicleSpec` are typed dataclasses.
-- `load_scenario()` reads JSON, validates required fields, enforces minimal schema constraints, and returns typed objects.
-- `format_scenario_summary()` produces deterministic human-readable summaries for CLI use.
+- `Scenario` and related spec dataclasses define typed scenario structure.
+- `load_scenario()` reads JSON and validates required schema fields.
+- Scenarios can now drive actual execution, not just summary output.
+- Scenario packs support running grouped scenario suites and aggregating their results.
 
-Current scenario support is intentionally narrow and stable:
-
-- Map kind: `grid`
-- Required top-level fields: `name`, `seed`, `duration_s`, `map`, `vehicles`
-- Vehicle entries include ID, position, velocity, payload, max payload, max speed, and optional `vehicle_type`
+The project is no longer limited to scenario validation and summary: scenario execution is now part of the supported CLI surface.
 
 ### 4. Runtime world state
 
-`autonomous_ops_sim/simulation/world_state.py` provides `WorldState`, which currently owns runtime blocked-edge state.
+`autonomous_ops_sim/simulation/world_state.py` provides `WorldState`, which owns runtime blocked-edge state.
 
-This split matters because:
+This matters because:
 
-- the same static map can be reused across runs,
+- the same map can be reused across runs,
 - runtime changes do not mutate the map asset,
-- resetting runtime conditions is explicit and deterministic.
+- resetting runtime conditions stays explicit and deterministic.
 
 ### 5. Routing
 
 Routing lives in `autonomous_ops_sim/routing/`:
 
-- `Router` is the public shortest-path surface.
+- `Router` is the public pathfinding surface.
 - `dijkstra()` implements pathfinding.
-- `CostModel` is a protocol for edge-cost injection.
-- `DistanceCostModel` and `TimeCostModel` are the built-in cost models.
+- `CostModel` allows injected edge-cost logic.
+- `DistanceCostModel` and `TimeCostModel` are built-in.
 
-Routing honors `WorldState` blocked edges and validates that injected costs remain non-negative for Dijkstra-based operation.
+Routing respects runtime blocked-edge state and remains intentionally simple, deterministic, and testable.
 
-### 6. Simulation engine and trace
+### 6. Simulation engine, trace, and behavior
 
 Execution lives in `autonomous_ops_sim/simulation/`:
 
-- `SimulationEngine` owns the static map, runtime world state, router, seed, deterministic RNG, resources, trace, and simulated time.
-- `run(until_s)` advances simulated time monotonically.
+- `SimulationEngine` owns the map, world state, router, seed, resources, trace, and simulated time.
 - `Trace` is append-only and deterministic.
-- `TraceEvent` and `TraceEventType` define the stable event surface used by execution, metrics, and exports.
+- `TraceEvent` and `TraceEventType` define the stable event surface used by metrics, visualization, and bundle exports.
+- The behavior layer tracks explicit vehicle operational states such as idle, moving, conflict wait, resource wait, servicing, and failure-like states.
 
-This gives the project a single source of truth for “what happened during the run.”
+This gives the project one source of truth for what actually happened during a run.
 
-### 7. Vehicle execution
-
-`VehicleProcess` executes work for a single vehicle over simulated time:
-
-- `execute_route()` performs routing, moves along edges, advances time from edge travel, and emits route/arrival trace events.
-- `execute_job()` executes an ordered `Job` through move/load/unload tasks.
-- Service tasks can consume simulated time and optionally reserve shared resources.
-
-Travel time is based on both vehicle max speed and edge speed limit.
-
-### 8. Jobs, tasks, resources, and dispatch
+### 7. Jobs, tasks, resources, and dispatch
 
 The operations layer lives in `autonomous_ops_sim/operations/`:
 
-- `MoveTask`, `LoadTask`, and `UnloadTask` define ordered operational work.
-- `Job` packages tasks into a single unit of execution.
-- `SharedResource` models finite-capacity deterministic service access.
-- `FirstFeasibleDispatcher` selects the first pending feasible job for a vehicle.
+- `MoveTask`, `LoadTask`, and `UnloadTask` define ordered work.
+- `Job` packages tasks into a unit of execution.
+- `SharedResource` models finite-capacity service access.
+- Dispatcher behavior is deterministic and intentionally baseline rather than “smart” by default.
 
-Dispatcher behavior is intentionally baseline and deterministic rather than sophisticated.
+### 8. Multi-vehicle coordination and reservations
 
-### 9. Multi-vehicle conflict handling
+Deterministic multi-vehicle coordination lives in `autonomous_ops_sim/simulation/reservations.py` and the engine’s multi-vehicle execution path:
 
-Deterministic conflict handling lives in `autonomous_ops_sim/simulation/reservations.py` and the multi-vehicle execution path in `SimulationEngine`:
+- `VehicleRouteRequest` describes coordinated route execution requests.
+- `ReservationTable` stores node, edge, and corridor occupancy windows.
+- Conflict handling uses deterministic waiting rather than uncontrolled simultaneous occupancy.
+- Reservation scans are optimized in Python and can optionally use a narrow native accelerator for departure-time scanning.
 
-- `VehicleRouteRequest` describes a coordinated route request.
-- `ReservationTable` stores node and edge occupancy windows.
-- Conflict handling uses deterministic waiting rather than unconstrained simultaneous occupancy.
-- The engine can produce a `MultiVehicleExecutionResult` with per-vehicle route outcomes and reservation data.
+### 9. Metrics, exports, and public API bundles
 
-This is a controlled baseline for shared-space safety and reproducibility.
+Outward-facing analysis/export support now includes:
 
-### 10. Behavior layer
+- engine execution summaries
+- deterministic engine export JSON
+- replay-oriented visualization state
+- versioned **Simulation API** bundles for:
+  - replay
+  - live session
+  - live sync
 
-The behavior layer lives in `autonomous_ops_sim/simulation/behavior.py`:
+These bundles carry rich derived surfaces such as:
 
-- `VehicleBehaviorController` tracks explicit operational states.
-- The current FSM includes `idle`, `moving`, `conflict_wait`, `resource_wait`, `servicing`, and `failed`.
-- Transitions are validated and emitted into the trace as behavior events.
+- static map surface
+- render geometry
+- motion segments
+- traffic baseline
+- command results
+- command-center state
+- vehicle inspections
+- AI-assist read models
 
-This keeps operational state logic explicit and testable without introducing a much larger behavior framework.
+### 10. Visualization, serious viewer, and operator surfaces
 
-### 11. Metrics and export surfaces
+Visualization support now spans multiple layers:
 
-Step 11’s outward-facing analysis layer lives in:
+- replay/frame-oriented visualization state
+- render geometry for roads/intersections/areas
+- interpolated motion segments for smoother playback
+- baseline traffic/control/queue surfaces
+- command-center surfaces for selection, previews, and edge actions
+- richer vehicle inspection surfaces
+- AI-assist explanation/suggestion/anomaly surfaces
+- a **serious viewer** that renders standalone HTML from Simulation API bundles
 
-- `autonomous_ops_sim/simulation/metrics.py`
-- `autonomous_ops_sim/io/exports.py`
+This is the current serious frontend foundation. It is intentionally derived from simulator truth and still leaves room for a later higher-end live UI.
 
-Current Step 11 surfaces include:
+### 11. Showcase and benchmark layers
 
-- `summarize_engine_execution()` for stable derived metrics
-- `build_engine_export()` for structured export records
-- `export_engine_json()` for deterministic JSON output
-- golden-regression coverage via `tests/golden/step_11_metrics_export.json`
+The repository now includes:
 
-Metrics currently summarize things like:
-
-- final simulated time
-- vehicles involved
-- route, job, and task completion counts
-- edge traversals and node arrivals
-- total route distance
-- total service time
-- total resource wait time
-- total conflict wait time
-- counts per trace event type
-
-## Package structure
-
-```text
-autonomous_ops_sim/
-  cli.py                    # Thin CLI: scenario load/validate/summary
-  core/                     # Graph primitives: Node, Edge, Graph
-  io/                       # Scenario loading, summaries, exports
-  maps/                     # Map facade and grid-map generator
-  operations/               # Jobs, tasks, resources, dispatcher
-  routing/                  # Dijkstra, cost models, Router
-  simulation/               # Scenario types, world state, engine, trace,
-                            # behavior, reservations, metrics, vehicle process
-  vehicles/                 # Vehicle types and a minimal Vehicle object
-docs/
-  roadmap.md
-  current_phase.md
-  step-11-metrics-exports.md
-scenarios/
-  example.json
-tests/
-  ... unit and regression tests across all current layers
-```
+- a mining-focused showpiece export flow that produces replay/live/live-sync viewers and a manifest
+- a repeatable benchmark suite covering routing, reservations, scenario execution, scenario packs, visualization export, and live-sync export
+- optional native reservation acceleration that is benchmark-aware and parity-tested against the Python path
 
 ## Public entrypoints
 
-Today’s most important entrypoints are:
+### CLI
 
-- CLI:
-  - `python3 -m autonomous_ops_sim.cli --help`
-  - `python3 -m autonomous_ops_sim.cli run scenarios/example.json`
-  - `autonomous-ops-sim --help` after editable install
-- Routing:
-  - `autonomous_ops_sim.routing.Router`
-  - `autonomous_ops_sim.routing.DistanceCostModel`
-  - `autonomous_ops_sim.routing.TimeCostModel`
-- Simulation:
-  - `autonomous_ops_sim.simulation.SimulationEngine`
-  - `autonomous_ops_sim.simulation.WorldState`
-  - `autonomous_ops_sim.simulation.Trace`
-  - `autonomous_ops_sim.simulation.summarize_engine_execution`
-- Exports:
-  - `autonomous_ops_sim.io.exports.build_engine_export`
-  - `autonomous_ops_sim.io.exports.export_engine_json`
+After editable install:
+
+```bash
+autonomous-ops-sim --help
+```
+
+Current top-level CLI subcommands include:
+
+```bash
+autonomous-ops-sim run scenarios/example.json
+autonomous-ops-sim execute scenarios/step_12_single_vehicle_job.json
+autonomous-ops-sim benchmark --repetitions 1 --warmup-iterations 0
+autonomous-ops-sim showcase --output-dir showcase_output
+```
+
+### Serious viewer
+
+Generate or obtain a Simulation API bundle JSON, then render it through the serious viewer:
+
+```bash
+autonomous-ops-serious-viewer path/to/bundle.json
+```
+
+### Showcase exporter
+
+The mining showcase can also be exported directly through its dedicated entrypoint:
+
+```bash
+autonomous-ops-showcase --output-dir showcase_output
+```
 
 ## Installation
 
@@ -225,136 +217,150 @@ The project requires Python 3.11 or newer.
 python3 -m pip install -e .
 ```
 
-## CLI usage
+If you are working on the optional native reservation accelerator, a working C toolchain is helpful but not strictly required: the project is designed to fall back to the Python path when native compilation/loading is unavailable.
 
-Show help:
+## Common workflows
 
-```bash
-python3 -m autonomous_ops_sim.cli --help
-```
-
-Validate and summarize the example scenario:
+### 1. Validate and summarize a scenario
 
 ```bash
 python3 -m autonomous_ops_sim.cli run scenarios/example.json
 ```
 
-Installed console script:
+### 2. Execute a scenario and emit deterministic export JSON
 
 ```bash
-autonomous-ops-sim run scenarios/example.json
+python3 -m autonomous_ops_sim.cli execute scenarios/step_12_single_vehicle_job.json
 ```
 
-The current CLI prints a deterministic scenario summary. It does not yet run full simulator executions from scenario files.
+### 3. Run the benchmark suite
 
-## Example scenario
+```bash
+python3 -m autonomous_ops_sim.cli benchmark --repetitions 1 --warmup-iterations 0
+```
 
-The repository includes `scenarios/example.json`, which demonstrates the current scenario schema:
+### 4. Export the mining showcase artifacts
 
-```json
-{
-  "name": "basic_grid_demo",
-  "seed": 123,
-  "duration_s": 1000.0,
-  "map": {
-    "kind": "grid",
-    "params": {
-      "grid_size": 5
-    }
-  },
-  "vehicles": [
-    {
-      "id": 1,
-      "position": [0, 0, 0],
-      "velocity": 0.0,
-      "payload": 0.0,
-      "max_payload": 100.0,
-      "max_speed": 25.0
-    }
-  ]
-}
+```bash
+python3 -m autonomous_ops_sim.cli showcase --output-dir showcase_output
+```
+
+This writes a manifest plus replay/live/live-sync bundles and standalone viewer HTML files for the flagship mining scenario and its supporting scenario pack.
+
+## Showcase flow
+
+The project now includes a real mining-oriented showpiece flow.
+
+The showcase exporter produces:
+
+- replay bundle JSON
+- replay viewer HTML
+- live session bundle JSON
+- live session viewer HTML
+- live sync bundle JSON
+- live sync viewer HTML
+- scenario pack export JSON
+- manifest JSON
+
+This is currently the easiest built-in way to see a richer end-to-end project slice without writing custom scripts.
+
+## Benchmarking and native acceleration
+
+The benchmark suite covers a narrow but important set of current workloads:
+
+- routing
+- reservation departure scans
+- scenario execution
+- scenario-pack execution
+- visualization export
+- live-sync export
+
+The reservation benchmark includes both:
+
+- Python reservation departure scanning
+- optional native reservation departure scanning
+
+The native path is intentionally narrow:
+
+- it is used only for a bounded hotspot,
+- it preserves Python fallback behavior,
+- it is parity-tested against the Python implementation,
+- it is not intended as a broad rewrite of the simulator into native code.
+
+## Package structure
+
+```text
+autonomous_ops_sim/
+  api.py                    # Versioned replay/live/live-sync Simulation API bundles
+  cli.py                    # Main CLI: run, execute, benchmark, showcase
+  core/                     # Graph primitives: Node, Edge, Graph
+  io/                       # Scenario loading, summaries, exports, scenario-pack support
+  maps/                     # Map facade and generators/builders
+  native/                   # Optional native reservation acceleration
+  operations/               # Jobs, tasks, resources, dispatcher
+  perf/                     # Benchmark harness and default suite
+  routing/                  # Dijkstra, cost models, Router
+  showcase.py               # Mining showpiece export flow
+  simulation/               # Engine, scenario execution, world state, trace,
+                            # behavior, reservations, live session, control surfaces
+  vehicles/                 # Vehicle entities and types
+  visualization/            # Replay state, geometry, motion, traffic,
+                            # command center, inspections, AI assist,
+                            # serious viewer, GUI viewer prototypes
+scenarios/
+  ... example scenarios, benchmark packs, and showpiece mining scenarios
+tests/
+  ... unit, integration, export, showcase, and perf-related tests
 ```
 
 ## Programmatic example
 
-The simulator’s richest capabilities are currently exposed as Python APIs. A minimal example looks like this:
+A minimal example that executes a scenario and emits deterministic export JSON:
 
 ```python
-from autonomous_ops_sim.core.edge import Edge
-from autonomous_ops_sim.core.graph import Graph
-from autonomous_ops_sim.core.node import Node
-from autonomous_ops_sim.io.exports import export_engine_json
-from autonomous_ops_sim.maps.map import Map
-from autonomous_ops_sim.operations.jobs import Job
-from autonomous_ops_sim.operations.tasks import LoadTask, MoveTask, UnloadTask
-from autonomous_ops_sim.routing import Router
-from autonomous_ops_sim.simulation import SimulationEngine, WorldState, summarize_engine_execution
+from pathlib import Path
 
-graph = Graph()
-node_1 = Node(1, (0.0, 0.0, 0.0))
-node_2 = Node(2, (10.0, 0.0, 0.0))
-node_3 = Node(3, (15.0, 0.0, 0.0))
+from autonomous_ops_sim.io.scenario_loader import load_scenario
+from autonomous_ops_sim.simulation.scenario_executor import execute_scenario
 
-graph.add_node(node_1)
-graph.add_node(node_2)
-graph.add_node(node_3)
-graph.add_edge(Edge(1, node_1, node_2, 10.0, 5.0))
-graph.add_edge(Edge(2, node_2, node_3, 5.0, 5.0))
+scenario = load_scenario(Path("scenarios/step_12_single_vehicle_job.json"))
+result = execute_scenario(scenario)
 
-simulation_map = Map(
-    graph,
-    coord_to_id={
-        (0.0, 0.0, 0.0): 1,
-        (10.0, 0.0, 0.0): 2,
-        (15.0, 0.0, 0.0): 3,
-    },
-)
+print(result.summary)
+print(result.export_json)
+```
 
-engine = SimulationEngine(
-    simulation_map=simulation_map,
-    world_state=WorldState(graph),
-    router=Router(),
-    seed=117,
-)
+A minimal example that exports the built-in mining showcase:
 
-engine.execute_job(
-    vehicle_id=911,
-    start_node_id=1,
-    max_speed=5.0,
-    job=Job(
-        id="example-job",
-        tasks=(
-            MoveTask(destination_node_id=2),
-            LoadTask(node_id=2, amount=4.0, service_duration_s=3.0),
-            MoveTask(destination_node_id=3),
-            UnloadTask(node_id=3, amount=4.0, service_duration_s=1.0),
-        ),
-    ),
-    max_payload=8.0,
-)
+```python
+from autonomous_ops_sim.showcase import export_showcase_demo
 
-summary = summarize_engine_execution(engine)
-print(summary)
-print(export_engine_json(engine, summary=summary))
+artifacts = export_showcase_demo("showcase_output")
+print(artifacts.manifest_path)
 ```
 
 ## Determinism and testing
 
-The project is heavily test-driven around deterministic behavior. Tests currently cover:
+The project remains heavily test-driven around deterministic behavior. Coverage now spans:
 
 - graph and map behavior
-- grid map generation
 - scenario parsing and validation
-- CLI scenario loading
-- world-state separation from static maps
+- scenario execution
+- CLI run/execute/benchmark/showcase paths
+- world-state behavior
 - routing and cost-model behavior
 - simulation engine time behavior
-- single-vehicle route execution
-- jobs, tasks, and shared resources
-- dispatcher selection and execution
-- multi-vehicle conflict handling
-- behavior-state transitions and failure/recovery
-- metrics/export stability and golden regression output
+- jobs, tasks, resources, and dispatch
+- multi-vehicle reservations and conflict handling
+- behavior-state transitions
+- metrics/export stability
+- Simulation API bundle stability
+- serious viewer export behavior
+- command-center and live-viewer workflows
+- traffic baseline derivation
+- showcase artifact generation
+- benchmark harness structure
+- native reservation acceleration parity and fallback stability
 
 Repository quality commands:
 
@@ -364,30 +370,52 @@ python3 -m ruff check .
 python3 -m mypy autonomous_ops_sim tests
 ```
 
-If you change CLI behavior, also verify:
+Useful manual checks:
 
 ```bash
 python3 -m autonomous_ops_sim.cli --help
+python3 -m autonomous_ops_sim.cli benchmark --repetitions 1 --warmup-iterations 0
+python3 -m autonomous_ops_sim.cli showcase --output-dir showcase_output
 python3 -m pip install -e .
 autonomous-ops-sim --help
+autonomous-ops-showcase --help
 ```
 
 ## Current limitations
 
-The README should be honest about what is not here yet:
+This README should stay honest about what is not here yet:
 
-- Scenario files are currently validated and summarized, but not yet turned into end-to-end executable simulator runs through the CLI.
-- The supported scenario map kind is currently `grid`.
-- The `Vehicle` class exists but is still minimal; most execution flows currently use explicit scalar inputs and typed specs rather than a richer persistent vehicle entity.
-- Visualization hooks are still minimal.
-- There is no large dashboard, animation layer, or broad external environment wrapper yet.
+- The serious viewer is now real and useful, but it is still a **foundation-stage frontend**, not yet the final polished live operations UI.
+- Traffic realism is present as a baseline (queues, control points, congestion sampling, command-center overlays), but it is not yet the final lane-level, signal-rich, overtaking-capable realism target.
+- Vehicle motion is materially better than frame-snapping, but still short of the final realism target for acceleration, lane behavior, and high-fidelity turning.
+- AI assist is currently a grounded read-model layer; it is not yet a full planner/copilot system.
+- The mining showpiece is the strongest environment today; broader environment richness and a higher-end cross-platform frontend are still roadmap work.
+- Native acceleration is intentionally narrow and optional; the simulator is still primarily a Python system.
 
 ## Roadmap alignment
 
-The source-of-truth planning docs are:
+The repo now contains work well beyond the early planning docs referenced in the old README. At a high level, the project through Step 40 now includes:
 
-- `docs/current_phase.md`
-- `docs/step-11-metrics-exports.md`
-- `docs/roadmap.md`
+- scenario execution and packs
+- metrics and export surfaces
+- visualization and replay state
+- live session/live sync support
+- serious viewer foundation
+- motion interpolation
+- render geometry and map realism baseline
+- traffic baseline surfaces
+- command-center baseline
+- vehicle inspection baseline
+- AI-assist baseline
+- showcase/demo export flow
+- Python-side performance work
+- optional native reservation acceleration
 
-Development is intended to stay roadmap-aligned, additive, and production-like: avoid speculative rewrites, avoid smuggling later architecture into earlier phases, and prefer clear responsibility boundaries over convenience abstractions.
+The next major phase is no longer “can the simulator execute and export?”
+It is primarily about:
+
+- stronger frontend quality
+- richer map/world realism
+- deeper traffic and vehicle realism
+- more live operator interaction
+- better showpiece polish across mining, construction-yard, and city-street environments
