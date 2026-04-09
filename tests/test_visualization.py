@@ -321,6 +321,156 @@ def test_graphical_replay_controller_consumes_frames_deterministically() -> None
     assert replay.current_frame().trigger.event_name == "block_edge"
 
 
+def test_graphical_replay_controller_supports_stronger_navigation() -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+    replay = ReplayController(state)
+
+    assert replay.frame_count == len(state.frames)
+    assert replay.last_frame_index == len(state.frames) - 1
+    assert replay.previous_frame().frame_index == 0
+
+    replay.jump_to_frame(5)
+    assert replay.frame_index == 5
+    assert replay.current_frame().trigger.event_name == "node_arrival"
+
+    replay.previous_frame()
+    assert replay.frame_index == 4
+    assert replay.current_frame().trigger.event_name == "edge_enter"
+
+    replay.last_frame()
+    assert replay.frame_index == replay.last_frame_index
+    assert replay.current_frame().trigger.event_name == "behavior_transition"
+
+    replay.first_frame()
+    assert replay.frame_index == 0
+    assert replay.current_frame().trigger.event_name == "initial_state"
+
+
+def test_graphical_replay_controller_playback_speed_and_status_are_stable() -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+    replay = ReplayController(state)
+
+    replay.set_playback_speed(2.0)
+    replay.jump_to_frame(1)
+    status = replay.current_status()
+
+    assert replay.playback_delay_ms(250) == 125
+    assert status.playback_state == "paused"
+    assert status.playback_speed == 2.0
+    assert status.frame_index == 1
+    assert status.last_frame_index == len(state.frames) - 1
+    assert status.timestamp_s == 0.0
+    assert status.trigger_source == "command"
+    assert status.trigger_event_name == "block_edge"
+    assert status.blocked_edge_ids == (2,)
+    assert status.vehicle_count == 1
+    assert status.vehicle_states == (("idle", 1),)
+    assert (
+        status.summary_text()
+        == "paused frame=1/18 time=0.0s trigger=command:block_edge speed=2.0x"
+    )
+    assert status.metadata_text() == "blocked_edges=[2] vehicles=1 states=idle=1"
+
+
+def test_graphical_replay_controller_rejects_invalid_navigation_inputs() -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+    replay = ReplayController(state)
+
+    try:
+        replay.jump_to_frame(-1)
+    except IndexError as exc:
+        assert str(exc) == "frame index out of range: -1"
+    else:
+        raise AssertionError("expected jump_to_frame to reject negative indexes")
+
+    try:
+        replay.jump_to_frame(len(state.frames))
+    except IndexError as exc:
+        assert str(exc) == f"frame index out of range: {len(state.frames)}"
+    else:
+        raise AssertionError("expected jump_to_frame to reject past-the-end indexes")
+
+    try:
+        replay.set_playback_speed(0.0)
+    except ValueError as exc:
+        assert str(exc) == "playback speed must be a finite positive number"
+    else:
+        raise AssertionError("expected playback speed validation failure")
+
+
+def test_graphical_replay_controller_navigation_sequences_repeat_identically() -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+
+    def run_sequence() -> list[tuple[int, str, str]]:
+        replay = ReplayController(state)
+        observed: list[tuple[int, str, str]] = []
+
+        replay.set_playback_speed(4.0)
+        observed.append(
+            (
+                replay.current_status().frame_index,
+                replay.current_status().summary_text(),
+                replay.current_status().metadata_text(),
+            )
+        )
+        replay.last_frame()
+        observed.append(
+            (
+                replay.current_status().frame_index,
+                replay.current_status().summary_text(),
+                replay.current_status().metadata_text(),
+            )
+        )
+        replay.previous_frame()
+        observed.append(
+            (
+                replay.current_status().frame_index,
+                replay.current_status().summary_text(),
+                replay.current_status().metadata_text(),
+            )
+        )
+        replay.jump_to_frame(10)
+        observed.append(
+            (
+                replay.current_status().frame_index,
+                replay.current_status().summary_text(),
+                replay.current_status().metadata_text(),
+            )
+        )
+        replay.play()
+        observed.append(
+            (
+                replay.current_status().frame_index,
+                replay.current_status().summary_text(),
+                replay.current_status().metadata_text(),
+            )
+        )
+        replay.advance_playback()
+        observed.append(
+            (
+                replay.current_status().frame_index,
+                replay.current_status().summary_text(),
+                replay.current_status().metadata_text(),
+            )
+        )
+        replay.first_frame()
+        observed.append(
+            (
+                replay.current_status().frame_index,
+                replay.current_status().summary_text(),
+                replay.current_status().metadata_text(),
+            )
+        )
+
+        return observed
+
+    assert run_sequence() == run_sequence()
+
+
 def test_graphical_viewer_render_plan_is_stable_after_json_load(tmp_path) -> None:
     controller, _ = build_visualization_controller()
     state = build_visualization_state_from_controller(controller)

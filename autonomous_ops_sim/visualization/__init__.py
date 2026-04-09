@@ -1,4 +1,5 @@
 from autonomous_ops_sim.visualization.gui_viewer import (
+    FrameStatus,
     FrameRenderPlan,
     GraphicalReplayViewer,
     ReplayController,
@@ -44,6 +45,7 @@ __all__ = [
     "BlockEdgeInteraction",
     "EdgeSurface",
     "FrameTrigger",
+    "FrameStatus",
     "FrameRenderPlan",
     "GraphicalReplayViewer",
     "InteractionValidationError",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import math
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,40 @@ class FrameRenderPlan:
     vehicles: tuple[RenderedVehicle, ...]
 
 
+@dataclass(frozen=True)
+class FrameStatus:
+    playback_state: str
+    playback_speed: float
+    frame_index: int
+    last_frame_index: int
+    frame_count: int
+    timestamp_s: float
+    trigger_source: str
+    trigger_event_name: str
+    blocked_edge_ids: tuple[int, ...]
+    vehicle_count: int
+    vehicle_states: tuple[tuple[str, int], ...]
+
+    def summary_text(self) -> str:
+        return (
+            f"{self.playback_state} frame={self.frame_index}/{self.last_frame_index} "
+            f"time={self.timestamp_s}s "
+            f"trigger={self.trigger_source}:{self.trigger_event_name} "
+            f"speed={self.playback_speed}x"
+        )
+
+    def metadata_text(self) -> str:
+        state_counts = ", ".join(
+            f"{state}={count}"
+            for state, count in self.vehicle_states
+        ) or "none"
+        return (
+            f"blocked_edges={list(self.blocked_edge_ids)} "
+            f"vehicles={self.vehicle_count} "
+            f"states={state_counts}"
+        )
+
+
 @dataclass
 class ReplayController:
     """Deterministic playback controller over completed replay frames."""
@@ -61,38 +96,97 @@ class ReplayController:
     state: VisualizationState
     frame_index: int = 0
     is_playing: bool = False
+    playback_speed: float = 1.0
 
     def current_frame(self) -> ReplayFrame:
         return get_replay_frame(self.state, self.frame_index)
 
+    @property
+    def frame_count(self) -> int:
+        return len(self.state.frames)
+
+    @property
+    def last_frame_index(self) -> int:
+        return self.frame_count - 1
+
     def play(self) -> None:
-        if self.frame_index < len(self.state.frames) - 1:
+        if self.frame_index < self.last_frame_index:
             self.is_playing = True
 
     def pause(self) -> None:
         self.is_playing = False
 
     def next_frame(self) -> ReplayFrame:
-        if self.frame_index < len(self.state.frames) - 1:
+        self.pause()
+        if self.frame_index < self.last_frame_index:
             self.frame_index += 1
-        else:
-            self.is_playing = False
         return self.current_frame()
 
-    def reset(self) -> ReplayFrame:
-        self.is_playing = False
+    def previous_frame(self) -> ReplayFrame:
+        self.pause()
+        if self.frame_index > 0:
+            self.frame_index -= 1
+        return self.current_frame()
+
+    def first_frame(self) -> ReplayFrame:
+        self.pause()
         self.frame_index = 0
         return self.current_frame()
+
+    def last_frame(self) -> ReplayFrame:
+        self.pause()
+        self.frame_index = self.last_frame_index
+        return self.current_frame()
+
+    def jump_to_frame(self, frame_index: int) -> ReplayFrame:
+        self.pause()
+        get_replay_frame(self.state, frame_index)
+        self.frame_index = frame_index
+        return self.current_frame()
+
+    def set_playback_speed(self, speed: float) -> None:
+        if not math.isfinite(speed) or speed <= 0.0:
+            raise ValueError("playback speed must be a finite positive number")
+        self.playback_speed = speed
+
+    def playback_delay_ms(self, base_delay_ms: int) -> int:
+        if base_delay_ms <= 0:
+            raise ValueError("base delay must be positive")
+        return max(1, int(round(base_delay_ms / self.playback_speed)))
+
+    def current_status(self) -> FrameStatus:
+        frame = self.current_frame()
+        vehicle_state_counts: dict[str, int] = {}
+        for vehicle in frame.vehicles:
+            vehicle_state_counts[vehicle.operational_state] = (
+                vehicle_state_counts.get(vehicle.operational_state, 0) + 1
+            )
+        return FrameStatus(
+            playback_state="playing" if self.is_playing else "paused",
+            playback_speed=self.playback_speed,
+            frame_index=frame.frame_index,
+            last_frame_index=self.last_frame_index,
+            frame_count=self.frame_count,
+            timestamp_s=frame.timestamp_s,
+            trigger_source=frame.trigger.source,
+            trigger_event_name=frame.trigger.event_name,
+            blocked_edge_ids=frame.blocked_edge_ids,
+            vehicle_count=len(frame.vehicles),
+            vehicle_states=tuple(sorted(vehicle_state_counts.items())),
+        )
+
+    def reset(self) -> ReplayFrame:
+        return self.first_frame()
 
     def advance_playback(self) -> bool:
         if not self.is_playing:
             return False
-        if self.frame_index >= len(self.state.frames) - 1:
+        if self.frame_index >= self.last_frame_index:
             self.is_playing = False
             return False
 
         self.frame_index += 1
-        if self.frame_index >= len(self.state.frames) - 1:
+        if self.frame_index >= self.last_frame_index:
             self.is_playing = False
         return True
 
@@ -259,11 +353,41 @@ class GraphicalReplayViewer:
 
         tk.Button(controls, text="Play", command=self.play).pack(side="left")
         tk.Button(controls, text="Pause", command=self.pause).pack(side="left")
-        tk.Button(controls, text="Next Frame", command=self.next_frame).pack(side="left")
+        tk.Button(controls, text="First", command=self.first_frame).pack(side="left")
+        tk.Button(controls, text="Previous", command=self.previous_frame).pack(side="left")
+        tk.Button(controls, text="Next", command=self.next_frame).pack(side="left")
+        tk.Button(controls, text="Last", command=self.last_frame).pack(side="left")
         tk.Button(controls, text="Reset", command=self.reset).pack(side="left")
+
+        self.jump_var = tk.StringVar(value="0")
+        tk.Entry(controls, textvariable=self.jump_var, width=6).pack(
+            side="left",
+            padx=(12, 4),
+        )
+        tk.Button(controls, text="Jump", command=self.jump_to_frame).pack(side="left")
+
+        self.speed_var = tk.StringVar(value="1.0x")
+        tk.Label(controls, text="Speed").pack(side="left", padx=(12, 4))
+        tk.OptionMenu(
+            controls,
+            self.speed_var,
+            "0.5x",
+            "1.0x",
+            "2.0x",
+            "4.0x",
+            command=lambda _selected: self._on_speed_change(),
+        ).pack(side="left")
 
         self.status_var = tk.StringVar()
         tk.Label(controls, textvariable=self.status_var).pack(side="right")
+
+        self.metadata_var = tk.StringVar()
+        tk.Label(
+            self.root,
+            textvariable=self.metadata_var,
+            anchor="w",
+            justify="left",
+        ).pack(fill="x", padx=12, pady=(0, 8))
 
         self.canvas = tk.Canvas(
             self.root,
@@ -289,12 +413,38 @@ class GraphicalReplayViewer:
         self._update_status()
 
     def next_frame(self) -> None:
-        self.controller.pause()
         self.controller.next_frame()
+        self._render_current_frame()
+
+    def previous_frame(self) -> None:
+        self.controller.previous_frame()
+        self._render_current_frame()
+
+    def first_frame(self) -> None:
+        self.controller.first_frame()
+        self.jump_var.set(str(self.controller.frame_index))
+        self._render_current_frame()
+
+    def last_frame(self) -> None:
+        self.controller.last_frame()
+        self.jump_var.set(str(self.controller.frame_index))
+        self._render_current_frame()
+
+    def jump_to_frame(self) -> None:
+        try:
+            frame_index = int(self.jump_var.get())
+            self.controller.jump_to_frame(frame_index)
+        except (TypeError, ValueError, IndexError):
+            self.status_var.set(
+                f"paused invalid-frame={self.jump_var.get()} "
+                f"valid=0-{self.controller.last_frame_index}"
+            )
+            return
         self._render_current_frame()
 
     def reset(self) -> None:
         self.controller.reset()
+        self.jump_var.set(str(self.controller.frame_index))
         self._render_current_frame()
 
     def run(self) -> None:
@@ -302,7 +452,10 @@ class GraphicalReplayViewer:
 
     def _schedule_tick(self) -> None:
         if self._after_id is None and self.controller.is_playing:
-            self._after_id = self.root.after(self.frame_delay_ms, self._tick)
+            self._after_id = self.root.after(
+                self.controller.playback_delay_ms(self.frame_delay_ms),
+                self._tick,
+            )
 
     def _tick(self) -> None:
         self._after_id = None
@@ -323,10 +476,20 @@ class GraphicalReplayViewer:
         self._update_status()
 
     def _update_status(self) -> None:
-        status = "playing" if self.controller.is_playing else "paused"
-        self.status_var.set(
-            f"{status} frame={self.controller.frame_index}/{len(self.state.frames) - 1}"
-        )
+        status = self.controller.current_status()
+        self.jump_var.set(str(status.frame_index))
+        self.status_var.set(status.summary_text())
+        self.metadata_var.set(status.metadata_text())
+
+    def _on_speed_change(self) -> None:
+        speed_text = self.speed_var.get().removesuffix("x")
+        try:
+            speed = float(speed_text)
+        except ValueError:
+            self.status_var.set(f"paused invalid-speed={self.speed_var.get()}")
+            return
+        self.controller.set_playback_speed(speed)
+        self._update_status()
 
     def _on_close(self) -> None:
         self.pause()
