@@ -111,6 +111,9 @@ def test_command_center_surface_tracks_selection_edge_openings_and_preview_reque
     updated_surface = build_live_command_center_surface(session)
     assert updated_surface.edges[1].is_blocked is False
     assert updated_surface.edges[1].available_action == "block_edge"
+    assert updated_surface.ai_assist.explanations == ()
+    assert updated_surface.ai_assist.suggestions == ()
+    assert updated_surface.ai_assist.anomalies == ()
 
 
 def test_vehicle_inspection_surface_exposes_payload_route_history_and_diagnostics() -> None:
@@ -143,3 +146,48 @@ def test_vehicle_inspection_surface_exposes_payload_route_history_and_diagnostic
         "route_preview",
         "ready_state",
     ]
+
+
+def test_ai_assist_surface_provides_explanations_and_actionable_suggestions() -> None:
+    session = LiveSimulationSession(build_command_center_engine())
+
+    surface = build_live_command_center_surface(
+        session,
+        selected_vehicle_ids=(77,),
+        route_preview_requests=(RoutePreviewRequest(vehicle_id=77, destination_node_id=3),),
+    )
+
+    assert [explanation.summary for explanation in surface.ai_assist.explanations] == [
+        "Vehicle 77 is positioned to travel 1 -> 2 -> 3."
+    ]
+    assert [suggestion.kind for suggestion in surface.ai_assist.suggestions] == [
+        "retask_vehicle"
+    ]
+    assert surface.ai_assist.suggestions[0].proposed_command == {
+        "command_type": "assign_vehicle_destination",
+        "vehicle_id": 77,
+        "destination_node_id": 3,
+    }
+    assert surface.ai_assist.anomalies == ()
+
+
+def test_ai_assist_surface_explains_blocked_route_anomaly_and_reopen_suggestion() -> None:
+    session = LiveSimulationSession(build_command_center_engine())
+    session.apply(BlockEdgeCommand(edge_id=2))
+    session.apply(BlockEdgeCommand(edge_id=4))
+
+    surface = build_live_command_center_surface(
+        session,
+        selected_vehicle_ids=(77,),
+        route_preview_requests=(RoutePreviewRequest(vehicle_id=77, destination_node_id=3),),
+    )
+
+    assert surface.route_previews[0].reason == "no_route"
+    assert [suggestion.kind for suggestion in surface.ai_assist.suggestions] == [
+        "reopen_edge"
+    ]
+    assert surface.ai_assist.suggestions[0].proposed_command == {
+        "command_type": "unblock_edge",
+        "edge_id": 2,
+    }
+    assert surface.ai_assist.anomalies == ()

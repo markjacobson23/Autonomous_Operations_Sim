@@ -369,6 +369,11 @@ def build_serious_viewer_html(
         <ul class="list" id="commandCenterList"></ul>
       </section>
       <section class="card">
+        <h2>AI Assistant</h2>
+        <div class="tiny" id="assistantHint">AI-style summaries and suggestions are derived from authoritative simulator state.</div>
+        <ul class="list" id="assistantList"></ul>
+      </section>
+      <section class="card">
         <h2>Vehicle Inspector</h2>
         <div class="tiny" id="inspectorHint">Select a vehicle from the scene or list.</div>
         <div class="inspector-list" id="vehicleList"></div>
@@ -403,6 +408,7 @@ def build_serious_viewer_html(
       recent_commands: [],
       route_previews: [],
       vehicle_inspections: [],
+      ai_assist: {{ explanations: [], suggestions: [], anomalies: [] }},
     }};
     const motionSegments = Array.isArray(bundle.motion_segments) ? bundle.motion_segments : [];
     const timelineEntries = buildTimelineEntries(bundle);
@@ -696,6 +702,7 @@ def build_serious_viewer_html(
 
       renderOverlay(current, trafficSnapshot);
       renderCommandCenter();
+      renderAssistant();
       renderInspector(sampledVehicles);
       if (selectedVehicleId === null && sampledVehicles.length > 0) {{
         selectedVehicleId = sampledVehicles[0].vehicle_id;
@@ -885,6 +892,39 @@ def build_serious_viewer_html(
         }},
       ];
       commandCenterList.innerHTML = lines.map((item) =>
+        `<li><strong>${{escapeHtml(item.label)}}</strong>${{escapeHtml(item.value)}}</li>`
+      ).join("");
+    }}
+
+    function renderAssistant() {{
+      const assistantList = document.getElementById("assistantList");
+      const aiAssist = commandCenter.ai_assist || {{ explanations: [], suggestions: [], anomalies: [] }};
+      const lines = [];
+      if ((aiAssist.explanations || []).length > 0) {{
+        lines.push(...aiAssist.explanations.map((explanation) => ({{
+          label: `Explain V${{explanation.vehicle_id}}`,
+          value: explanation.summary,
+        }})));
+      }}
+      if ((aiAssist.suggestions || []).length > 0) {{
+        lines.push(...aiAssist.suggestions.map((suggestion) => ({{
+          label: `${{suggestion.priority}} suggestion`,
+          value: suggestion.summary,
+        }})));
+      }}
+      if ((aiAssist.anomalies || []).length > 0) {{
+        lines.push(...aiAssist.anomalies.map((anomaly) => ({{
+          label: `${{anomaly.severity}} anomaly`,
+          value: anomaly.summary,
+        }})));
+      }}
+      if (lines.length === 0) {{
+        lines.push({{
+          label: "AI status",
+          value: "No current AI-assisted insights for this bundle.",
+        }});
+      }}
+      assistantList.innerHTML = lines.map((item) =>
         `<li><strong>${{escapeHtml(item.label)}}</strong>${{escapeHtml(item.value)}}</li>`
       ).join("");
     }}

@@ -74,6 +74,47 @@ class VehicleInspectionSurface:
 
 
 @dataclass(frozen=True)
+class AIAssistExplanation:
+    """Deterministic AI-style explanation over authoritative vehicle state."""
+
+    vehicle_id: int
+    summary: str
+    rationale_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class AIAssistSuggestion:
+    """Operator-facing suggested next step derived from runtime truth."""
+
+    suggestion_id: str
+    kind: str
+    priority: str
+    summary: str
+    proposed_command: dict[str, Any] | None = None
+    target_vehicle_id: int | None = None
+    target_edge_id: int | None = None
+
+
+@dataclass(frozen=True)
+class AIAssistAnomaly:
+    """Derived anomaly explanation over authoritative state."""
+
+    anomaly_id: str
+    severity: str
+    summary: str
+    vehicle_id: int | None = None
+
+
+@dataclass(frozen=True)
+class AIAssistSurface:
+    """Low-risk AI-assist read-model layered above command-center truth."""
+
+    explanations: tuple[AIAssistExplanation, ...]
+    suggestions: tuple[AIAssistSuggestion, ...]
+    anomalies: tuple[AIAssistAnomaly, ...]
+
+
+@dataclass(frozen=True)
 class CommandCenterEdgeSurface:
     """Stable operator-facing open/close action summary for one edge."""
 
@@ -93,6 +134,7 @@ class CommandCenterSurface:
     recent_commands: tuple[dict[str, Any], ...]
     route_previews: tuple[RoutePreviewSurface, ...]
     vehicle_inspections: tuple[VehicleInspectionSurface, ...]
+    ai_assist: AIAssistSurface
 
 
 def preview_route_command(
@@ -149,6 +191,25 @@ def build_live_command_center_surface(
         session,
         selected_vehicle_ids,
     )
+    route_previews = tuple(
+        preview_route_command(
+            session,
+            vehicle_id=request.vehicle_id,
+            destination_node_id=request.destination_node_id,
+        )
+        for request in route_preview_requests
+    )
+    vehicle_inspections = tuple(
+        build_vehicle_inspection_surface(
+            session,
+            vehicle_id=vehicle_id,
+            route_preview=_preview_for_vehicle(
+                vehicle_id=vehicle_id,
+                route_previews=route_previews,
+            ),
+        )
+        for vehicle_id in normalized_selection
+    )
     return CommandCenterSurface(
         simulated_time_s=session.engine.simulated_time_s,
         selected_vehicle_ids=normalized_selection,
@@ -178,25 +239,12 @@ def build_live_command_center_surface(
             command_to_dict(record.command)
             for record in session.command_history[-8:]
         ),
-        route_previews=tuple(
-            preview_route_command(
-                session,
-                vehicle_id=request.vehicle_id,
-                destination_node_id=request.destination_node_id,
-            )
-            for request in route_preview_requests
-        ),
-        vehicle_inspections=tuple(
-            build_vehicle_inspection_surface(
-                session,
-                vehicle_id=vehicle_id,
-                route_preview=_preview_for_vehicle(
-                    session,
-                    vehicle_id=vehicle_id,
-                    route_preview_requests=route_preview_requests,
-                ),
-            )
-            for vehicle_id in normalized_selection
+        route_previews=route_previews,
+        vehicle_inspections=vehicle_inspections,
+        ai_assist=build_ai_assist_surface(
+            session,
+            vehicle_inspections=vehicle_inspections,
+            route_previews=route_previews,
         ),
     )
 
@@ -308,6 +356,42 @@ def vehicle_inspection_surface_to_dict(
     }
 
 
+def ai_assist_surface_to_dict(surface: AIAssistSurface) -> dict[str, Any]:
+    """Convert AI-assist state into a stable JSON-ready record."""
+
+    return {
+        "explanations": [
+            {
+                "vehicle_id": explanation.vehicle_id,
+                "summary": explanation.summary,
+                "rationale_codes": list(explanation.rationale_codes),
+            }
+            for explanation in surface.explanations
+        ],
+        "suggestions": [
+            {
+                "suggestion_id": suggestion.suggestion_id,
+                "kind": suggestion.kind,
+                "priority": suggestion.priority,
+                "summary": suggestion.summary,
+                "proposed_command": suggestion.proposed_command,
+                "target_vehicle_id": suggestion.target_vehicle_id,
+                "target_edge_id": suggestion.target_edge_id,
+            }
+            for suggestion in surface.suggestions
+        ],
+        "anomalies": [
+            {
+                "anomaly_id": anomaly.anomaly_id,
+                "severity": anomaly.severity,
+                "summary": anomaly.summary,
+                "vehicle_id": anomaly.vehicle_id,
+            }
+            for anomaly in surface.anomalies
+        ],
+    }
+
+
 def command_center_surface_to_dict(
     surface: CommandCenterSurface,
 ) -> dict[str, Any]:
@@ -343,6 +427,7 @@ def command_center_surface_to_dict(
             vehicle_inspection_surface_to_dict(inspection)
             for inspection in surface.vehicle_inspections
         ],
+        "ai_assist": ai_assist_surface_to_dict(surface.ai_assist),
     }
 
 
@@ -430,20 +515,13 @@ def _active_execution_context(
 
 
 def _preview_for_vehicle(
-    session: LiveSimulationSession,
     *,
     vehicle_id: int,
-    route_preview_requests: tuple[RoutePreviewRequest, ...]
-    | list[RoutePreviewRequest],
+    route_previews: tuple[RoutePreviewSurface, ...],
 ) -> RoutePreviewSurface | None:
-    for request in route_preview_requests:
-        if request.vehicle_id != vehicle_id:
-            continue
-        return preview_route_command(
-            session,
-            vehicle_id=request.vehicle_id,
-            destination_node_id=request.destination_node_id,
-        )
+    for preview in route_previews:
+        if preview.vehicle_id == vehicle_id:
+            return preview
     return None
 
 
@@ -521,7 +599,181 @@ def _build_vehicle_diagnostics(
     return tuple(diagnostics)
 
 
+def build_ai_assist_surface(
+    session: LiveSimulationSession,
+    *,
+    vehicle_inspections: tuple[VehicleInspectionSurface, ...],
+    route_previews: tuple[RoutePreviewSurface, ...],
+) -> AIAssistSurface:
+    """Build deterministic AI-style operator assistance from command-center truth."""
+
+    explanations = tuple(
+        _build_ai_explanation(inspection) for inspection in vehicle_inspections
+    )
+    anomalies = tuple(
+        anomaly
+        for inspection in vehicle_inspections
+        for anomaly in _build_ai_anomalies(inspection)
+    )
+    suggestions = tuple(
+        suggestion
+        for inspection in vehicle_inspections
+        for suggestion in _build_ai_suggestions(
+            session,
+            inspection=inspection,
+            route_preview=_preview_for_vehicle(
+                vehicle_id=inspection.vehicle_id,
+                route_previews=route_previews,
+            ),
+        )
+    )
+    return AIAssistSurface(
+        explanations=explanations,
+        suggestions=suggestions,
+        anomalies=anomalies,
+    )
+
+
+def _build_ai_explanation(
+    inspection: VehicleInspectionSurface,
+) -> AIAssistExplanation:
+    if inspection.wait_reason is not None:
+        return AIAssistExplanation(
+            vehicle_id=inspection.vehicle_id,
+            summary=(
+                f"Vehicle {inspection.vehicle_id} is paused at node "
+                f"{inspection.current_node_id} because of {inspection.wait_reason}."
+            ),
+            rationale_codes=("wait_reason", inspection.operational_state),
+        )
+    if inspection.current_task_type is not None:
+        return AIAssistExplanation(
+            vehicle_id=inspection.vehicle_id,
+            summary=(
+                f"Vehicle {inspection.vehicle_id} is working on "
+                f"{inspection.current_task_type} task {inspection.current_task_index} "
+                f"for job {inspection.current_job_id}."
+            ),
+            rationale_codes=("active_task", inspection.current_task_type),
+        )
+    if inspection.route_ahead_node_ids:
+        return AIAssistExplanation(
+            vehicle_id=inspection.vehicle_id,
+            summary=(
+                f"Vehicle {inspection.vehicle_id} is positioned to travel "
+                f"{' -> '.join(str(node_id) for node_id in inspection.route_ahead_node_ids)}."
+            ),
+            rationale_codes=("route_ahead", inspection.operational_state),
+        )
+    return AIAssistExplanation(
+        vehicle_id=inspection.vehicle_id,
+        summary=(
+            f"Vehicle {inspection.vehicle_id} is idle at node "
+            f"{inspection.current_node_id} and available for reassignment."
+        ),
+        rationale_codes=("idle_ready",),
+    )
+
+
+def _build_ai_anomalies(
+    inspection: VehicleInspectionSurface,
+) -> tuple[AIAssistAnomaly, ...]:
+    anomalies: list[AIAssistAnomaly] = []
+    if inspection.wait_reason is not None:
+        anomalies.append(
+            AIAssistAnomaly(
+                anomaly_id=f"vehicle-{inspection.vehicle_id}-wait",
+                severity="warning",
+                summary=(
+                    f"Vehicle {inspection.vehicle_id} is stalled by "
+                    f"{inspection.wait_reason}."
+                ),
+                vehicle_id=inspection.vehicle_id,
+            )
+        )
+    if inspection.operational_state == "failed":
+        anomalies.append(
+            AIAssistAnomaly(
+                anomaly_id=f"vehicle-{inspection.vehicle_id}-failed",
+                severity="critical",
+                summary=f"Vehicle {inspection.vehicle_id} is in failed state.",
+                vehicle_id=inspection.vehicle_id,
+            )
+        )
+    return tuple(anomalies)
+
+
+def _build_ai_suggestions(
+    session: LiveSimulationSession,
+    *,
+    inspection: VehicleInspectionSurface,
+    route_preview: RoutePreviewSurface | None,
+) -> tuple[AIAssistSuggestion, ...]:
+    suggestions: list[AIAssistSuggestion] = []
+    if route_preview is not None and route_preview.is_actionable:
+        suggestions.append(
+            AIAssistSuggestion(
+                suggestion_id=f"assign-{inspection.vehicle_id}-{route_preview.destination_node_id}",
+                kind="retask_vehicle",
+                priority="high",
+                summary=(
+                    f"Assign vehicle {inspection.vehicle_id} to destination "
+                    f"{route_preview.destination_node_id} using the previewed route."
+                ),
+                proposed_command={
+                    "command_type": "assign_vehicle_destination",
+                    "vehicle_id": inspection.vehicle_id,
+                    "destination_node_id": route_preview.destination_node_id,
+                },
+                target_vehicle_id=inspection.vehicle_id,
+            )
+        )
+    elif route_preview is not None and route_preview.reason == "no_route":
+        blocked_edge_ids = sorted(session.engine.world_state.blocked_edge_ids)
+        if blocked_edge_ids:
+            blocked_edge_id = blocked_edge_ids[0]
+            suggestions.append(
+                AIAssistSuggestion(
+                    suggestion_id=f"unblock-{blocked_edge_id}",
+                    kind="reopen_edge",
+                    priority="medium",
+                    summary=(
+                        f"Consider reopening blocked edge {blocked_edge_id} to restore "
+                        f"routing options for vehicle {inspection.vehicle_id}."
+                    ),
+                    proposed_command={
+                        "command_type": "unblock_edge",
+                        "edge_id": blocked_edge_id,
+                    },
+                    target_vehicle_id=inspection.vehicle_id,
+                    target_edge_id=blocked_edge_id,
+                )
+            )
+    if (
+        inspection.operational_state == "idle"
+        and inspection.current_job_id is None
+        and route_preview is None
+    ):
+        suggestions.append(
+            AIAssistSuggestion(
+                suggestion_id=f"preview-{inspection.vehicle_id}",
+                kind="preview_destination",
+                priority="medium",
+                summary=(
+                    f"Preview a destination for idle vehicle {inspection.vehicle_id} "
+                    "before committing a retask command."
+                ),
+                target_vehicle_id=inspection.vehicle_id,
+            )
+        )
+    return tuple(suggestions)
+
+
 __all__ = [
+    "AIAssistAnomaly",
+    "AIAssistExplanation",
+    "AIAssistSuggestion",
+    "AIAssistSurface",
     "CommandCenterEdgeSurface",
     "CommandCenterSurface",
     "CommandCenterVehicleSurface",
@@ -529,6 +781,8 @@ __all__ = [
     "RoutePreviewSurface",
     "VehicleDiagnosticSurface",
     "VehicleInspectionSurface",
+    "ai_assist_surface_to_dict",
+    "build_ai_assist_surface",
     "build_vehicle_inspection_surface",
     "build_live_command_center_surface",
     "command_center_surface_to_dict",

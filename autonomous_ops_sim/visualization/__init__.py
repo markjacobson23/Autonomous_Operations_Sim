@@ -20,6 +20,10 @@ from autonomous_ops_sim.visualization.geometry import (
     render_geometry_surface_to_dict,
 )
 from autonomous_ops_sim.visualization.command_center import (
+    AIAssistAnomaly,
+    AIAssistExplanation,
+    AIAssistSuggestion,
+    AIAssistSurface,
     CommandCenterEdgeSurface,
     CommandCenterSurface,
     CommandCenterVehicleSurface,
@@ -27,6 +31,8 @@ from autonomous_ops_sim.visualization.command_center import (
     RoutePreviewSurface,
     VehicleDiagnosticSurface,
     VehicleInspectionSurface,
+    ai_assist_surface_to_dict,
+    build_ai_assist_surface,
     build_live_command_center_surface,
     build_vehicle_inspection_surface,
     command_center_surface_to_dict,
@@ -132,6 +138,10 @@ from autonomous_ops_sim.visualization.traffic import (
 )
 
 __all__ = [
+    "AIAssistAnomaly",
+    "AIAssistExplanation",
+    "AIAssistSuggestion",
+    "AIAssistSurface",
     "AreaGeometrySurface",
     "AssignDestinationInteraction",
     "AssignSelectedDestinationViewerAction",
@@ -195,6 +205,8 @@ __all__ = [
     "apply_interaction_to_live_session",
     "apply_interactions",
     "apply_interactions_to_live_session",
+    "ai_assist_surface_to_dict",
+    "build_ai_assist_surface",
     "build_live_runtime_snapshot",
     "build_live_command_center_surface",
     "build_vehicle_inspection_surface",

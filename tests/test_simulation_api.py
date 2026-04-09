@@ -164,6 +164,8 @@ def test_live_session_and_live_sync_bundles_share_one_api_version() -> None:
     assert live_bundle.command_center.route_previews[0].node_ids == (3,)
     assert live_bundle.command_center.vehicle_inspections[0].vehicle_id == 77
     assert live_bundle.command_center.vehicle_inspections[0].payload == 0.0
+    assert live_bundle.command_center.ai_assist.explanations[0].vehicle_id == 77
+    assert live_bundle.command_center.ai_assist.suggestions[0].kind == "retask_vehicle"
     assert live_bundle.command_center.vehicle_inspections[0].recent_commands[-1][
         "command_type"
     ] == "assign_vehicle_destination"
@@ -225,3 +227,5 @@ def test_replay_live_and_sync_bundle_exports_are_deterministic() -> None:
     assert "command_center" in json.loads(sync_json_a)
     assert "vehicle_inspections" in json.loads(live_json_a)["command_center"]
     assert "vehicle_inspections" in json.loads(sync_json_a)["command_center"]
+    assert "ai_assist" in json.loads(live_json_a)["command_center"]
+    assert "ai_assist" in json.loads(sync_json_a)["command_center"]

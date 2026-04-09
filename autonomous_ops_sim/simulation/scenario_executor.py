@@ -41,18 +41,15 @@ class ScenarioExecutionResult:
     export_json: str
 
 
-def execute_scenario(scenario: Scenario) -> ScenarioExecutionResult:
-    """Execute one narrow scenario configuration through the real simulator."""
-
-    if scenario.execution is None:
-        raise ValueError("Scenario does not define an executable 'execution' section.")
+def build_scenario_engine(scenario: Scenario) -> SimulationEngine:
+    """Build an unexecuted engine for one parsed scenario."""
 
     simulation_map = _build_map(map_spec=scenario.map_spec)
     world_state = _build_world_state(
         simulation_map=simulation_map,
         world_state_spec=scenario.world_state,
     )
-    engine = SimulationEngine(
+    return SimulationEngine(
         simulation_map=simulation_map,
         world_state=world_state,
         router=Router(),
@@ -64,11 +61,20 @@ def execute_scenario(scenario: Scenario) -> ScenarioExecutionResult:
         ),
     )
 
+
+def execute_scenario(scenario: Scenario) -> ScenarioExecutionResult:
+    """Execute one narrow scenario configuration through the real simulator."""
+
+    if scenario.execution is None:
+        raise ValueError("Scenario does not define an executable 'execution' section.")
+
+    engine = build_scenario_engine(scenario)
+
     vehicle = _get_execution_vehicle(engine=engine, scenario=scenario)
     _execute_configured_work(
         engine=engine,
         scenario=scenario,
-        simulation_map=simulation_map,
+        simulation_map=engine.map,
         vehicle=vehicle,
     )
 
