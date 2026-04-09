@@ -364,6 +364,11 @@ def build_serious_viewer_html(
         <ul class="list" id="overlayList"></ul>
       </section>
       <section class="card">
+        <h2>Command Center</h2>
+        <div class="tiny" id="commandCenterHint">Live operator controls derive from authoritative session state.</div>
+        <ul class="list" id="commandCenterList"></ul>
+      </section>
+      <section class="card">
         <h2>Vehicle Inspector</h2>
         <div class="tiny" id="inspectorHint">Select a vehicle from the scene or list.</div>
         <div class="inspector-list" id="vehicleList"></div>
@@ -389,6 +394,13 @@ def build_serious_viewer_html(
     const mapSurface = bundle.map_surface;
     const renderGeometry = bundle.render_geometry || {{ roads: [], intersections: [], areas: [] }};
     const trafficBaseline = bundle.traffic_baseline || {{ control_points: [], queue_records: [] }};
+    const commandCenter = bundle.command_center || {{
+      selected_vehicle_ids: [],
+      vehicles: [],
+      edges: [],
+      recent_commands: [],
+      route_previews: [],
+    }};
     const motionSegments = Array.isArray(bundle.motion_segments) ? bundle.motion_segments : [];
     const timelineEntries = buildTimelineEntries(bundle);
     let selectedVehicleId = null;
@@ -680,6 +692,7 @@ def build_serious_viewer_html(
       slider.value = String(Math.round(currentTimeS * 1000.0));
 
       renderOverlay(current, trafficSnapshot);
+      renderCommandCenter();
       renderInspector(sampledVehicles);
       if (selectedVehicleId === null && sampledVehicles.length > 0) {{
         selectedVehicleId = sampledVehicles[0].vehicle_id;
@@ -766,6 +779,43 @@ def build_serious_viewer_html(
           </button>
         `;
       }}).join("");
+    }}
+
+    function renderCommandCenter() {{
+      const commandCenterList = document.getElementById("commandCenterList");
+      const lines = [
+        {{
+          label: "Selected vehicles",
+          value: (commandCenter.selected_vehicle_ids || []).join(", ") || "none",
+        }},
+        {{
+          label: "Controllable vehicles",
+          value: String(
+            (commandCenter.vehicles || []).filter((vehicle) => vehicle.can_assign_destination).length,
+          ),
+        }},
+        {{
+          label: "Blocked edges",
+          value: String(
+            (commandCenter.edges || []).filter((edge) => edge.is_blocked).length,
+          ),
+        }},
+        {{
+          label: "Recent commands",
+          value: (commandCenter.recent_commands || [])
+            .map((command) => command.command_type)
+            .join(", ") || "none",
+        }},
+        {{
+          label: "Route previews",
+          value: (commandCenter.route_previews || [])
+            .map((preview) => `V${{preview.vehicle_id}} -> N${{preview.destination_node_id}} [${{preview.node_ids.join(" -> ")}}]`)
+            .join(" | ") || "none",
+        }},
+      ];
+      commandCenterList.innerHTML = lines.map((item) =>
+        `<li><strong>${{escapeHtml(item.label)}}</strong>${{escapeHtml(item.value)}}</li>`
+      ).join("");
     }}
 
     function sampleTrafficAtTime(timestampS) {{

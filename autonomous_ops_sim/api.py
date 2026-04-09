@@ -13,6 +13,7 @@ from autonomous_ops_sim.simulation.commands import (
     BlockEdgeCommand,
     RepositionVehicleCommand,
     SimulationCommand,
+    UnblockEdgeCommand,
     command_to_dict,
 )
 from autonomous_ops_sim.simulation.control import (
@@ -31,6 +32,12 @@ from autonomous_ops_sim.simulation.metrics import (
     summarize_engine_execution,
 )
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
+from autonomous_ops_sim.visualization.command_center import (
+    CommandCenterSurface,
+    RoutePreviewRequest,
+    build_live_command_center_surface,
+    command_center_surface_to_dict,
+)
 from autonomous_ops_sim.visualization.live_sync import (
     LiveRuntimeSnapshot,
     LiveStateUpdate,
@@ -66,8 +73,8 @@ from autonomous_ops_sim.visualization.state import (
 
 SIMULATION_API_VERSION = 1
 REPLAY_BUNDLE_SCHEMA_VERSION = 4
-LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 4
-LIVE_SYNC_BUNDLE_SCHEMA_VERSION = 4
+LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 5
+LIVE_SYNC_BUNDLE_SCHEMA_VERSION = 5
 
 
 @dataclass(frozen=True)
@@ -130,6 +137,7 @@ class LiveSessionBundle:
     command_results: tuple[SimulationCommandResult, ...]
     motion_segments: tuple[VehicleMotionSegment, ...]
     traffic_baseline: TrafficBaselineSurface
+    command_center: CommandCenterSurface
 
 
 @dataclass(frozen=True)
@@ -145,6 +153,7 @@ class LiveSyncBundle:
     command_results: tuple[SimulationCommandResult, ...]
     motion_segments: tuple[VehicleMotionSegment, ...]
     traffic_baseline: TrafficBaselineSurface
+    command_center: CommandCenterSurface
 
 
 def apply_command_with_result(
@@ -259,6 +268,9 @@ def build_live_session_bundle(
     session: LiveSimulationSession,
     *,
     summary: ExecutionMetricsSummary | None = None,
+    selected_vehicle_ids: tuple[int, ...] | list[int] = (),
+    route_preview_requests: tuple[RoutePreviewRequest, ...]
+    | list[RoutePreviewRequest] = (),
 ) -> LiveSessionBundle:
     """Build the versioned live-session API surface."""
 
@@ -292,10 +304,21 @@ def build_live_session_bundle(
             render_geometry=render_geometry,
             motion_segments=motion_segments,
         ),
+        command_center=build_live_command_center_surface(
+            session,
+            selected_vehicle_ids=selected_vehicle_ids,
+            route_preview_requests=route_preview_requests,
+        ),
     )
 
 
-def build_live_sync_bundle(session: LiveSimulationSession) -> LiveSyncBundle:
+def build_live_sync_bundle(
+    session: LiveSimulationSession,
+    *,
+    selected_vehicle_ids: tuple[int, ...] | list[int] = (),
+    route_preview_requests: tuple[RoutePreviewRequest, ...]
+    | list[RoutePreviewRequest] = (),
+) -> LiveSyncBundle:
     """Build the versioned live sync bundle for transport-agnostic viewers."""
 
     surface = build_live_sync_surface(session)
@@ -332,6 +355,11 @@ def build_live_sync_bundle(session: LiveSimulationSession) -> LiveSyncBundle:
             replay_state,
             render_geometry=render_geometry,
             motion_segments=motion_segments,
+        ),
+        command_center=build_live_command_center_surface(
+            session,
+            selected_vehicle_ids=selected_vehicle_ids,
+            route_preview_requests=route_preview_requests,
         ),
     )
 
@@ -421,6 +449,7 @@ def live_session_bundle_to_dict(bundle: LiveSessionBundle) -> dict[str, Any]:
             motion_segment_to_dict(segment) for segment in bundle.motion_segments
         ],
         "traffic_baseline": traffic_baseline_surface_to_dict(bundle.traffic_baseline),
+        "command_center": command_center_surface_to_dict(bundle.command_center),
     }
 
 
@@ -442,6 +471,7 @@ def live_sync_bundle_to_dict(bundle: LiveSyncBundle) -> dict[str, Any]:
             motion_segment_to_dict(segment) for segment in bundle.motion_segments
         ],
         "traffic_baseline": traffic_baseline_surface_to_dict(bundle.traffic_baseline),
+        "command_center": command_center_surface_to_dict(bundle.command_center),
     }
 
 
@@ -516,7 +546,10 @@ def _select_replay_result_frame(
         frame = frames[frame_index]
         frame_index += 1
 
-        if isinstance(record.command, (BlockEdgeCommand, RepositionVehicleCommand)):
+        if isinstance(
+            record.command,
+            (BlockEdgeCommand, RepositionVehicleCommand, UnblockEdgeCommand),
+        ):
             if (
                 frame.trigger.source == "command"
                 and frame.trigger.sequence == record.sequence

@@ -30,6 +30,7 @@ from autonomous_ops_sim.simulation import (
 )
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
 from autonomous_ops_sim.visualization import (
+    RoutePreviewRequest,
     build_live_runtime_snapshot,
     build_visualization_state_from_controller,
 )
@@ -135,8 +136,16 @@ def test_replay_bundle_is_versioned_and_matches_existing_replay_surface() -> Non
 
 def test_live_session_and_live_sync_bundles_share_one_api_version() -> None:
     session = run_api_session()
-    live_bundle = build_live_session_bundle(session)
-    sync_bundle = build_live_sync_bundle(session)
+    live_bundle = build_live_session_bundle(
+        session,
+        selected_vehicle_ids=(77,),
+        route_preview_requests=(RoutePreviewRequest(vehicle_id=77, destination_node_id=3),),
+    )
+    sync_bundle = build_live_sync_bundle(
+        session,
+        selected_vehicle_ids=(77,),
+        route_preview_requests=(RoutePreviewRequest(vehicle_id=77, destination_node_id=3),),
+    )
 
     assert live_bundle.metadata.api_version == SIMULATION_API_VERSION
     assert live_bundle.metadata.surface_schema_version == LIVE_SESSION_BUNDLE_SCHEMA_VERSION
@@ -150,6 +159,9 @@ def test_live_session_and_live_sync_bundles_share_one_api_version() -> None:
     assert len(live_bundle.motion_segments) == 4
     assert len(sync_bundle.motion_segments) == 4
     assert live_bundle.traffic_baseline == sync_bundle.traffic_baseline
+    assert live_bundle.command_center == sync_bundle.command_center
+    assert live_bundle.command_center.selected_vehicle_ids == (77,)
+    assert live_bundle.command_center.route_previews[0].node_ids == (3,)
     assert sync_bundle.command_results[1].emitted_update_indices == (
         2,
         3,
@@ -204,3 +216,5 @@ def test_replay_live_and_sync_bundle_exports_are_deterministic() -> None:
     assert "traffic_baseline" in json.loads(replay_json_a)
     assert "traffic_baseline" in json.loads(live_json_a)
     assert "traffic_baseline" in json.loads(sync_json_a)
+    assert "command_center" in json.loads(live_json_a)
+    assert "command_center" in json.loads(sync_json_a)

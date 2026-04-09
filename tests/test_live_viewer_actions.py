@@ -11,6 +11,7 @@ from autonomous_ops_sim.simulation import (
     LiveSimulationSession,
     RepositionVehicleCommand,
     SimulationEngine,
+    UnblockEdgeCommand,
     WorldState,
     export_live_session_json,
 )
@@ -20,12 +21,16 @@ from autonomous_ops_sim.visualization import (
     AssignSelectedDestinationViewerAction,
     BlockEdgeInteraction,
     BlockEdgeViewerAction,
+    ClearVehicleSelectionViewerAction,
     LiveViewerActionResult,
     LiveViewerActionValidationError,
     LiveViewerController,
     RepositionSelectedVehicleViewerAction,
     RepositionVehicleInteraction,
+    SelectVehiclesViewerAction,
     SelectVehicleViewerAction,
+    UnblockEdgeInteraction,
+    UnblockEdgeViewerAction,
     build_visualization_state_from_live_session,
     export_visualization_json,
     interaction_to_command,
@@ -104,23 +109,31 @@ def test_live_viewer_action_translation_reuses_interactions_and_commands() -> No
     selected_vehicle_id, select_interaction = translate_live_viewer_action(
         SelectVehicleViewerAction(vehicle_id=77),
         session=session,
-        selected_vehicle_id=None,
+        selected_vehicle_ids=(),
     )
-    assert selected_vehicle_id == 77
+    assert selected_vehicle_id == (77,)
     assert select_interaction is None
 
     selected_vehicle_id, block_interaction = translate_live_viewer_action(
         BlockEdgeViewerAction(edge_id=2),
         session=session,
-        selected_vehicle_id=selected_vehicle_id,
+        selected_vehicle_ids=selected_vehicle_id,
     )
     assert block_interaction == BlockEdgeInteraction(edge_id=2)
     assert interaction_to_command(block_interaction) == BlockEdgeCommand(edge_id=2)
 
+    selected_vehicle_id, unblock_interaction = translate_live_viewer_action(
+        UnblockEdgeViewerAction(edge_id=2),
+        session=session,
+        selected_vehicle_ids=selected_vehicle_id,
+    )
+    assert unblock_interaction == UnblockEdgeInteraction(edge_id=2)
+    assert interaction_to_command(unblock_interaction) == UnblockEdgeCommand(edge_id=2)
+
     selected_vehicle_id, reposition_interaction = translate_live_viewer_action(
         RepositionSelectedVehicleViewerAction(node_id=2),
         session=session,
-        selected_vehicle_id=selected_vehicle_id,
+        selected_vehicle_ids=selected_vehicle_id,
     )
     assert reposition_interaction == RepositionVehicleInteraction(
         vehicle_id=77,
@@ -134,7 +147,7 @@ def test_live_viewer_action_translation_reuses_interactions_and_commands() -> No
     _, assign_interaction = translate_live_viewer_action(
         AssignSelectedDestinationViewerAction(destination_node_id=3),
         session=session,
-        selected_vehicle_id=selected_vehicle_id,
+        selected_vehicle_ids=selected_vehicle_id,
     )
     assert assign_interaction == AssignDestinationInteraction(
         vehicle_id=77,
@@ -177,6 +190,7 @@ def test_live_viewer_actions_apply_deterministically_and_refresh_visualization()
     assert controller_a.session.engine.world_state.blocked_edge_ids == {2}
     assert controller_a.session.engine.get_vehicle(77).current_node_id == 3
     assert controller_a.selected_vehicle_id == 77
+    assert controller_a.selected_vehicle_ids == (77,)
 
 
 def test_live_viewer_action_sequences_repeat_identical_session_replay_and_export_outputs() -> None:
@@ -215,3 +229,22 @@ def test_live_viewer_actions_reject_missing_selection_and_out_of_bounds_repositi
         controller.apply_action(
             RepositionSelectedVehicleViewerAction(node_id=3)
         )
+
+
+def test_live_viewer_supports_multi_selection_preview_and_edge_reopening() -> None:
+    controller = build_live_viewer_controller()
+
+    result = controller.apply_action(SelectVehiclesViewerAction(vehicle_ids=(77, 77)))
+    preview = controller.preview_destination(3)
+    controller.apply_action(BlockEdgeViewerAction(edge_id=2))
+    controller.apply_action(UnblockEdgeViewerAction(edge_id=2))
+    clear_result = controller.apply_action(ClearVehicleSelectionViewerAction())
+
+    assert result.selected_vehicle_id == 77
+    assert result.selected_vehicle_ids == (77,)
+    assert preview.node_ids == (1, 2, 3)
+    assert preview.edge_ids == (1, 2)
+    assert preview.is_actionable is True
+    assert controller.session.engine.world_state.blocked_edge_ids == set()
+    assert clear_result.selected_vehicle_id is None
+    assert clear_result.selected_vehicle_ids == ()

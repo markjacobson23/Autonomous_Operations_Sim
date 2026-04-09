@@ -9,6 +9,7 @@ from autonomous_ops_sim.simulation.commands import (
     BlockEdgeCommand,
     RepositionVehicleCommand,
     SimulationCommand,
+    UnblockEdgeCommand,
     command_to_dict,
 )
 from autonomous_ops_sim.simulation.engine import SimulationEngine
@@ -60,6 +61,8 @@ class SimulationController:
 
         if isinstance(command, BlockEdgeCommand):
             self.engine.world_state.block_edge(command.edge_id)
+        elif isinstance(command, UnblockEdgeCommand):
+            self.engine.world_state.unblock_edge(command.edge_id)
         elif isinstance(command, RepositionVehicleCommand):
             vehicle = self.engine.get_vehicle(command.vehicle_id)
             vehicle.move_to_node(
@@ -96,6 +99,9 @@ class SimulationController:
         if isinstance(command, BlockEdgeCommand):
             self._validate_block_edge(command)
             return
+        if isinstance(command, UnblockEdgeCommand):
+            self._validate_unblock_edge(command)
+            return
         if isinstance(command, RepositionVehicleCommand):
             self._validate_reposition_vehicle(command)
             return
@@ -109,6 +115,16 @@ class SimulationController:
         if already_blocked:
             raise CommandValidationError(
                 f"edge_id {command.edge_id} is already blocked"
+            )
+
+    def _validate_unblock_edge(self, command: UnblockEdgeCommand) -> None:
+        try:
+            is_blocked = self.engine.world_state.is_edge_blocked(command.edge_id)
+        except KeyError as exc:
+            raise CommandValidationError(f"Unknown edge_id: {command.edge_id}") from exc
+        if not is_blocked:
+            raise CommandValidationError(
+                f"edge_id {command.edge_id} is not currently blocked"
             )
 
     def _validate_reposition_vehicle(self, command: RepositionVehicleCommand) -> None:

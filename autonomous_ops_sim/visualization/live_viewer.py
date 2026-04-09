@@ -11,8 +11,13 @@ from autonomous_ops_sim.visualization.interactions import (
     BlockEdgeInteraction,
     InteractionValidationError,
     RepositionVehicleInteraction,
+    UnblockEdgeInteraction,
     VisualizationInteraction,
     apply_interaction_to_live_session,
+)
+from autonomous_ops_sim.visualization.command_center import (
+    RoutePreviewSurface,
+    preview_route_command,
 )
 from autonomous_ops_sim.visualization.state import (
     VisualizationState,
@@ -37,6 +42,32 @@ class SelectVehicleViewerAction:
     @property
     def action_type(self) -> str:
         return "select_vehicle"
+
+
+@dataclass(frozen=True)
+class SelectVehiclesViewerAction:
+    """Select multiple existing vehicles for command-center workflows."""
+
+    vehicle_ids: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        if not self.vehicle_ids:
+            raise LiveViewerActionValidationError("vehicle_ids must not be empty")
+        if any(vehicle_id < 0 for vehicle_id in self.vehicle_ids):
+            raise LiveViewerActionValidationError("vehicle_ids must be non-negative")
+
+    @property
+    def action_type(self) -> str:
+        return "select_vehicles"
+
+
+@dataclass(frozen=True)
+class ClearVehicleSelectionViewerAction:
+    """Clear any active command-center vehicle selection."""
+
+    @property
+    def action_type(self) -> str:
+        return "clear_vehicle_selection"
 
 
 @dataclass(frozen=True)
@@ -72,6 +103,21 @@ class BlockEdgeViewerAction:
 
 
 @dataclass(frozen=True)
+class UnblockEdgeViewerAction:
+    """Reopen one edge during a live session."""
+
+    edge_id: int
+
+    def __post_init__(self) -> None:
+        if self.edge_id < 0:
+            raise LiveViewerActionValidationError("edge_id must be non-negative")
+
+    @property
+    def action_type(self) -> str:
+        return "unblock_edge"
+
+
+@dataclass(frozen=True)
 class RepositionSelectedVehicleViewerAction:
     """Reposition the selected vehicle to its current or adjacent node."""
 
@@ -88,8 +134,11 @@ class RepositionSelectedVehicleViewerAction:
 
 LiveViewerAction = (
     SelectVehicleViewerAction
+    | SelectVehiclesViewerAction
+    | ClearVehicleSelectionViewerAction
     | AssignSelectedDestinationViewerAction
     | BlockEdgeViewerAction
+    | UnblockEdgeViewerAction
     | RepositionSelectedVehicleViewerAction
 )
 
@@ -100,6 +149,7 @@ class LiveViewerActionResult:
 
     action: LiveViewerAction
     selected_vehicle_id: int | None
+    selected_vehicle_ids: tuple[int, ...]
     interaction: VisualizationInteraction | None
     command_record: CommandApplicationRecord | None
     visualization_state: VisualizationState
@@ -113,15 +163,25 @@ class LiveViewerController:
         session: LiveSimulationSession,
         *,
         selected_vehicle_id: int | None = None,
+        selected_vehicle_ids: tuple[int, ...] | None = None,
     ) -> None:
         self._session = session
-        self._selected_vehicle_id: int | None = None
+        self._selected_vehicle_ids: tuple[int, ...] = ()
         self._visualization_state = build_visualization_state_from_live_session(
             session
         )
-        if selected_vehicle_id is not None:
+        if selected_vehicle_ids is not None and selected_vehicle_id is not None:
+            raise ValueError(
+                "selected_vehicle_id and selected_vehicle_ids cannot both be provided"
+            )
+        if selected_vehicle_ids is not None:
+            self._selected_vehicle_ids = _normalize_selected_vehicle_ids(
+                session,
+                selected_vehicle_ids,
+            )
+        elif selected_vehicle_id is not None:
             self._require_vehicle_exists(selected_vehicle_id)
-            self._selected_vehicle_id = selected_vehicle_id
+            self._selected_vehicle_ids = (selected_vehicle_id,)
 
     @property
     def session(self) -> LiveSimulationSession:
@@ -133,7 +193,15 @@ class LiveViewerController:
     def selected_vehicle_id(self) -> int | None:
         """Return the currently selected vehicle, if any."""
 
-        return self._selected_vehicle_id
+        if not self._selected_vehicle_ids:
+            return None
+        return self._selected_vehicle_ids[0]
+
+    @property
+    def selected_vehicle_ids(self) -> tuple[int, ...]:
+        """Return the currently selected vehicles in stable operator order."""
+
+        return self._selected_vehicle_ids
 
     @property
     def visualization_state(self) -> VisualizationState:
@@ -149,16 +217,38 @@ class LiveViewerController:
         )
         return self.visualization_state
 
+    def preview_destination(
+        self,
+        destination_node_id: int,
+        *,
+        vehicle_id: int | None = None,
+    ) -> RoutePreviewSurface:
+        """Preview a destination assignment without mutating the live session."""
+
+        target_vehicle_id = (
+            self.selected_vehicle_id if vehicle_id is None else vehicle_id
+        )
+        if target_vehicle_id is None:
+            raise LiveViewerActionValidationError(
+                "a vehicle must be selected before previewing a destination"
+            )
+        self._require_vehicle_exists(target_vehicle_id)
+        return preview_route_command(
+            self.session,
+            vehicle_id=target_vehicle_id,
+            destination_node_id=destination_node_id,
+        )
+
     def apply_action(
         self,
         action: LiveViewerAction,
     ) -> LiveViewerActionResult:
         """Apply one explicit viewer action through selection, interaction, and session layers."""
 
-        selected_vehicle_id, interaction = translate_live_viewer_action(
+        selected_vehicle_ids, interaction = translate_live_viewer_action(
             action,
             session=self.session,
-            selected_vehicle_id=self.selected_vehicle_id,
+            selected_vehicle_ids=self.selected_vehicle_ids,
         )
 
         command_record: CommandApplicationRecord | None = None
@@ -171,11 +261,12 @@ class LiveViewerController:
             except InteractionValidationError as exc:
                 raise LiveViewerActionValidationError(str(exc)) from exc
 
-        self._selected_vehicle_id = selected_vehicle_id
+        self._selected_vehicle_ids = selected_vehicle_ids
         self.refresh()
         return LiveViewerActionResult(
             action=action,
             selected_vehicle_id=self.selected_vehicle_id,
+            selected_vehicle_ids=self.selected_vehicle_ids,
             interaction=interaction,
             command_record=command_record,
             visualization_state=self.visualization_state,
@@ -194,22 +285,31 @@ def translate_live_viewer_action(
     action: LiveViewerAction,
     *,
     session: LiveSimulationSession,
-    selected_vehicle_id: int | None,
-) -> tuple[int | None, VisualizationInteraction | None]:
+    selected_vehicle_ids: tuple[int, ...],
+) -> tuple[tuple[int, ...], VisualizationInteraction | None]:
     """Translate one live viewer action into selection state and an optional interaction."""
 
     if isinstance(action, SelectVehicleViewerAction):
         _require_vehicle_exists(session, action.vehicle_id)
-        return action.vehicle_id, None
+        return (action.vehicle_id,), None
+
+    if isinstance(action, SelectVehiclesViewerAction):
+        return _normalize_selected_vehicle_ids(session, action.vehicle_ids), None
+
+    if isinstance(action, ClearVehicleSelectionViewerAction):
+        return (), None
 
     if isinstance(action, BlockEdgeViewerAction):
-        return selected_vehicle_id, BlockEdgeInteraction(edge_id=action.edge_id)
+        return selected_vehicle_ids, BlockEdgeInteraction(edge_id=action.edge_id)
 
-    vehicle_id = _require_selected_vehicle_id(selected_vehicle_id)
+    if isinstance(action, UnblockEdgeViewerAction):
+        return selected_vehicle_ids, UnblockEdgeInteraction(edge_id=action.edge_id)
+
+    vehicle_id = _require_selected_vehicle_id(selected_vehicle_ids)
     _require_vehicle_exists(session, vehicle_id)
 
     if isinstance(action, AssignSelectedDestinationViewerAction):
-        return vehicle_id, AssignDestinationInteraction(
+        return selected_vehicle_ids, AssignDestinationInteraction(
             vehicle_id=vehicle_id,
             destination_node_id=action.destination_node_id,
         )
@@ -220,18 +320,18 @@ def translate_live_viewer_action(
         vehicle_id=vehicle_id,
         node_id=action.node_id,
     )
-    return vehicle_id, RepositionVehicleInteraction(
+    return selected_vehicle_ids, RepositionVehicleInteraction(
         vehicle_id=vehicle_id,
         node_id=action.node_id,
     )
 
 
-def _require_selected_vehicle_id(selected_vehicle_id: int | None) -> int:
-    if selected_vehicle_id is None:
+def _require_selected_vehicle_id(selected_vehicle_ids: tuple[int, ...]) -> int:
+    if not selected_vehicle_ids:
         raise LiveViewerActionValidationError(
             "a vehicle must be selected before issuing this action"
         )
-    return selected_vehicle_id
+    return selected_vehicle_ids[0]
 
 
 def _require_vehicle_exists(
@@ -244,6 +344,21 @@ def _require_vehicle_exists(
         raise LiveViewerActionValidationError(
             f"Unknown vehicle_id: {vehicle_id}"
         ) from exc
+
+
+def _normalize_selected_vehicle_ids(
+    session: LiveSimulationSession,
+    vehicle_ids: tuple[int, ...],
+) -> tuple[int, ...]:
+    ordered_unique: list[int] = []
+    seen: set[int] = set()
+    for vehicle_id in vehicle_ids:
+        if vehicle_id in seen:
+            continue
+        _require_vehicle_exists(session, vehicle_id)
+        seen.add(vehicle_id)
+        ordered_unique.append(vehicle_id)
+    return tuple(ordered_unique)
 
 
 def _require_bounded_reposition(

@@ -10,6 +10,7 @@ from autonomous_ops_sim.simulation.commands import (
     AssignVehicleDestinationCommand,
     BlockEdgeCommand,
     RepositionVehicleCommand,
+    UnblockEdgeCommand,
     command_to_dict,
 )
 from autonomous_ops_sim.simulation.control import (
@@ -555,7 +556,10 @@ def _build_timeline(
     for record in command_history:
         append_pending_session_records(record.completed_at_s)
         command = record.command
-        if isinstance(command, (BlockEdgeCommand, RepositionVehicleCommand)):
+        if isinstance(
+            command,
+            (BlockEdgeCommand, RepositionVehicleCommand, UnblockEdgeCommand),
+        ):
             timeline.append(
                 _TimelineRecord(
                     timestamp_s=record.completed_at_s,
@@ -614,6 +618,9 @@ def _apply_command_record(
     command = record.command
     if isinstance(command, BlockEdgeCommand):
         mutable_blocked_edge_ids.add(command.edge_id)
+        return
+    if isinstance(command, UnblockEdgeCommand):
+        mutable_blocked_edge_ids.discard(command.edge_id)
         return
 
     assert isinstance(command, RepositionVehicleCommand)

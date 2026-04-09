@@ -3,6 +3,7 @@ from autonomous_ops_sim.simulation.commands import (
     BlockEdgeCommand,
     RepositionVehicleCommand,
     SimulationCommand,
+    UnblockEdgeCommand,
     command_to_dict,
 )
 from autonomous_ops_sim.simulation.control import (
@@ -56,6 +57,7 @@ __all__ = [
     "TraceEvent",
     "TraceEventCount",
     "TraceEventType",
+    "UnblockEdgeCommand",
     "VehicleBehaviorController",
     "VehicleOperationalState",
     "WorldState",

@@ -12,6 +12,7 @@ from autonomous_ops_sim.simulation import (
     RepositionVehicleCommand,
     SimulationCommand,
     SimulationController,
+    UnblockEdgeCommand,
     command_to_dict,
 )
 from autonomous_ops_sim.visualization.state import (
@@ -78,10 +79,26 @@ class BlockEdgeInteraction:
         return "block_edge"
 
 
+@dataclass(frozen=True)
+class UnblockEdgeInteraction:
+    """Viewer-facing intent to reopen one runtime edge."""
+
+    edge_id: int
+
+    def __post_init__(self) -> None:
+        if self.edge_id < 0:
+            raise InteractionValidationError("edge_id must be non-negative")
+
+    @property
+    def interaction_type(self) -> str:
+        return "unblock_edge"
+
+
 VisualizationInteraction = (
     AssignDestinationInteraction
     | RepositionVehicleInteraction
     | BlockEdgeInteraction
+    | UnblockEdgeInteraction
 )
 
 
@@ -92,6 +109,8 @@ def interaction_to_command(
 
     if isinstance(interaction, BlockEdgeInteraction):
         return BlockEdgeCommand(edge_id=interaction.edge_id)
+    if isinstance(interaction, UnblockEdgeInteraction):
+        return UnblockEdgeCommand(edge_id=interaction.edge_id)
     if isinstance(interaction, RepositionVehicleInteraction):
         return RepositionVehicleCommand(
             vehicle_id=interaction.vehicle_id,

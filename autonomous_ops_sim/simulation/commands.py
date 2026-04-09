@@ -20,6 +20,21 @@ class BlockEdgeCommand:
 
 
 @dataclass(frozen=True)
+class UnblockEdgeCommand:
+    """Reopen one runtime edge through the existing WorldState surface."""
+
+    edge_id: int
+
+    def __post_init__(self) -> None:
+        if self.edge_id < 0:
+            raise ValueError("edge_id must be non-negative")
+
+    @property
+    def command_type(self) -> str:
+        return "unblock_edge"
+
+
+@dataclass(frozen=True)
 class RepositionVehicleCommand:
     """Move one runtime vehicle to an existing node without route execution."""
 
@@ -56,14 +71,17 @@ class AssignVehicleDestinationCommand:
 
 
 SimulationCommand = (
-    BlockEdgeCommand | RepositionVehicleCommand | AssignVehicleDestinationCommand
+    BlockEdgeCommand
+    | UnblockEdgeCommand
+    | RepositionVehicleCommand
+    | AssignVehicleDestinationCommand
 )
 
 
 def command_to_dict(command: SimulationCommand) -> dict[str, Any]:
     """Convert one typed command to a stable export-ready record."""
 
-    if isinstance(command, BlockEdgeCommand):
+    if isinstance(command, (BlockEdgeCommand, UnblockEdgeCommand)):
         return {
             "command_type": command.command_type,
             "edge_id": command.edge_id,
