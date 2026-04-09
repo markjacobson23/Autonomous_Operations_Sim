@@ -254,10 +254,49 @@ h3 {
   gap: 16px;
 }
 
-.stage-canvas {
-  min-height: 490px;
+.scene-toolbar,
+.layer-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.tool-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scene-button,
+.layer-chip {
+  border: 1px solid rgba(97, 112, 125, 0.18);
+  background: var(--panel-strong);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 9px 13px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.scene-button:disabled {
+  opacity: 0.45;
+}
+
+.layer-chip-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.stage-canvas-frame {
   position: relative;
-  overflow: hidden;
+  min-height: 490px;
+}
+
+.stage-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 490px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   background:
@@ -265,15 +304,6 @@ h3 {
     linear-gradient(90deg, rgba(97, 112, 125, 0.08) 1px, transparent 1px),
     linear-gradient(rgba(97, 112, 125, 0.08) 1px, transparent 1px);
   background-size: auto, 52px 52px, 52px 52px;
-}
-
-.grid-overlay {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 22% 18%, rgba(0, 108, 103, 0.18), transparent 16%),
-    radial-gradient(circle at 76% 28%, rgba(29, 78, 216, 0.12), transparent 14%),
-    radial-gradient(circle at 78% 72%, rgba(201, 106, 24, 0.14), transparent 18%);
 }
 
 .scene-routes {
@@ -455,4 +485,107 @@ h3 {
     left: 18px;
     max-width: none;
   }
+}
+
+.scene-backdrop {
+  fill: rgba(255, 255, 255, 0.36);
+}
+
+.scene-area {
+  fill: rgba(97, 112, 125, 0.12);
+  stroke: rgba(97, 112, 125, 0.18);
+  stroke-width: 0.08;
+}
+
+.scene-area-depot,
+.scene-area-loading_bay {
+  fill: rgba(0, 108, 103, 0.16);
+}
+
+.scene-area-building,
+.scene-area-no_go_zone {
+  fill: rgba(201, 106, 24, 0.12);
+}
+
+.scene-road {
+  fill: none;
+  stroke: rgba(52, 64, 74, 0.76);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.scene-road-primary {
+  stroke: rgba(29, 78, 216, 0.78);
+}
+
+.scene-intersection {
+  fill: rgba(29, 78, 216, 0.12);
+  stroke: rgba(29, 78, 216, 0.25);
+  stroke-width: 0.08;
+}
+
+.scene-route-preview {
+  fill: none;
+  stroke: rgba(0, 108, 103, 0.8);
+  stroke-width: 0.32;
+  stroke-dasharray: 0.9 0.6;
+}
+
+.scene-reservation {
+  stroke: rgba(29, 78, 216, 0.55);
+  stroke-width: 0.22;
+  stroke-dasharray: 0.4 0.35;
+}
+
+.scene-hazard {
+  stroke: rgba(182, 75, 58, 0.82);
+  stroke-width: 0.42;
+}
+
+.scene-vehicle circle {
+  fill: rgba(0, 108, 103, 0.95);
+  stroke: white;
+  stroke-width: 0.14;
+}
+
+.scene-vehicle text {
+  fill: var(--ink);
+  font-size: 0.8px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.scene-vehicle.selected circle {
+  fill: rgba(201, 106, 24, 0.96);
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 0.18;
+}
+
+.minimap {
+  width: 100%;
+  height: 180px;
+  margin-top: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.minimap-bg {
+  fill: rgba(255, 255, 255, 0.7);
+}
+
+.minimap-road {
+  fill: none;
+  stroke: rgba(52, 64, 74, 0.6);
+  stroke-width: 1.4;
+}
+
+.minimap-vehicle {
+  fill: rgba(0, 108, 103, 0.85);
+}
+
+.minimap-viewport {
+  fill: rgba(29, 78, 216, 0.06);
+  stroke: rgba(29, 78, 216, 0.7);
+  stroke-width: 1.4;
 }

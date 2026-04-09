@@ -1,0 +1,928 @@
+{
+  "command_center": {
+    "ai_assist": {
+      "anomalies": [],
+      "explanations": [],
+      "suggestions": []
+    },
+    "edges": [
+      {
+        "available_action": "block_edge",
+        "edge_id": 1000,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1001,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1002,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1003,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1004,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1005,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1006,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1007,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1008,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1009,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1010,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1011,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1012,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1013,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1014,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1015,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1016,
+        "is_blocked": false
+      },
+      {
+        "available_action": "block_edge",
+        "edge_id": 1017,
+        "is_blocked": false
+      }
+    ],
+    "recent_commands": [],
+    "route_previews": [],
+    "selected_vehicle_ids": [],
+    "simulated_time_s": 0.0,
+    "vehicle_inspections": [],
+    "vehicles": [
+      {
+        "can_assign_destination": true,
+        "can_reposition": true,
+        "current_node_id": 100,
+        "operational_state": "idle",
+        "vehicle_id": 301
+      }
+    ]
+  },
+  "command_results": [],
+  "map_surface": {
+    "edges": [
+      {
+        "distance": 3.0,
+        "edge_id": 1000,
+        "end_node_id": 110,
+        "speed_limit": 3.0,
+        "start_node_id": 100
+      },
+      {
+        "distance": 3.0,
+        "edge_id": 1001,
+        "end_node_id": 100,
+        "speed_limit": 3.0,
+        "start_node_id": 110
+      },
+      {
+        "distance": 4.0,
+        "edge_id": 1002,
+        "end_node_id": 120,
+        "speed_limit": 2.2,
+        "start_node_id": 110
+      },
+      {
+        "distance": 4.0,
+        "edge_id": 1003,
+        "end_node_id": 110,
+        "speed_limit": 2.2,
+        "start_node_id": 120
+      },
+      {
+        "distance": 3.0,
+        "edge_id": 1004,
+        "end_node_id": 130,
+        "speed_limit": 1.8,
+        "start_node_id": 120
+      },
+      {
+        "distance": 3.0,
+        "edge_id": 1005,
+        "end_node_id": 120,
+        "speed_limit": 1.8,
+        "start_node_id": 130
+      },
+      {
+        "distance": 3.4,
+        "edge_id": 1006,
+        "end_node_id": 140,
+        "speed_limit": 2.5,
+        "start_node_id": 130
+      },
+      {
+        "distance": 3.4,
+        "edge_id": 1007,
+        "end_node_id": 130,
+        "speed_limit": 2.5,
+        "start_node_id": 140
+      },
+      {
+        "distance": 2.5,
+        "edge_id": 1008,
+        "end_node_id": 170,
+        "speed_limit": 1.5,
+        "start_node_id": 110
+      },
+      {
+        "distance": 2.5,
+        "edge_id": 1009,
+        "end_node_id": 110,
+        "speed_limit": 1.5,
+        "start_node_id": 170
+      },
+      {
+        "distance": 4.5,
+        "edge_id": 1010,
+        "end_node_id": 150,
+        "speed_limit": 1.6,
+        "start_node_id": 110
+      },
+      {
+        "distance": 4.5,
+        "edge_id": 1011,
+        "end_node_id": 110,
+        "speed_limit": 1.6,
+        "start_node_id": 150
+      },
+      {
+        "distance": 3.0,
+        "edge_id": 1012,
+        "end_node_id": 160,
+        "speed_limit": 1.4,
+        "start_node_id": 150
+      },
+      {
+        "distance": 3.0,
+        "edge_id": 1013,
+        "end_node_id": 150,
+        "speed_limit": 1.4,
+        "start_node_id": 160
+      },
+      {
+        "distance": 2.8,
+        "edge_id": 1014,
+        "end_node_id": 140,
+        "speed_limit": 1.7,
+        "start_node_id": 160
+      },
+      {
+        "distance": 2.8,
+        "edge_id": 1015,
+        "end_node_id": 160,
+        "speed_limit": 1.7,
+        "start_node_id": 140
+      },
+      {
+        "distance": 4.8,
+        "edge_id": 1016,
+        "end_node_id": 150,
+        "speed_limit": 1.5,
+        "start_node_id": 120
+      },
+      {
+        "distance": 4.8,
+        "edge_id": 1017,
+        "end_node_id": 120,
+        "speed_limit": 1.5,
+        "start_node_id": 150
+      }
+    ],
+    "nodes": [
+      {
+        "node_id": 100,
+        "node_type": "depot",
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "node_id": 110,
+        "node_type": "intersection",
+        "position": [
+          3.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "node_id": 120,
+        "node_type": "loading_zone",
+        "position": [
+          6.0,
+          2.0,
+          0.0
+        ]
+      },
+      {
+        "node_id": 130,
+        "node_type": "intersection",
+        "position": [
+          9.0,
+          2.5,
+          0.0
+        ]
+      },
+      {
+        "node_id": 140,
+        "node_type": "unloading_zone",
+        "position": [
+          12.0,
+          0.5,
+          0.0
+        ]
+      },
+      {
+        "node_id": 150,
+        "node_type": "job_site",
+        "position": [
+          7.0,
+          -2.0,
+          0.0
+        ]
+      },
+      {
+        "node_id": 160,
+        "node_type": "intersection",
+        "position": [
+          10.0,
+          -2.0,
+          0.0
+        ]
+      },
+      {
+        "node_id": 170,
+        "node_type": "job_site",
+        "position": [
+          1.5,
+          -2.0,
+          0.0
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "api_version": 1,
+    "surface_name": "live_session_bundle",
+    "surface_schema_version": 7
+  },
+  "motion_segments": [],
+  "render_geometry": {
+    "areas": [
+      {
+        "area_id": "dispatch-yard",
+        "kind": "depot",
+        "label": "Dispatch Yard",
+        "polygon": [
+          [
+            -0.9,
+            -0.9,
+            0.0
+          ],
+          [
+            1.1,
+            -0.9,
+            0.0
+          ],
+          [
+            1.1,
+            0.9,
+            0.0
+          ],
+          [
+            -0.9,
+            0.9,
+            0.0
+          ]
+        ]
+      },
+      {
+        "area_id": "ore-cut",
+        "kind": "loading_bay",
+        "label": "Ore Cut",
+        "polygon": [
+          [
+            5.0,
+            1.1,
+            0.0
+          ],
+          [
+            7.4,
+            1.1,
+            0.0
+          ],
+          [
+            7.4,
+            3.3,
+            0.0
+          ],
+          [
+            5.0,
+            3.3,
+            0.0
+          ]
+        ]
+      },
+      {
+        "area_id": "crusher-pad",
+        "kind": "loading_bay",
+        "label": "Crusher Pad",
+        "polygon": [
+          [
+            10.9,
+            -0.5,
+            0.0
+          ],
+          [
+            12.9,
+            -0.5,
+            0.0
+          ],
+          [
+            12.9,
+            1.6,
+            0.0
+          ],
+          [
+            10.9,
+            1.6,
+            0.0
+          ]
+        ]
+      },
+      {
+        "area_id": "service-yard",
+        "kind": "building",
+        "label": "Service Yard",
+        "polygon": [
+          [
+            5.8,
+            -3.2,
+            0.0
+          ],
+          [
+            8.1,
+            -3.2,
+            0.0
+          ],
+          [
+            8.1,
+            -1.4,
+            0.0
+          ],
+          [
+            5.8,
+            -1.4,
+            0.0
+          ]
+        ]
+      },
+      {
+        "area_id": "blast-buffer",
+        "kind": "no_go_zone",
+        "label": "Blast Buffer",
+        "polygon": [
+          [
+            8.7,
+            1.1,
+            0.0
+          ],
+          [
+            10.4,
+            1.1,
+            0.0
+          ],
+          [
+            10.4,
+            3.1,
+            0.0
+          ],
+          [
+            8.7,
+            3.1,
+            0.0
+          ]
+        ]
+      }
+    ],
+    "intersections": [
+      {
+        "intersection_id": "dispatch-hub",
+        "intersection_type": "yard_junction",
+        "node_id": 110,
+        "polygon": [
+          [
+            2.4,
+            -0.6,
+            0.0
+          ],
+          [
+            3.7,
+            -0.5,
+            0.0
+          ],
+          [
+            3.8,
+            0.6,
+            0.0
+          ],
+          [
+            2.6,
+            0.8,
+            0.0
+          ]
+        ]
+      },
+      {
+        "intersection_id": "pit-apron",
+        "intersection_type": "loading_apron",
+        "node_id": 120,
+        "polygon": [
+          [
+            5.5,
+            1.4,
+            0.0
+          ],
+          [
+            6.8,
+            1.4,
+            0.0
+          ],
+          [
+            6.9,
+            2.7,
+            0.0
+          ],
+          [
+            5.7,
+            2.8,
+            0.0
+          ]
+        ]
+      },
+      {
+        "intersection_id": "crusher-apron",
+        "intersection_type": "yard_junction",
+        "node_id": 140,
+        "polygon": [
+          [
+            11.3,
+            -0.2,
+            0.0
+          ],
+          [
+            12.7,
+            -0.1,
+            0.0
+          ],
+          [
+            12.8,
+            1.1,
+            0.0
+          ],
+          [
+            11.4,
+            1.2,
+            0.0
+          ]
+        ]
+      },
+      {
+        "intersection_id": "service-turn",
+        "intersection_type": "service_turnout",
+        "node_id": 150,
+        "polygon": [
+          [
+            6.3,
+            -2.6,
+            0.0
+          ],
+          [
+            7.6,
+            -2.6,
+            0.0
+          ],
+          [
+            7.8,
+            -1.4,
+            0.0
+          ],
+          [
+            6.5,
+            -1.3,
+            0.0
+          ]
+        ]
+      }
+    ],
+    "roads": [
+      {
+        "centerline": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.6,
+            0.1,
+            0.0
+          ],
+          [
+            3.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "directionality": "two_way",
+        "edge_ids": [
+          1000,
+          1001
+        ],
+        "lane_count": 2,
+        "road_class": "haul_road",
+        "road_id": "dispatch-spine",
+        "width_m": 1.8
+      },
+      {
+        "centerline": [
+          [
+            3.0,
+            0.0,
+            0.0
+          ],
+          [
+            4.1,
+            0.4,
+            0.0
+          ],
+          [
+            5.0,
+            1.2,
+            0.0
+          ],
+          [
+            6.0,
+            2.0,
+            0.0
+          ]
+        ],
+        "directionality": "two_way",
+        "edge_ids": [
+          1002,
+          1003
+        ],
+        "lane_count": 2,
+        "road_class": "service_road",
+        "road_id": "pit-approach",
+        "width_m": 1.6
+      },
+      {
+        "centerline": [
+          [
+            6.0,
+            2.0,
+            0.0
+          ],
+          [
+            7.0,
+            2.2,
+            0.0
+          ],
+          [
+            8.0,
+            2.5,
+            0.0
+          ],
+          [
+            9.0,
+            2.5,
+            0.0
+          ]
+        ],
+        "directionality": "two_way",
+        "edge_ids": [
+          1004,
+          1005
+        ],
+        "lane_count": 1,
+        "road_class": "ramp",
+        "road_id": "cut-ramp",
+        "width_m": 1.3
+      },
+      {
+        "centerline": [
+          [
+            9.0,
+            2.5,
+            0.0
+          ],
+          [
+            10.1,
+            2.2,
+            0.0
+          ],
+          [
+            11.0,
+            1.5,
+            0.0
+          ],
+          [
+            12.0,
+            0.5,
+            0.0
+          ]
+        ],
+        "directionality": "two_way",
+        "edge_ids": [
+          1006,
+          1007
+        ],
+        "lane_count": 2,
+        "road_class": "haul_road",
+        "road_id": "crusher-run",
+        "width_m": 1.9
+      },
+      {
+        "centerline": [
+          [
+            3.0,
+            0.0,
+            0.0
+          ],
+          [
+            2.5,
+            -0.7,
+            0.0
+          ],
+          [
+            2.0,
+            -1.3,
+            0.0
+          ],
+          [
+            1.5,
+            -2.0,
+            0.0
+          ]
+        ],
+        "directionality": "two_way",
+        "edge_ids": [
+          1008,
+          1009
+        ],
+        "lane_count": 1,
+        "road_class": "yard_lane",
+        "road_id": "fuel-branch",
+        "width_m": 1.0
+      },
+      {
+        "centerline": [
+          [
+            3.0,
+            0.0,
+            0.0
+          ],
+          [
+            4.4,
+            -0.4,
+            0.0
+          ],
+          [
+            5.8,
+            -1.3,
+            0.0
+          ],
+          [
+            7.0,
+            -2.0,
+            0.0
+          ]
+        ],
+        "directionality": "two_way",
+        "edge_ids": [
+          1010,
+          1011
+        ],
+        "lane_count": 1,
+        "road_class": "service_road",
+        "road_id": "maintenance-link",
+        "width_m": 1.1
+      },
+      {
+        "centerline": [
+          [
+            7.0,
+            -2.0,
+            0.0
+          ],
+          [
+            8.6,
+            -2.1,
+            0.0
+          ],
+          [
+            10.0,
+            -2.0,
+            0.0
+          ],
+          [
+            11.0,
+            -1.1,
+            0.0
+          ],
+          [
+            12.0,
+            0.5,
+            0.0
+          ]
+        ],
+        "directionality": "two_way",
+        "edge_ids": [
+          1012,
+          1013,
+          1014,
+          1015
+        ],
+        "lane_count": 1,
+        "road_class": "bypass",
+        "road_id": "south-bypass",
+        "width_m": 1.2
+      },
+      {
+        "centerline": [
+          [
+            6.0,
+            2.0,
+            0.0
+          ],
+          [
+            6.4,
+            0.7,
+            0.0
+          ],
+          [
+            6.8,
+            -0.5,
+            0.0
+          ],
+          [
+            7.0,
+            -2.0,
+            0.0
+          ]
+        ],
+        "directionality": "two_way",
+        "edge_ids": [
+          1016,
+          1017
+        ],
+        "lane_count": 1,
+        "road_class": "ramp",
+        "road_id": "escape-ramp",
+        "width_m": 1.0
+      }
+    ]
+  },
+  "seed": 3801,
+  "session_history": [],
+  "simulated_time_s": 0.0,
+  "snapshot": {
+    "blocked_edge_ids": [],
+    "command_count": 0,
+    "is_active": true,
+    "session_step_count": 0,
+    "simulated_time_s": 0.0,
+    "trace_event_count": 0,
+    "vehicles": [
+      {
+        "node_id": 100,
+        "operational_state": "idle",
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "vehicle_id": 301
+      }
+    ]
+  },
+  "summary": {
+    "completed_job_count": 0,
+    "completed_task_count": 0,
+    "edge_traversal_count": 0,
+    "event_counts": [],
+    "final_time_s": 0.0,
+    "node_arrival_count": 0,
+    "route_count": 0,
+    "seed": 3801,
+    "total_conflict_wait_time_s": 0.0,
+    "total_resource_wait_time_s": 0.0,
+    "total_route_distance": 0.0,
+    "total_service_time_s": 0.0,
+    "trace_event_count": 0,
+    "vehicle_ids": []
+  },
+  "trace_events": [],
+  "traffic_baseline": {
+    "control_points": [
+      {
+        "control_id": "control-dispatch-hub",
+        "control_type": "signalized",
+        "controlled_road_ids": [
+          "dispatch-spine",
+          "fuel-branch",
+          "maintenance-link",
+          "pit-approach"
+        ],
+        "node_id": 110
+      },
+      {
+        "control_id": "control-pit-apron",
+        "control_type": "yield",
+        "controlled_road_ids": [
+          "cut-ramp",
+          "escape-ramp",
+          "pit-approach"
+        ],
+        "node_id": 120
+      },
+      {
+        "control_id": "control-crusher-apron",
+        "control_type": "yield",
+        "controlled_road_ids": [
+          "crusher-run",
+          "south-bypass"
+        ],
+        "node_id": 140
+      },
+      {
+        "control_id": "control-service-turn",
+        "control_type": "yield",
+        "controlled_road_ids": [
+          "escape-ramp",
+          "maintenance-link",
+          "south-bypass"
+        ],
+        "node_id": 150
+      }
+    ],
+    "queue_records": []
+  }
+}

@@ -6,6 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="80a83f02-da50-42e5-b2f5-61cccc1dbda7" name="Changes" comment="added simple demos">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/serious_ui/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/serious_ui/src/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/serious_ui/src/app-shell.css" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/serious_ui/src/app-shell.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_frontend_shell.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_frontend_shell.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

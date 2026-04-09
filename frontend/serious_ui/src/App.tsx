@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 
 type BootstrapSummary = {
   loadState: "idle" | "loading" | "loaded" | "error";
@@ -16,6 +16,24 @@ type BootstrapSummary = {
   message: string;
   commandCenter: CommandCenterPayload;
   summary: BundleSummaryPayload | null;
+  bundle: BundlePayload | null;
+};
+
+type ViewportState = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type LayerState = {
+  areas: boolean;
+  roads: boolean;
+  intersections: boolean;
+  vehicles: boolean;
+  routes: boolean;
+  reservations: boolean;
+  hazards: boolean;
 };
 
 type BundleSummaryPayload = {
@@ -39,6 +57,7 @@ type RoutePreviewPayload = {
   reason?: string | null;
   total_distance?: number;
   node_ids?: number[];
+  edge_ids?: number[];
 };
 
 type VehicleInspectionPayload = {
@@ -84,6 +103,69 @@ type AnomalyPayload = {
   vehicle_id?: number | null;
 };
 
+type Position3 = [number, number, number];
+
+type RenderGeometryPayload = {
+  roads?: RoadPayload[];
+  intersections?: IntersectionPayload[];
+  areas?: AreaPayload[];
+};
+
+type RoadPayload = {
+  road_id?: string;
+  edge_ids?: number[];
+  centerline?: Position3[];
+  road_class?: string;
+  directionality?: string;
+  lane_count?: number;
+  width_m?: number;
+};
+
+type IntersectionPayload = {
+  intersection_id?: string;
+  node_id?: number;
+  polygon?: Position3[];
+  intersection_type?: string;
+};
+
+type AreaPayload = {
+  area_id?: string;
+  kind?: string;
+  polygon?: Position3[];
+  label?: string | null;
+};
+
+type MapSurfacePayload = {
+  nodes?: NodePayload[];
+  edges?: EdgePayload[];
+};
+
+type NodePayload = {
+  node_id?: number;
+  position?: Position3;
+  node_type?: string;
+};
+
+type EdgePayload = {
+  edge_id?: number;
+  start_node_id?: number;
+  end_node_id?: number;
+  distance?: number;
+  speed_limit?: number;
+};
+
+type VehicleSnapshotPayload = {
+  vehicle_id?: number;
+  node_id?: number;
+  position?: Position3;
+  operational_state?: string;
+};
+
+type TrafficBaselinePayload = {
+  control_points?: Array<{ edge_id?: number; state?: string }>;
+  queue_records?: Array<{ edge_id?: number; vehicle_ids?: number[] }>;
+};
+
 type BundlePayload = {
   metadata?: { surface_name?: string };
   seed?: number;
@@ -91,11 +173,23 @@ type BundlePayload = {
   trace_events?: unknown[];
   summary?: BundleSummaryPayload;
   command_center?: CommandCenterPayload;
+  map_surface?: MapSurfacePayload;
+  render_geometry?: RenderGeometryPayload;
+  traffic_baseline?: TrafficBaselinePayload;
   snapshot?: {
     simulated_time_s?: number;
-    blocked_edge_ids?: unknown[];
-    vehicles?: unknown[];
+    blocked_edge_ids?: number[];
+    vehicles?: VehicleSnapshotPayload[];
   };
+};
+
+type Bounds = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  width: number;
+  height: number;
 };
 
 const architecture = {
@@ -111,7 +205,19 @@ const sessionActions = [
   "Open Timeline",
 ];
 
+const defaultLayers: LayerState = {
+  areas: true,
+  roads: true,
+  intersections: true,
+  vehicles: true,
+  routes: true,
+  reservations: true,
+  hazards: true,
+};
+
 function App(): JSX.Element {
+  const minimapRef = useRef<SVGSVGElement | null>(null);
+  const [layers, setLayers] = useState<LayerState>(defaultLayers);
   const [bootstrap, setBootstrap] = useState<BootstrapSummary>({
     loadState: "idle",
     surfaceName: "unbound",
@@ -128,6 +234,13 @@ function App(): JSX.Element {
     message: "No live bundle is connected yet.",
     commandCenter: {},
     summary: null,
+    bundle: null,
+  });
+  const [viewport, setViewport] = useState<ViewportState>({
+    x: -20,
+    y: -12,
+    width: 40,
+    height: 24,
   });
 
   useEffect(() => {
@@ -158,7 +271,9 @@ function App(): JSX.Element {
         const commandCenter = bundle.command_center ?? {};
         const aiAssist = commandCenter.ai_assist ?? {};
         const summary = bundle.summary ?? null;
+        const fittedViewport = fitViewportToBundle(bundle);
 
+        setViewport(fittedViewport);
         setBootstrap({
           loadState: "loaded",
           surfaceName: bundle.metadata?.surface_name ?? "unknown_surface",
@@ -189,6 +304,7 @@ function App(): JSX.Element {
           message: "Live bundle bootstrap connected.",
           commandCenter,
           summary,
+          bundle,
         });
       })
       .catch((error: unknown) => {
@@ -212,6 +328,7 @@ function App(): JSX.Element {
           message,
           commandCenter: {},
           summary: null,
+          bundle: null,
         });
       });
 
@@ -220,23 +337,98 @@ function App(): JSX.Element {
     };
   }, []);
 
+  const bundle = bootstrap.bundle;
+  const bounds = computeSceneBounds(bundle);
   const routePreviews = bootstrap.commandCenter.route_previews ?? [];
   const inspections = bootstrap.commandCenter.vehicle_inspections ?? [];
   const recentCommands = bootstrap.commandCenter.recent_commands ?? [];
   const suggestions = bootstrap.commandCenter.ai_assist?.suggestions ?? [];
   const anomalies = bootstrap.commandCenter.ai_assist?.anomalies ?? [];
   const explanations = bootstrap.commandCenter.ai_assist?.explanations ?? [];
+  const selectedVehicleId =
+    bootstrap.commandCenter.selected_vehicle_ids?.[0] ?? inspections[0]?.vehicle_id ?? null;
+  const selectedVehicle = findVehicleById(bundle, selectedVehicleId);
+
+  function panView(deltaX: number, deltaY: number): void {
+    setViewport((current) => ({
+      ...current,
+      x: current.x + deltaX * current.width,
+      y: current.y + deltaY * current.height,
+    }));
+  }
+
+  function zoomView(factor: number): void {
+    setViewport((current) => {
+      const nextWidth = current.width * factor;
+      const nextHeight = current.height * factor;
+      return {
+        x: current.x + (current.width - nextWidth) / 2,
+        y: current.y + (current.height - nextHeight) / 2,
+        width: nextWidth,
+        height: nextHeight,
+      };
+    });
+  }
+
+  function fitScene(): void {
+    setViewport(fitViewportToBundle(bundle));
+  }
+
+  function focusSelectedVehicle(): void {
+    if (!selectedVehicle?.position) {
+      return;
+    }
+    const [x, y] = selectedVehicle.position;
+    const nextWidth = Math.max(bounds.width * 0.32, 8);
+    const nextHeight = Math.max(bounds.height * 0.32, 6);
+    setViewport({
+      x: x - nextWidth / 2,
+      y: y - nextHeight / 2,
+      width: nextWidth,
+      height: nextHeight,
+    });
+  }
+
+  function handleMinimapClick(event: MouseEvent<SVGSVGElement>): void {
+    if (!minimapRef.current) {
+      return;
+    }
+    const rect = minimapRef.current.getBoundingClientRect();
+    const clickX = (event.clientX - rect.left) / rect.width;
+    const clickY = (event.clientY - rect.top) / rect.height;
+    const targetX = bounds.minX + clickX * bounds.width;
+    const targetY = bounds.minY + clickY * bounds.height;
+    setViewport((current) => ({
+      ...current,
+      x: targetX - current.width / 2,
+      y: targetY - current.height / 2,
+    }));
+  }
+
+  function toggleLayer(layer: keyof LayerState): void {
+    setLayers((current) => ({
+      ...current,
+      [layer]: !current[layer],
+    }));
+  }
+
+  const minimapRect = {
+    x: ((viewport.x - bounds.minX) / bounds.width) * 100,
+    y: ((viewport.y - bounds.minY) / bounds.height) * 100,
+    width: (viewport.width / bounds.width) * 100,
+    height: (viewport.height / bounds.height) * 100,
+  };
 
   return (
     <div className="shell">
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 43 Operator Shell</p>
+          <p className="eyebrow">Step 44 Navigation Shell</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
-            The serious frontend now has a real operator-facing frame with live
-            metadata, command-center regions, inspection space, alerts, and a
-            timeline dock, while scene interaction stays reserved for the next step.
+            The serious frontend now has camera controls, a bundle-driven scene graph,
+            layer toggles, selected-vehicle focus, and minimap navigation, while direct
+            scene selection still waits for the next step.
           </p>
         </div>
         <div className="masthead-meta">
@@ -294,41 +486,255 @@ function App(): JSX.Element {
                 <h2 id="scene-title">Operations Viewport</h2>
               </div>
               <div className="status-stack">
-                <span className="status-pill">SVG scene baseline</span>
-                <span className="status-pill secondary">Minimap placeholder ready</span>
+                <span className="status-pill">Camera controls active</span>
+                <span className="status-pill secondary">Selection focus baseline</span>
               </div>
             </div>
+
+            <div className="scene-toolbar" aria-label="Scene toolbar">
+              <div className="tool-group">
+                <button className="scene-button" type="button" onClick={() => panView(0, -0.18)}>
+                  Pan Up
+                </button>
+                <button className="scene-button" type="button" onClick={() => panView(-0.18, 0)}>
+                  Pan Left
+                </button>
+                <button className="scene-button" type="button" onClick={() => panView(0.18, 0)}>
+                  Pan Right
+                </button>
+                <button className="scene-button" type="button" onClick={() => panView(0, 0.18)}>
+                  Pan Down
+                </button>
+              </div>
+              <div className="tool-group">
+                <button className="scene-button" type="button" onClick={() => zoomView(0.82)}>
+                  Zoom In
+                </button>
+                <button className="scene-button" type="button" onClick={() => zoomView(1.2)}>
+                  Zoom Out
+                </button>
+                <button className="scene-button" type="button" onClick={fitScene}>
+                  Fit Scene
+                </button>
+                <button
+                  className="scene-button"
+                  type="button"
+                  onClick={focusSelectedVehicle}
+                  disabled={selectedVehicle === null}
+                >
+                  Focus Selected
+                </button>
+              </div>
+            </div>
+
+            <div className="layer-toolbar" aria-label="Layer toggles">
+              {Object.entries(layers).map(([layer, enabled]) => (
+                <button
+                  key={layer}
+                  className={`layer-chip ${enabled ? "layer-chip-active" : ""}`}
+                  type="button"
+                  onClick={() => toggleLayer(layer as keyof LayerState)}
+                >
+                  {layer}
+                </button>
+              ))}
+            </div>
+
             <div className="stage-grid">
-              <div className="stage-canvas" role="img" aria-label="Placeholder scene">
-                <div className="grid-overlay" />
-                <div className="scene-routes">
-                  <span className="route-chip route-chip-primary">Haul corridor</span>
-                  <span className="route-chip route-chip-secondary">Loading loop</span>
-                  <span className="route-chip route-chip-alert">Blocked edge watch</span>
-                </div>
+              <div className="stage-canvas-frame">
+                <svg
+                  className="stage-canvas"
+                  viewBox={`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`}
+                  aria-label="Simulation scene graph"
+                >
+                  <rect
+                    x={bounds.minX}
+                    y={bounds.minY}
+                    width={bounds.width}
+                    height={bounds.height}
+                    className="scene-backdrop"
+                  />
+
+                  {layers.areas &&
+                    (bundle?.render_geometry?.areas ?? []).map((area, index) => (
+                      <polygon
+                        key={area.area_id ?? `area-${index}`}
+                        points={toPointString(area.polygon)}
+                        className={`scene-area scene-area-${area.kind ?? "generic"}`}
+                      />
+                    ))}
+
+                  {layers.roads &&
+                    (bundle?.render_geometry?.roads ?? []).map((road, index) => (
+                      <polyline
+                        key={road.road_id ?? `road-${index}`}
+                        points={toPointString(road.centerline)}
+                        className={`scene-road scene-road-${road.road_class ?? "connector"}`}
+                        strokeWidth={Math.max(road.width_m ?? 1.4, 0.9)}
+                      />
+                    ))}
+
+                  {layers.intersections &&
+                    (bundle?.render_geometry?.intersections ?? []).map((intersection, index) => (
+                      <polygon
+                        key={intersection.intersection_id ?? `intersection-${index}`}
+                        points={toPointString(intersection.polygon)}
+                        className="scene-intersection"
+                      />
+                    ))}
+
+                  {layers.routes &&
+                    routePreviews.map((preview, previewIndex) => {
+                      const routePoints = buildRoutePreviewPoints(
+                        preview,
+                        bundle?.map_surface?.nodes ?? [],
+                      );
+                      if (routePoints.length < 2) {
+                        return null;
+                      }
+                      return (
+                        <polyline
+                          key={`route-preview-${previewIndex}`}
+                          points={toPointString(routePoints)}
+                          className="scene-route-preview"
+                        />
+                      );
+                    })}
+
+                  {layers.reservations &&
+                    (bundle?.traffic_baseline?.queue_records ?? []).map((record, queueIndex) => {
+                      const edge = findEdgeById(
+                        bundle?.map_surface?.edges ?? [],
+                        record.edge_id ?? null,
+                      );
+                      const start = edge
+                        ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.start_node_id)
+                        : null;
+                      const end = edge
+                        ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.end_node_id)
+                        : null;
+                      if (!start || !end) {
+                        return null;
+                      }
+                      return (
+                        <line
+                          key={`reservation-${queueIndex}`}
+                          x1={start[0]}
+                          y1={start[1]}
+                          x2={end[0]}
+                          y2={end[1]}
+                          className="scene-reservation"
+                        />
+                      );
+                    })}
+
+                  {layers.hazards &&
+                    (bundle?.snapshot?.blocked_edge_ids ?? []).map((edgeId, blockedIndex) => {
+                      const edge = findEdgeById(bundle?.map_surface?.edges ?? [], edgeId);
+                      const start = edge
+                        ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.start_node_id)
+                        : null;
+                      const end = edge
+                        ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.end_node_id)
+                        : null;
+                      if (!start || !end) {
+                        return null;
+                      }
+                      return (
+                        <line
+                          key={`hazard-${blockedIndex}`}
+                          x1={start[0]}
+                          y1={start[1]}
+                          x2={end[0]}
+                          y2={end[1]}
+                          className="scene-hazard"
+                        />
+                      );
+                    })}
+
+                  {layers.vehicles &&
+                    (bundle?.snapshot?.vehicles ?? []).map((vehicle, vehicleIndex) => {
+                      const position = vehicle.position ?? [0, 0, 0];
+                      const isSelected = vehicle.vehicle_id === selectedVehicleId;
+                      return (
+                        <g
+                          key={vehicle.vehicle_id ?? `vehicle-${vehicleIndex}`}
+                          className={isSelected ? "scene-vehicle selected" : "scene-vehicle"}
+                        >
+                          <circle cx={position[0]} cy={position[1]} r={0.55} />
+                          <text x={position[0]} y={position[1] - 0.85}>
+                            V{vehicle.vehicle_id ?? vehicleIndex}
+                          </text>
+                        </g>
+                      );
+                    })}
+                </svg>
+
                 <div className="focus-card">
-                  <strong>Viewport reserved for Step 44 camera controls</strong>
+                  <strong>Camera baseline is now live</strong>
                   <p>
-                    This region already sits inside the real shell layout, with room
-                    for scene graph layers, fit-to-scene, and direct selection next.
+                    Pan, zoom, fit-to-scene, selected-vehicle focus, scene layers, and
+                    minimap navigation are active. Direct object picking still starts in
+                    Step 45.
                   </p>
                 </div>
               </div>
+
               <aside className="overview-panel">
                 <div className="overview-card">
                   <p className="eyebrow">Overview</p>
-                  <h3>Minimap / Scene Summary</h3>
-                  <p>
-                    Mining scene overview placeholder with reserved space for map
-                    extent, camera box, and quick navigation.
-                  </p>
+                  <h3>Minimap Navigation</h3>
+                  <svg
+                    ref={minimapRef}
+                    className="minimap"
+                    viewBox={`0 0 100 100`}
+                    aria-label="Scene minimap"
+                    onClick={handleMinimapClick}
+                  >
+                    <rect x={0} y={0} width={100} height={100} className="minimap-bg" />
+                    {(bundle?.render_geometry?.roads ?? []).map((road, index) => (
+                      <polyline
+                        key={road.road_id ?? `minimap-road-${index}`}
+                        points={toScaledPointString(road.centerline, bounds)}
+                        className="minimap-road"
+                      />
+                    ))}
+                    {(bundle?.snapshot?.vehicles ?? []).map((vehicle, index) => (
+                      <circle
+                        key={vehicle.vehicle_id ?? `minimap-vehicle-${index}`}
+                        cx={scaleX(vehicle.position?.[0] ?? 0, bounds)}
+                        cy={scaleY(vehicle.position?.[1] ?? 0, bounds)}
+                        r={1.7}
+                        className="minimap-vehicle"
+                      />
+                    ))}
+                    <rect
+                      x={minimapRect.x}
+                      y={minimapRect.y}
+                      width={minimapRect.width}
+                      height={minimapRect.height}
+                      className="minimap-viewport"
+                    />
+                  </svg>
+                  <p>Click anywhere on the minimap to recenter the current viewport.</p>
                 </div>
+
                 <div className="overview-card">
-                  <p className="eyebrow">Session Status</p>
+                  <p className="eyebrow">Layer Summary</p>
                   <ul className="mini-list">
-                    <li>{bootstrap.message}</li>
-                    <li>{inspections.length} inspection record(s) available</li>
-                    <li>{routePreviews.length} route preview(s) available</li>
+                    <li>
+                      Roads: {layers.roads ? "visible" : "hidden"} · Areas:{" "}
+                      {layers.areas ? "visible" : "hidden"}
+                    </li>
+                    <li>
+                      Intersections: {layers.intersections ? "visible" : "hidden"} ·
+                      Vehicles: {layers.vehicles ? "visible" : "hidden"}
+                    </li>
+                    <li>
+                      Routes: {layers.routes ? "visible" : "hidden"} · Reservations:{" "}
+                      {layers.reservations ? "visible" : "hidden"}
+                    </li>
+                    <li>Hazards: {layers.hazards ? "visible" : "hidden"}</li>
                   </ul>
                 </div>
               </aside>
@@ -525,6 +931,133 @@ function App(): JSX.Element {
       </main>
     </div>
   );
+}
+
+function fitViewportToBundle(bundle: BundlePayload | null): ViewportState {
+  const bounds = computeSceneBounds(bundle);
+  const paddingX = Math.max(bounds.width * 0.08, 2);
+  const paddingY = Math.max(bounds.height * 0.1, 2);
+  return {
+    x: bounds.minX - paddingX,
+    y: bounds.minY - paddingY,
+    width: bounds.width + paddingX * 2,
+    height: bounds.height + paddingY * 2,
+  };
+}
+
+function computeSceneBounds(bundle: BundlePayload | null): Bounds {
+  const points: Position3[] = [];
+
+  for (const road of bundle?.render_geometry?.roads ?? []) {
+    points.push(...(road.centerline ?? []));
+  }
+  for (const area of bundle?.render_geometry?.areas ?? []) {
+    points.push(...(area.polygon ?? []));
+  }
+  for (const intersection of bundle?.render_geometry?.intersections ?? []) {
+    points.push(...(intersection.polygon ?? []));
+  }
+  for (const node of bundle?.map_surface?.nodes ?? []) {
+    if (node.position) {
+      points.push(node.position);
+    }
+  }
+  for (const vehicle of bundle?.snapshot?.vehicles ?? []) {
+    if (vehicle.position) {
+      points.push(vehicle.position);
+    }
+  }
+
+  if (points.length === 0) {
+    return {
+      minX: -10,
+      minY: -6,
+      maxX: 10,
+      maxY: 6,
+      width: 20,
+      height: 12,
+    };
+  }
+
+  let minX = points[0][0];
+  let minY = points[0][1];
+  let maxX = points[0][0];
+  let maxY = points[0][1];
+
+  for (const [x, y] of points) {
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: Math.max(maxX - minX, 1),
+    height: Math.max(maxY - minY, 1),
+  };
+}
+
+function toPointString(points: Position3[] | undefined): string {
+  return (points ?? []).map(([x, y]) => `${x},${y}`).join(" ");
+}
+
+function toScaledPointString(points: Position3[] | undefined, bounds: Bounds): string {
+  return (points ?? [])
+    .map(([x, y]) => `${scaleX(x, bounds)},${scaleY(y, bounds)}`)
+    .join(" ");
+}
+
+function scaleX(x: number, bounds: Bounds): number {
+  return ((x - bounds.minX) / bounds.width) * 100;
+}
+
+function scaleY(y: number, bounds: Bounds): number {
+  return ((y - bounds.minY) / bounds.height) * 100;
+}
+
+function buildRoutePreviewPoints(
+  preview: RoutePreviewPayload,
+  nodes: NodePayload[],
+): Position3[] {
+  const routePoints: Position3[] = [];
+  for (const nodeId of preview.node_ids ?? []) {
+    const point = findNodePosition(nodes, nodeId);
+    if (point) {
+      routePoints.push(point);
+    }
+  }
+  return routePoints;
+}
+
+function findVehicleById(
+  bundle: BundlePayload | null,
+  vehicleId: number | null,
+): VehicleSnapshotPayload | null {
+  if (vehicleId === null) {
+    return null;
+  }
+  return (
+    (bundle?.snapshot?.vehicles ?? []).find((vehicle) => vehicle.vehicle_id === vehicleId) ??
+    null
+  );
+}
+
+function findEdgeById(edges: EdgePayload[], edgeId: number | null): EdgePayload | null {
+  if (edgeId === null) {
+    return null;
+  }
+  return edges.find((edge) => edge.edge_id === edgeId) ?? null;
+}
+
+function findNodePosition(nodes: NodePayload[], nodeId: number | undefined): Position3 | null {
+  if (nodeId === undefined) {
+    return null;
+  }
+  return nodes.find((node) => node.node_id === nodeId)?.position ?? null;
 }
 
 function formatMaybeNumber(value: number | null): string {
