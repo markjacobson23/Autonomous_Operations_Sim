@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 22 — Optional research wrapper
+Step 23 — Graphical replay viewer foundation
 
 ## Step status summary
 - Step 1: complete
@@ -25,62 +25,67 @@ Step 22 — Optional research wrapper
 - Step 19: complete
 - Step 20: complete
 - Step 21: complete
-- Step 22: active
+- Step 22: complete
+- Step 23: active
+- Step 24: not started
 
 ## What already exists
 The repository already has:
 - deterministic scenario parsing and summaries
 - executable scenario-driven runs
-- richer scenario-driven operational setup
-- a persistent runtime-facing `Vehicle` entity
+- richer operational scenario support
+- a persistent runtime-facing vehicle model
 - scenario-pack / batch execution
 - repeated-work workload execution
-- upgraded corridor-aware coordination
-- typed command/control surfaces with deterministic history
-- visualization replay state and a first viewer
-- a thin interaction layer translating viewer intent into commands
-- support for richer non-grid graph map scenarios with environment semantics
-- deterministic routing, execution, metrics, exports, and golden regression coverage
+- corridor-aware coordination
+- typed command/control surfaces
+- visualization replay state and a text viewer
+- viewer-facing interactions translated into commands
+- graph-map realism
+- optional research comparison tooling
 
 ## Goal of the current phase
-Add a thin optional research/experimentation wrapper that makes the simulator easier to use for comparative experiments without turning the simulator into a research-framework-first codebase.
+Build the first real graphical viewer on top of the existing visualization replay surface.
 
-The main Step 22 objective is:
-- expose a narrow experimentation wrapper on top of stable simulator surfaces
-- support controlled comparison workflows
-- preserve determinism and keep the wrapper clearly optional
-- avoid redesigning the simulator around RL or benchmark framework assumptions
+The main Step 23 objective is:
+- render map and vehicle replay state graphically
+- consume the existing visualization state rather than bypassing it
+- preserve deterministic playback over completed runs
+- establish the first true graphical visualization milestone without overcommitting to a heavy UI architecture
 
 ## In-scope work
 Work that is allowed right now:
-- add a thin optional experimentation wrapper or adapter
-- support a narrow workflow such as:
-  - policy comparison over existing scenario packs
-  - command/interaction sequence comparison
-  - wrapper-style step/reset interface for controlled experiments
-- reuse existing scenario execution, command, visualization, and export surfaces
-- add deterministic tests and at least one comparison/demo fixture
-- perform additive refactors and targeted normal refactors needed to keep the wrapper clearly optional
+- add a graphical replay viewer on top of `VisualizationState`
+- render nodes, edges, vehicles, and frame progression
+- support narrow replay controls over completed runs, such as:
+  - frame stepping
+  - play / pause
+  - reset to start
+- reuse existing visualization export/load/replay surfaces
+- add deterministic tests for visualization state consumption where feasible
+- add at least one regression or demonstrative fixture for graphical replay input/output behavior
+- perform additive refactors and targeted normal refactors needed to keep viewer boundaries clean
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- redesign the simulator around Gym/RL APIs
-- make research abstractions the new core architecture
-- add a broad training framework
-- add stochastic learning loops or optimization systems
-- overbuild a benchmark platform beyond the narrow optional wrapper goal
+- add live runtime manipulation yet
+- redesign the simulator around a render loop
+- bypass visualization state and read deep engine internals directly from the viewer
+- build a heavy product-style dashboard
+- add streaming/network architecture yet
+- start performance or language separation work prematurely
 
 ## Architectural guidance for this phase
-- The wrapper must sit on top of existing simulator surfaces.
-- Keep it clearly optional and adapter-like.
-- Preserve deterministic behavior and replayability.
-- Prefer one narrow experimental workflow over a broad framework abstraction.
-- Avoid changing core runtime ownership just to satisfy wrapper ergonomics.
+- The graphical viewer must consume visualization state as a client surface.
+- Start with replay of completed runs, not live simulation control.
+- Keep the viewer small and demonstrative.
+- Keep the simulator core authoritative.
+- Stay open to future mixed-stack separation, but do not force it yet.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 22
-Step 22 is complete when:
-- one thin optional experimentation/research wrapper exists
-- it reuses existing simulator surfaces cleanly
-- deterministic comparison or wrapper-style execution is covered by tests
+## Completion criteria for Step 23
+Step 23 is complete when:
+- a real graphical replay viewer exists
+- it renders map and vehicle progression from `VisualizationState`
+- replay remains deterministic for the same run
 - tests/lint/type checks pass
