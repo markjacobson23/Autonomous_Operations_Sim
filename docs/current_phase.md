@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 27 — Streaming/state sync surface
+Step 28 — Visual presentation and frontend quality upgrade
 
 ## Step status summary
 - Step 1: complete
@@ -30,8 +30,9 @@ Step 27 — Streaming/state sync surface
 - Step 24: complete
 - Step 25: complete
 - Step 26: complete
-- Step 27: active
-- Step 28: not started
+- Step 27: complete
+- Step 28: active
+- Step 29: not started
 
 ## What already exists
 The repository already has:
@@ -45,46 +46,48 @@ The repository already has:
 - graph-map realism
 - optional research comparison tooling
 - a live simulation session bridge
-- first real live interactive viewer actions
+- live interactive viewer actions
+- a transport-agnostic live state/command sync surface
 
 ## Goal of the current phase
-Formalize a cleaner live state/command synchronization surface between the simulator runtime and viewer layer.
+Upgrade the quality of the visualization/frontend experience so the simulator becomes significantly more legible, understandable, and pleasant to use.
 
-The main Step 27 objective is:
-- define a stable state-sync surface for live viewer consumption
-- separate runtime state publication from viewer toolkit details
-- preserve deterministic replay compatibility
-- prepare for later visual-quality work and possible mixed-stack viewer separation
+The main Step 28 objective is:
+- materially improve UI/UX quality
+- improve visual clarity and readability
+- make state, actions, and map context easier to understand
+- keep the simulator core authoritative while allowing the viewer/frontend stack to evolve if needed
 
 ## In-scope work
 Work that is allowed right now:
-- add a live state snapshot/update surface
-- define stable viewer-facing runtime sync records
-- support command/result publication through that sync surface
-- reuse live session, command history, and visualization state builders
-- add deterministic tests for repeated sync/update sequences
-- perform additive refactors and targeted normal refactors needed to clarify viewer/runtime boundaries
+- improve the visual presentation of the current viewer substantially
+- improve layout, styling, labeling, selection, and status presentation
+- improve how map, vehicles, blocked edges, and action context are communicated
+- evaluate whether the existing Python GUI remains the right implementation vehicle for near-term UI quality
+- perform a bounded frontend/viewer refactor if needed to materially improve UX
+- reuse the existing live sync, visualization, command, and session surfaces
+- add tests for any new stable viewer-facing assumptions where practical
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- redesign the simulator around networking or async frameworks
-- build a full remote protocol
-- bypass live session and command surfaces
-- focus on visual polish yet
+- redesign the simulator core around the viewer
+- weaken determinism or replay stability for UI convenience
 - start performance/scaling work yet
-- overbuild a product-grade frontend architecture
+- build a full product dashboard
+- introduce remote multi-user architecture
+- overbuild a frontend framework beyond what is needed for a major quality upgrade
 
 ## Architectural guidance for this phase
-- The simulator core remains authoritative.
-- The sync surface should describe runtime state and updates cleanly for viewers.
-- Keep it transport-agnostic.
-- Preserve deterministic ordering and replay compatibility.
-- Make future frontend separation easier, not harder.
+- Optimize for actual legibility and usability, not just “more features.”
+- The best UI/UX quality matters more than keeping the viewer in Python.
+- The simulator core, commands, sessions, and sync surfaces remain authoritative.
+- The frontend/viewer should consume those surfaces cleanly.
+- A bounded viewer-stack change is acceptable if it clearly improves quality.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 27
-Step 27 is complete when:
-- a stable live state/command sync surface exists
-- viewers can consume it cleanly without deep runtime coupling
-- deterministic behavior and replay compatibility remain intact
+## Completion criteria for Step 28
+Step 28 is complete when:
+- the viewer/frontend experience is materially clearer and more usable than the Step 27 baseline
+- map, vehicle, selection, blocked-edge, and action context are significantly easier to understand
+- simulator/runtime authority remains cleanly separated from presentation
 - tests/lint/type checks pass
