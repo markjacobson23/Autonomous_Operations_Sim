@@ -8,6 +8,7 @@ from autonomous_ops_sim.simulation import (
     BlockEdgeCommand,
     CommandApplicationRecord,
     CommandValidationError,
+    LiveSimulationSession,
     RepositionVehicleCommand,
     SimulationCommand,
     SimulationController,
@@ -16,6 +17,7 @@ from autonomous_ops_sim.simulation import (
 from autonomous_ops_sim.visualization.state import (
     VisualizationState,
     build_visualization_state_from_controller,
+    build_visualization_state_from_live_session,
 )
 
 
@@ -138,6 +140,32 @@ def apply_interactions(
     return tuple(apply_interaction(controller, interaction) for interaction in interactions)
 
 
+def apply_interaction_to_live_session(
+    session: LiveSimulationSession,
+    interaction: VisualizationInteraction,
+) -> CommandApplicationRecord:
+    """Validate and apply one viewer-facing interaction through a live session."""
+
+    command = interaction_to_command(interaction)
+    try:
+        return session.apply(command)
+    except CommandValidationError as exc:
+        raise InteractionValidationError(str(exc)) from exc
+
+
+def apply_interactions_to_live_session(
+    session: LiveSimulationSession,
+    interactions: tuple[VisualizationInteraction, ...]
+    | list[VisualizationInteraction],
+) -> tuple[CommandApplicationRecord, ...]:
+    """Apply interactions through the deterministic live session command surface."""
+
+    return tuple(
+        apply_interaction_to_live_session(session, interaction)
+        for interaction in interactions
+    )
+
+
 def build_visualization_state_from_interactions(
     controller: SimulationController,
     interactions: tuple[VisualizationInteraction, ...]
@@ -147,6 +175,17 @@ def build_visualization_state_from_interactions(
 
     apply_interactions(controller, interactions)
     return build_visualization_state_from_controller(controller)
+
+
+def build_visualization_state_from_live_interactions(
+    session: LiveSimulationSession,
+    interactions: tuple[VisualizationInteraction, ...]
+    | list[VisualizationInteraction],
+) -> VisualizationState:
+    """Apply interactions to a live session and return refreshed visualization state."""
+
+    apply_interactions_to_live_session(session, interactions)
+    return build_visualization_state_from_live_session(session)
 
 
 def interaction_to_dict(interaction: VisualizationInteraction) -> dict[str, Any]:

@@ -6,6 +6,14 @@ import math
 from pathlib import Path
 from typing import Any
 
+from autonomous_ops_sim.visualization.live_viewer import (
+    AssignSelectedDestinationViewerAction,
+    BlockEdgeViewerAction,
+    LiveViewerActionValidationError,
+    LiveViewerController,
+    RepositionSelectedVehicleViewerAction,
+    SelectVehicleViewerAction,
+)
 from autonomous_ops_sim.visualization.replay import get_replay_frame
 from autonomous_ops_sim.visualization.state import (
     MapSurface,
@@ -43,6 +51,7 @@ class RenderedVehicle:
     center: CanvasPoint
     operational_state: str
     color: str
+    selected: bool = False
 
 
 @dataclass(frozen=True)
@@ -198,6 +207,7 @@ def build_frame_render_plan(
     canvas_width: int = 900,
     canvas_height: int = 640,
     padding: int = 48,
+    selected_vehicle_id: int | None = None,
 ) -> FrameRenderPlan:
     """Project one visualization frame into deterministic canvas primitives."""
 
@@ -249,6 +259,7 @@ def build_frame_render_plan(
                 ),
                 operational_state=vehicle.operational_state,
                 color=_vehicle_color(vehicle.operational_state),
+                selected=vehicle.vehicle_id == selected_vehicle_id,
             )
             for vehicle in frame.vehicles
         ),
@@ -310,8 +321,8 @@ def render_frame_plan_to_canvas(
             vehicle.center.x + 12,
             vehicle.center.y + 12,
             fill=vehicle.color,
-            outline="#0f172a",
-            width=2,
+            outline="#f59e0b" if vehicle.selected else "#0f172a",
+            width=3 if vehicle.selected else 2,
             tags=("vehicle", f"vehicle-{vehicle.vehicle_id}"),
         )
         canvas.create_text(
@@ -493,6 +504,218 @@ class GraphicalReplayViewer:
 
     def _on_close(self) -> None:
         self.pause()
+        self.root.destroy()
+
+
+class GraphicalLiveViewer:
+    """Small Tkinter live viewer over a deterministic live-session controller."""
+
+    def __init__(
+        self,
+        controller: LiveViewerController,
+        *,
+        canvas_width: int = 900,
+        canvas_height: int = 640,
+    ) -> None:
+        import tkinter as tk
+
+        self._tk = tk
+        self.controller = controller
+        self.canvas_width = canvas_width
+        self.canvas_height = canvas_height
+
+        self.root = tk.Tk()
+        self.root.title("Autonomous Ops Graphical Live Viewer")
+
+        controls = tk.Frame(self.root)
+        controls.pack(fill="x", padx=12, pady=12)
+
+        tk.Label(controls, text="Vehicle").pack(side="left")
+        self.vehicle_var = tk.StringVar(value="")
+        tk.Entry(controls, textvariable=self.vehicle_var, width=6).pack(
+            side="left",
+            padx=(4, 4),
+        )
+        tk.Button(
+            controls,
+            text="Select",
+            command=self.select_vehicle,
+        ).pack(side="left", padx=(0, 12))
+
+        tk.Label(controls, text="Destination").pack(side="left")
+        self.destination_var = tk.StringVar(value="")
+        tk.Entry(controls, textvariable=self.destination_var, width=6).pack(
+            side="left",
+            padx=(4, 4),
+        )
+        tk.Button(
+            controls,
+            text="Assign",
+            command=self.assign_destination,
+        ).pack(side="left", padx=(0, 12))
+
+        tk.Label(controls, text="Edge").pack(side="left")
+        self.edge_var = tk.StringVar(value="")
+        tk.Entry(controls, textvariable=self.edge_var, width=6).pack(
+            side="left",
+            padx=(4, 4),
+        )
+        tk.Button(
+            controls,
+            text="Block",
+            command=self.block_edge,
+        ).pack(side="left", padx=(0, 12))
+
+        tk.Label(controls, text="Reposition").pack(side="left")
+        self.reposition_var = tk.StringVar(value="")
+        tk.Entry(controls, textvariable=self.reposition_var, width=6).pack(
+            side="left",
+            padx=(4, 4),
+        )
+        tk.Button(
+            controls,
+            text="Move",
+            command=self.reposition_vehicle,
+        ).pack(side="left", padx=(0, 12))
+
+        tk.Button(
+            controls,
+            text="Refresh",
+            command=self.refresh,
+        ).pack(side="left")
+
+        self.status_var = tk.StringVar()
+        tk.Label(self.root, textvariable=self.status_var, anchor="w").pack(
+            fill="x",
+            padx=12,
+            pady=(0, 4),
+        )
+
+        self.metadata_var = tk.StringVar()
+        tk.Label(
+            self.root,
+            textvariable=self.metadata_var,
+            anchor="w",
+            justify="left",
+        ).pack(fill="x", padx=12, pady=(0, 4))
+
+        self.message_var = tk.StringVar()
+        tk.Label(
+            self.root,
+            textvariable=self.message_var,
+            anchor="w",
+            justify="left",
+            fg="#92400e",
+        ).pack(fill="x", padx=12, pady=(0, 8))
+
+        self.canvas = tk.Canvas(
+            self.root,
+            width=self.canvas_width,
+            height=self.canvas_height,
+            background="#f8fafc",
+        )
+        self.canvas.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        self._render_current_state()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def run(self) -> None:
+        self.root.mainloop()
+
+    def refresh(self) -> None:
+        self.controller.refresh()
+        self.message_var.set("refreshed live visualization from session state")
+        self._render_current_state()
+
+    def select_vehicle(self) -> None:
+        self._apply_action_from_entry(
+            self.vehicle_var,
+            lambda value: SelectVehicleViewerAction(vehicle_id=value),
+        )
+
+    def assign_destination(self) -> None:
+        self._apply_action_from_entry(
+            self.destination_var,
+            lambda value: AssignSelectedDestinationViewerAction(
+                destination_node_id=value
+            ),
+        )
+
+    def block_edge(self) -> None:
+        self._apply_action_from_entry(
+            self.edge_var,
+            lambda value: BlockEdgeViewerAction(edge_id=value),
+        )
+
+    def reposition_vehicle(self) -> None:
+        self._apply_action_from_entry(
+            self.reposition_var,
+            lambda value: RepositionSelectedVehicleViewerAction(node_id=value),
+        )
+
+    def _apply_action_from_entry(
+        self,
+        field: Any,
+        action_builder: Any,
+    ) -> None:
+        try:
+            value = int(field.get())
+            result = self.controller.apply_action(action_builder(value))
+        except (TypeError, ValueError, LiveViewerActionValidationError) as exc:
+            self.message_var.set(str(exc))
+            return
+
+        if result.command_record is None:
+            self.message_var.set(
+                f"selected vehicle {result.selected_vehicle_id}"
+            )
+        else:
+            self.message_var.set(
+                "applied "
+                f"{result.command_record.command.command_type}"
+            )
+        self._render_current_state()
+
+    def _render_current_state(self) -> None:
+        state = self.controller.visualization_state
+        frame_index = len(state.frames) - 1
+        plan = build_frame_render_plan(
+            state,
+            frame_index=frame_index,
+            canvas_width=self.canvas_width,
+            canvas_height=self.canvas_height,
+            selected_vehicle_id=self.controller.selected_vehicle_id,
+        )
+        render_frame_plan_to_canvas(self.canvas, plan)
+
+        current_frame = state.frames[frame_index]
+        selected_vehicle_text = (
+            "none"
+            if self.controller.selected_vehicle_id is None
+            else str(self.controller.selected_vehicle_id)
+        )
+        self.status_var.set(
+            f"time={current_frame.timestamp_s}s "
+            f"selected_vehicle={selected_vehicle_text} "
+            f"trigger={current_frame.trigger.source}:{current_frame.trigger.event_name}"
+        )
+
+        vehicle_state_counts: dict[str, int] = {}
+        for vehicle in current_frame.vehicles:
+            vehicle_state_counts[vehicle.operational_state] = (
+                vehicle_state_counts.get(vehicle.operational_state, 0) + 1
+            )
+        state_counts = ", ".join(
+            f"{name}={count}"
+            for name, count in sorted(vehicle_state_counts.items())
+        ) or "none"
+        self.metadata_var.set(
+            f"blocked_edges={list(current_frame.blocked_edge_ids)} "
+            f"vehicles={len(current_frame.vehicles)} "
+            f"states={state_counts}"
+        )
+
+    def _on_close(self) -> None:
         self.root.destroy()
 
 
