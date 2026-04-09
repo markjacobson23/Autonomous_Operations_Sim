@@ -192,6 +192,17 @@ type Bounds = {
   height: number;
 };
 
+type SelectedTarget =
+  | { kind: "vehicle"; vehicleId: number }
+  | { kind: "road"; roadId: string }
+  | { kind: "queue"; edgeId: number }
+  | { kind: "hazard"; edgeId: number };
+
+type HoverTarget = {
+  label: string;
+  detail: string;
+};
+
 const architecture = {
   primaryStack: "React + TypeScript + Vite",
   authority: "Python simulator remains authoritative",
@@ -218,6 +229,8 @@ const defaultLayers: LayerState = {
 function App(): JSX.Element {
   const minimapRef = useRef<SVGSVGElement | null>(null);
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
+  const [selectedTarget, setSelectedTarget] = useState<SelectedTarget | null>(null);
+  const [hoverTarget, setHoverTarget] = useState<HoverTarget | null>(null);
   const [bootstrap, setBootstrap] = useState<BootstrapSummary>({
     loadState: "idle",
     surfaceName: "unbound",
@@ -345,9 +358,30 @@ function App(): JSX.Element {
   const suggestions = bootstrap.commandCenter.ai_assist?.suggestions ?? [];
   const anomalies = bootstrap.commandCenter.ai_assist?.anomalies ?? [];
   const explanations = bootstrap.commandCenter.ai_assist?.explanations ?? [];
-  const selectedVehicleId =
+  const defaultVehicleId =
     bootstrap.commandCenter.selected_vehicle_ids?.[0] ?? inspections[0]?.vehicle_id ?? null;
+  const selectedVehicleId =
+    selectedTarget?.kind === "vehicle" ? selectedTarget.vehicleId : defaultVehicleId;
   const selectedVehicle = findVehicleById(bundle, selectedVehicleId);
+  const selectedInspection = selectedVehicleId
+    ? inspections.find((inspection) => inspection.vehicle_id === selectedVehicleId) ?? null
+    : null;
+  const selectedRoad =
+    selectedTarget?.kind === "road"
+      ? (bundle?.render_geometry?.roads ?? []).find(
+          (road) => road.road_id === selectedTarget.roadId,
+        ) ?? null
+      : null;
+  const selectedQueueRecord =
+    selectedTarget?.kind === "queue"
+      ? (bundle?.traffic_baseline?.queue_records ?? []).find(
+          (record) => record.edge_id === selectedTarget.edgeId,
+        ) ?? null
+      : null;
+  const selectedHazardEdge =
+    selectedTarget?.kind === "hazard"
+      ? findEdgeById(bundle?.map_surface?.edges ?? [], selectedTarget.edgeId)
+      : null;
 
   function panView(deltaX: number, deltaY: number): void {
     setViewport((current) => ({
@@ -412,6 +446,34 @@ function App(): JSX.Element {
     }));
   }
 
+  function selectVehicle(vehicleId: number | undefined): void {
+    if (vehicleId === undefined) {
+      return;
+    }
+    setSelectedTarget({ kind: "vehicle", vehicleId });
+  }
+
+  function selectRoad(roadId: string | undefined): void {
+    if (!roadId) {
+      return;
+    }
+    setSelectedTarget({ kind: "road", roadId });
+  }
+
+  function selectQueue(edgeId: number | undefined): void {
+    if (edgeId === undefined) {
+      return;
+    }
+    setSelectedTarget({ kind: "queue", edgeId });
+  }
+
+  function selectHazard(edgeId: number | undefined): void {
+    if (edgeId === undefined) {
+      return;
+    }
+    setSelectedTarget({ kind: "hazard", edgeId });
+  }
+
   const minimapRect = {
     x: ((viewport.x - bounds.minX) / bounds.width) * 100,
     y: ((viewport.y - bounds.minY) / bounds.height) * 100,
@@ -423,12 +485,12 @@ function App(): JSX.Element {
     <div className="shell">
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 44 Navigation Shell</p>
+          <p className="eyebrow">Step 45 Interaction Baseline</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
-            The serious frontend now has camera controls, a bundle-driven scene graph,
-            layer toggles, selected-vehicle focus, and minimap navigation, while direct
-            scene selection still waits for the next step.
+            The serious frontend now supports direct click selection for vehicles,
+            roads, queues, and blocked edges, plus hover summaries and selected-object
+            highlighting on top of the existing navigation shell.
           </p>
         </div>
         <div className="masthead-meta">
@@ -487,7 +549,7 @@ function App(): JSX.Element {
               </div>
               <div className="status-stack">
                 <span className="status-pill">Camera controls active</span>
-                <span className="status-pill secondary">Selection focus baseline</span>
+                <span className="status-pill secondary">Hover and selection active</span>
               </div>
             </div>
 
@@ -546,6 +608,7 @@ function App(): JSX.Element {
                   className="stage-canvas"
                   viewBox={`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`}
                   aria-label="Simulation scene graph"
+                  onMouseLeave={() => setHoverTarget(null)}
                 >
                   <rect
                     x={bounds.minX}
@@ -569,8 +632,20 @@ function App(): JSX.Element {
                       <polyline
                         key={road.road_id ?? `road-${index}`}
                         points={toPointString(road.centerline)}
-                        className={`scene-road scene-road-${road.road_class ?? "connector"}`}
+                        className={`scene-road scene-road-${road.road_class ?? "connector"} ${
+                          selectedTarget?.kind === "road" &&
+                          selectedTarget.roadId === road.road_id
+                            ? "selected"
+                            : ""
+                        }`}
                         strokeWidth={Math.max(road.width_m ?? 1.4, 0.9)}
+                        onClick={() => selectRoad(road.road_id)}
+                        onMouseEnter={() =>
+                          setHoverTarget({
+                            label: road.road_id ?? "road",
+                            detail: `${road.directionality ?? "unknown"} · ${road.lane_count ?? 0} lane(s)`,
+                          })
+                        }
                       />
                     ))}
 
@@ -597,6 +672,12 @@ function App(): JSX.Element {
                           key={`route-preview-${previewIndex}`}
                           points={toPointString(routePoints)}
                           className="scene-route-preview"
+                          onMouseEnter={() =>
+                            setHoverTarget({
+                              label: `Route preview V${preview.vehicle_id ?? "?"}`,
+                              detail: preview.reason ?? "actionable preview",
+                            })
+                          }
                         />
                       );
                     })}
@@ -623,7 +704,19 @@ function App(): JSX.Element {
                           y1={start[1]}
                           x2={end[0]}
                           y2={end[1]}
-                          className="scene-reservation"
+                          className={`scene-reservation ${
+                            selectedTarget?.kind === "queue" &&
+                            selectedTarget.edgeId === record.edge_id
+                              ? "selected"
+                              : ""
+                          }`}
+                          onClick={() => selectQueue(record.edge_id)}
+                          onMouseEnter={() =>
+                            setHoverTarget({
+                              label: `Queue edge ${record.edge_id ?? "?"}`,
+                              detail: `${record.vehicle_ids?.length ?? 0} vehicle(s) queued`,
+                            })
+                          }
                         />
                       );
                     })}
@@ -647,7 +740,19 @@ function App(): JSX.Element {
                           y1={start[1]}
                           x2={end[0]}
                           y2={end[1]}
-                          className="scene-hazard"
+                          className={`scene-hazard ${
+                            selectedTarget?.kind === "hazard" &&
+                            selectedTarget.edgeId === edgeId
+                              ? "selected"
+                              : ""
+                          }`}
+                          onClick={() => selectHazard(edgeId)}
+                          onMouseEnter={() =>
+                            setHoverTarget({
+                              label: `Blocked edge ${edgeId}`,
+                              detail: "Conflict / hazard overlay",
+                            })
+                          }
                         />
                       );
                     })}
@@ -660,6 +765,13 @@ function App(): JSX.Element {
                         <g
                           key={vehicle.vehicle_id ?? `vehicle-${vehicleIndex}`}
                           className={isSelected ? "scene-vehicle selected" : "scene-vehicle"}
+                          onClick={() => selectVehicle(vehicle.vehicle_id)}
+                          onMouseEnter={() =>
+                            setHoverTarget({
+                              label: `Vehicle ${vehicle.vehicle_id ?? vehicleIndex}`,
+                              detail: vehicle.operational_state ?? "unknown_state",
+                            })
+                          }
                         >
                           <circle cx={position[0]} cy={position[1]} r={0.55} />
                           <text x={position[0]} y={position[1] - 0.85}>
@@ -671,13 +783,19 @@ function App(): JSX.Element {
                 </svg>
 
                 <div className="focus-card">
-                  <strong>Camera baseline is now live</strong>
+                  <strong>Direct selection baseline is now live</strong>
                   <p>
-                    Pan, zoom, fit-to-scene, selected-vehicle focus, scene layers, and
-                    minimap navigation are active. Direct object picking still starts in
-                    Step 45.
+                    Vehicles, roads, queues, and blocked edges now support direct click
+                    selection and hover summaries. Batch actions and edit tools still wait
+                    for later steps.
                   </p>
                 </div>
+                {hoverTarget ? (
+                  <div className="hover-card" aria-live="polite">
+                    <strong>{hoverTarget.label}</strong>
+                    <p>{hoverTarget.detail}</p>
+                  </div>
+                ) : null}
               </div>
 
               <aside className="overview-panel">
@@ -735,6 +853,9 @@ function App(): JSX.Element {
                       {layers.reservations ? "visible" : "hidden"}
                     </li>
                     <li>Hazards: {layers.hazards ? "visible" : "hidden"}</li>
+                    <li>
+                      Selection: {describeSelectedTarget(selectedTarget, selectedVehicleId)}
+                    </li>
                   </ul>
                 </div>
               </aside>
@@ -829,10 +950,81 @@ function App(): JSX.Element {
                 <p className="eyebrow">Inspector Region</p>
                 <h2 id="inspector-title">Vehicle Inspection</h2>
               </div>
-              <span className="status-pill secondary">{inspections.length} records</span>
+              <span className="status-pill secondary">
+                {selectedTarget ? describeSelectedBadge(selectedTarget) : `${inspections.length} records`}
+              </span>
             </div>
             <div className="section-stack">
-              {inspections.length > 0 ? (
+              {selectedTarget?.kind === "road" && selectedRoad ? (
+                <article className="inspection-card">
+                  <div className="inspection-header">
+                    <strong>{selectedRoad.road_id ?? "road"}</strong>
+                    <span>{selectedRoad.road_class ?? "connector"}</span>
+                  </div>
+                  <ul className="mini-list">
+                    <li>Directionality: {selectedRoad.directionality ?? "unknown"}</li>
+                    <li>Lanes: {formatMaybeNumber(selectedRoad.lane_count ?? null)}</li>
+                    <li>Width: {selectedRoad.width_m ?? "pending"}m</li>
+                    <li>Edges: {(selectedRoad.edge_ids ?? []).join(", ") || "none"}</li>
+                  </ul>
+                </article>
+              ) : null}
+
+              {selectedTarget?.kind === "queue" && selectedQueueRecord ? (
+                <article className="inspection-card">
+                  <div className="inspection-header">
+                    <strong>Queue Edge {selectedQueueRecord.edge_id ?? "?"}</strong>
+                    <span>reservation queue</span>
+                  </div>
+                  <ul className="mini-list">
+                    <li>Queued vehicles: {selectedQueueRecord.vehicle_ids?.join(", ") || "none"}</li>
+                    <li>Queue length: {selectedQueueRecord.vehicle_ids?.length ?? 0}</li>
+                  </ul>
+                </article>
+              ) : null}
+
+              {selectedTarget?.kind === "hazard" && selectedHazardEdge ? (
+                <article className="inspection-card">
+                  <div className="inspection-header">
+                    <strong>Blocked Edge {selectedHazardEdge.edge_id ?? "?"}</strong>
+                    <span>conflict area</span>
+                  </div>
+                  <ul className="mini-list">
+                    <li>Start node: {formatMaybeNumber(selectedHazardEdge.start_node_id ?? null)}</li>
+                    <li>End node: {formatMaybeNumber(selectedHazardEdge.end_node_id ?? null)}</li>
+                    <li>Distance: {selectedHazardEdge.distance ?? "pending"}</li>
+                    <li>Speed limit: {selectedHazardEdge.speed_limit ?? "pending"}</li>
+                  </ul>
+                </article>
+              ) : null}
+
+              {selectedInspection ? (
+                <article className="inspection-card">
+                  <div className="inspection-header">
+                    <strong>Vehicle {formatMaybeNumber(selectedInspection.vehicle_id ?? null)}</strong>
+                    <span>{selectedInspection.operational_state ?? "unknown_state"}</span>
+                  </div>
+                  <ul className="mini-list">
+                    <li>Node: {formatMaybeNumber(selectedInspection.current_node_id ?? null)}</li>
+                    <li>ETA: {formatSeconds(selectedInspection.eta_s ?? null)}</li>
+                    <li>Job: {selectedInspection.current_job_id ?? "none"}</li>
+                    <li>Wait: {selectedInspection.wait_reason ?? "none"}</li>
+                  </ul>
+                  <div className="diagnostic-row">
+                    {(selectedInspection.diagnostics ?? []).slice(0, 3).map((diagnostic, diagIndex) => (
+                      <span
+                        key={`${diagnostic.code ?? "diag"}-${diagIndex}`}
+                        className="diagnostic-pill"
+                      >
+                        {(diagnostic.severity ?? "info").toUpperCase()}:{" "}
+                        {diagnostic.code ?? "diagnostic"}
+                      </span>
+                    ))}
+                  </div>
+                </article>
+              ) : null}
+
+              {!selectedTarget && inspections.length > 0 ? (
                 inspections.slice(0, 2).map((inspection, index) => (
                   <article
                     key={`${inspection.vehicle_id ?? "inspection"}-${index}`}
@@ -861,12 +1053,14 @@ function App(): JSX.Element {
                     </div>
                   </article>
                 ))
-              ) : (
+              ) : null}
+
+              {!selectedTarget && inspections.length === 0 ? (
                 <div className="empty-state">
                   Inspection surfaces will populate here once a live session carries
                   selected vehicles and runtime diagnostics.
                 </div>
-              )}
+              ) : null}
             </div>
           </section>
 
@@ -1058,6 +1252,38 @@ function findNodePosition(nodes: NodePayload[], nodeId: number | undefined): Pos
     return null;
   }
   return nodes.find((node) => node.node_id === nodeId)?.position ?? null;
+}
+
+function describeSelectedTarget(
+  selectedTarget: SelectedTarget | null,
+  selectedVehicleId: number | null,
+): string {
+  if (selectedTarget?.kind === "road") {
+    return `road ${selectedTarget.roadId}`;
+  }
+  if (selectedTarget?.kind === "queue") {
+    return `queue edge ${selectedTarget.edgeId}`;
+  }
+  if (selectedTarget?.kind === "hazard") {
+    return `blocked edge ${selectedTarget.edgeId}`;
+  }
+  if (selectedVehicleId !== null) {
+    return `vehicle ${selectedVehicleId}`;
+  }
+  return "none";
+}
+
+function describeSelectedBadge(selectedTarget: SelectedTarget): string {
+  if (selectedTarget.kind === "vehicle") {
+    return `vehicle ${selectedTarget.vehicleId}`;
+  }
+  if (selectedTarget.kind === "road") {
+    return "road";
+  }
+  if (selectedTarget.kind === "queue") {
+    return "queue";
+  }
+  return "hazard";
 }
 
 function formatMaybeNumber(value: number | null): string {

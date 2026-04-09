@@ -350,8 +350,22 @@ h3 {
   padding: 18px;
 }
 
+.hover-card {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 1;
+  max-width: 250px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 252, 248, 0.96);
+  box-shadow: 0 14px 34px rgba(28, 36, 48, 0.14);
+}
+
 .focus-card p,
 .overview-card p,
+.hover-card p,
 .status-copy,
 .empty-state {
   margin: 8px 0 0;
@@ -512,6 +526,7 @@ h3 {
   stroke: rgba(52, 64, 74, 0.76);
   stroke-linecap: round;
   stroke-linejoin: round;
+  cursor: pointer;
 }
 
 .scene-road-primary {
@@ -535,17 +550,20 @@ h3 {
   stroke: rgba(29, 78, 216, 0.55);
   stroke-width: 0.22;
   stroke-dasharray: 0.4 0.35;
+  cursor: pointer;
 }
 
 .scene-hazard {
   stroke: rgba(182, 75, 58, 0.82);
   stroke-width: 0.42;
+  cursor: pointer;
 }
 
 .scene-vehicle circle {
   fill: rgba(0, 108, 103, 0.95);
   stroke: white;
   stroke-width: 0.14;
+  cursor: pointer;
 }
 
 .scene-vehicle text {
@@ -559,6 +577,21 @@ h3 {
   fill: rgba(201, 106, 24, 0.96);
   stroke: rgba(255, 255, 255, 0.95);
   stroke-width: 0.18;
+}
+
+.scene-road.selected {
+  stroke: rgba(201, 106, 24, 0.96);
+  stroke-width: 1.85;
+}
+
+.scene-reservation.selected {
+  stroke: rgba(0, 108, 103, 0.98);
+  stroke-width: 0.42;
+}
+
+.scene-hazard.selected {
+  stroke: rgba(201, 106, 24, 1);
+  stroke-width: 0.65;
 }
 
 .minimap {
