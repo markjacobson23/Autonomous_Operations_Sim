@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 23 — Graphical replay viewer foundation
+Step 24 — Playback control maturity
 
 ## Step status summary
 - Step 1: complete
@@ -26,66 +26,61 @@ Step 23 — Graphical replay viewer foundation
 - Step 20: complete
 - Step 21: complete
 - Step 22: complete
-- Step 23: active
-- Step 24: not started
+- Step 23: complete
+- Step 24: active
+- Step 25: not started
 
 ## What already exists
 The repository already has:
-- deterministic scenario parsing and summaries
-- executable scenario-driven runs
-- richer operational scenario support
-- a persistent runtime-facing vehicle model
-- scenario-pack / batch execution
-- repeated-work workload execution
-- corridor-aware coordination
-- typed command/control surfaces
-- visualization replay state and a text viewer
-- viewer-facing interactions translated into commands
+- deterministic scenario parsing and execution
+- operational jobs/resources/dispatch/workloads
+- command/control surfaces with deterministic history
+- visualization replay state and text viewer
+- interaction translation into commands
 - graph-map realism
-- optional research comparison tooling
+- research comparison tooling
+- a first graphical replay viewer consuming visualization state
 
 ## Goal of the current phase
-Build the first real graphical viewer on top of the existing visualization replay surface.
+Strengthen playback control for the graphical replay viewer so replay becomes easier to inspect and navigate before introducing live runtime interaction.
 
-The main Step 23 objective is:
-- render map and vehicle replay state graphically
-- consume the existing visualization state rather than bypassing it
-- preserve deterministic playback over completed runs
-- establish the first true graphical visualization milestone without overcommitting to a heavy UI architecture
+The main Step 24 objective is:
+- improve replay navigation and control
+- support richer deterministic playback UX
+- preserve the viewer as a consumer of completed replay state
+- prepare the viewer for later live-control integration
 
 ## In-scope work
 Work that is allowed right now:
-- add a graphical replay viewer on top of `VisualizationState`
-- render nodes, edges, vehicles, and frame progression
-- support narrow replay controls over completed runs, such as:
-  - frame stepping
-  - play / pause
-  - reset to start
-- reuse existing visualization export/load/replay surfaces
-- add deterministic tests for visualization state consumption where feasible
-- add at least one regression or demonstrative fixture for graphical replay input/output behavior
-- perform additive refactors and targeted normal refactors needed to keep viewer boundaries clean
+- extend replay controls with features such as:
+  - previous frame
+  - jump to first / last frame
+  - jump to specific frame index
+  - optional speed controls
+  - current-frame metadata display improvements
+- keep playback deterministic over completed replay frames
+- extend the graphical viewer in a narrow way
+- add tests for replay navigation and stable controller behavior
+- perform additive refactors and targeted normal refactors needed to keep playback logic clean
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- add live runtime manipulation yet
-- redesign the simulator around a render loop
-- bypass visualization state and read deep engine internals directly from the viewer
-- build a heavy product-style dashboard
-- add streaming/network architecture yet
-- start performance or language separation work prematurely
+- add live runtime manipulation
+- inject commands during an active graphical session
+- redesign the simulator around a live event loop
+- add networking/streaming yet
+- bypass replay state to reach directly into engine internals
+- build a heavy product UI
 
 ## Architectural guidance for this phase
-- The graphical viewer must consume visualization state as a client surface.
-- Start with replay of completed runs, not live simulation control.
-- Keep the viewer small and demonstrative.
-- Keep the simulator core authoritative.
-- Stay open to future mixed-stack separation, but do not force it yet.
+- The viewer still consumes completed replay state only.
+- Playback features should remain deterministic and frame-based.
+- Keep playback logic separate from future live-runtime control.
+- Improve inspectability without overbuilding UI complexity.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 23
-Step 23 is complete when:
-- a real graphical replay viewer exists
-- it renders map and vehicle progression from `VisualizationState`
-- replay remains deterministic for the same run
+## Completion criteria for Step 24
+Step 24 is complete when:
+- replay controls are meaningfully stronger than the Step 23 baseline
+- playback/navigation remains deterministic
 - tests/lint/type checks pass
