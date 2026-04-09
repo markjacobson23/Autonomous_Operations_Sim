@@ -2,294 +2,219 @@
 ## `docs/roadmap.md`
 
 ```markdown
-# Expansion Roadmap
+# Post-Step-22 Expansion Roadmap
 
-This roadmap begins after completion of the original foundation roadmap through Step 11.
+The original roadmap through Step 22 is complete.
 
-The foundation phase established:
-- deterministic topology/runtime separation
-- routing and cost-model injection
-- simulated-time execution
-- jobs/tasks/resources
-- baseline dispatch
-- multi-vehicle reservation-based conflict handling
-- vehicle behavior FSM
-- metrics/export/golden regression
+That roadmap established:
+- deterministic scenario execution
+- jobs/resources/dispatch/workloads
+- vehicle runtime state
+- coordination via reservations/corridors
+- command/control surfaces
+- visualization replay state
+- interaction translation
+- graph-map realism
+- optional research comparison tooling
 
-The purpose of this roadmap is to grow that deterministic simulator core into a more executable, extensible, and eventually interactive simulation platform without losing clean boundaries.
+The next roadmap focuses on three major expansion tracks:
+
+1. real graphical visualization
+2. more realistic live interactivity
+3. performance/scaling maturity
+
+This roadmap should remain incremental, deterministic, and architecture-first.
 
 ---
 
 ## Guiding principles
 
-- Determinism remains first-class.
-- Trace-centered metrics/export remain the stable outward-facing analysis surface.
-- Static topology remains separate from runtime state.
-- Prefer additive, production-style evolution over rewrites.
-- Introduce visualization and interactivity only after the runtime/control surfaces are strong enough to support them cleanly.
+- Preserve the simulator’s identity as an operations/fleet-level simulator, not a physics simulator.
+- Keep the Python simulator core authoritative unless profiling or capability needs justify separation.
+- Treat viewers and external frontends as consumers of stable simulator surfaces.
+- Treat performance/scaling work as benchmark-driven, not assumption-driven.
+- Prefer disciplined staging over building UI, performance, and runtime complexity all at once.
 
 ---
 
-## Step 12 — Executable scenario harness
+## Step 23 — Graphical replay viewer foundation
 
 ### Goal
-Turn scenario files into real executable simulator runs rather than validation-only inputs.
+Build the first real graphical viewer on top of the existing visualization replay surface.
 
-### Why this comes first
-The simulator already has execution, metrics, and exports, but scenario JSON currently stops at validation/summary rather than driving a full run. This is the highest immediate-value gap because it converts the system from a library-oriented simulator core into a runnable scenario platform. :contentReference[oaicite:1]{index=1}
+### Why first
+The repo already has deterministic visualization state and a text viewer. The next natural milestone is a real graphical replay viewer that consumes that state without changing simulator ownership. The research specifically identifies interactive UI/streaming as a next major gap, while noting the current replay/state layering is already a strength. :contentReference[oaicite:3]{index=3} :contentReference[oaicite:4]{index=4}
 
 ### Expected outcomes
-- scenario files can drive real simulator runs
-- CLI can execute scenarios, not just summarize them
-- scenario-driven runs produce deterministic export JSON
-- at least one scenario-run golden regression fixture exists
+- a real graphical viewer for completed runs
+- map rendering from visualization state
+- rendered vehicle positions/states over replay frames
+- deterministic playback controls over completed runs
 
-### Main likely modules
-- scenario execution/orchestration layer
-- CLI integration
-- minimal scenario schema extension only if needed
-
-### Out of scope
-- visualization
-- live interactive control
-- vehicle model consolidation
-- coordination redesign
+### Notes
+This should be the smallest version of “real visualization” that is meaningfully better than the text viewer.
 
 ---
 
-## Step 13 — Scenario schema for operations
+## Step 24 — Playback control maturity
 
 ### Goal
-Expand scenario/config schema so scenarios can express operational work, not just map + vehicles.
-
-### Why it follows Step 12
-First establish a working execution harness. Then expand what scenarios can describe.
+Strengthen replay control beyond static frame rendering.
 
 ### Expected outcomes
-- scenario schema can express:
-  - initial world conditions
-  - jobs/tasks
-  - resources
-  - dispatcher choice/config
-- deterministic parsing into runtime-ready structures
-- scenario-driven runs cover more of the simulator without requiring handwritten Python setup
+- play / pause / step / jump-to-frame
+- frame indexing and timeline controls
+- deterministic playback UX over existing replay frames
+- viewer remains a consumer of replay state
 
-### Main likely modules
-- `simulation/scenario.py`
-- `io/scenario_loader.py`
-- scenario execution/orchestration layer
-- docs and example scenarios
-
-### Out of scope
-- large schema generalization
-- visualization
-- control-command layer
+### Why it follows Step 23
+A graphical viewer is useful first; richer playback control is the next layer before true live runtime manipulation.
 
 ---
 
-## Step 14 — Persistent vehicle entity model
+## Step 25 — Live control loop bridge
 
 ### Goal
-Promote a real persistent vehicle/entity model instead of threading scalar vehicle inputs through many execution paths.
-
-### Why it follows Step 13
-Once scenarios can drive real runs, the next pressure point is the still-minimal `Vehicle` model and scattered scalar vehicle state. The research identified this as a major likely refactor target. :contentReference[oaicite:2]{index=2}
+Bridge the existing command/control layer into a more realistic live runtime control loop.
 
 ### Expected outcomes
-- a persistent `Vehicle` entity becomes the main execution-facing representation
-- vehicle state relates cleanly to:
-  - `VehicleProcess`
-  - `VehicleBehaviorController`
-  - trace
-  - runtime manipulation
-- reduced scalar argument threading
+- a narrow runtime session concept
+- controlled application of commands during an active session
+- consistent command ordering and replay capture
+- no direct viewer mutation of engine internals
 
-### Main likely modules
-- `vehicles/vehicle.py`
-- `simulation/vehicle_process.py`
-- `simulation/engine.py`
-- behavior integration points
-
-### Out of scope
-- visualization
-- interactive control UI
-- full fleet-management optimization
+### Why it follows playback maturity
+The report highlights interactive UI/streaming as a next gap, but the clean way to get there is through the existing command/control architecture, not a UI-first rewrite. :contentReference[oaicite:5]{index=5}
 
 ---
 
-## Step 15 — Evaluation and scenario-pack harness
+## Step 26 — Live interactive viewer actions
 
 ### Goal
-Support scenario packs, batch execution, and benchmark-style comparisons.
-
-### Why it follows Step 14
-Once scenarios run end-to-end and vehicles have stronger runtime identity, batch execution becomes much more useful and stable.
-
-### Expected outcomes
-- batch scenario execution
-- stable summary aggregation across runs
-- deterministic comparison harness
-- multiple golden-style scenario packs
-
-### Main likely modules
-- scenario pack runner
-- metrics aggregation utilities
-- export/report conventions
-
-### Out of scope
-- dashboard/UI
-- interactive control
-
----
-
-## Step 16 — Richer operations realism
-
-### Goal
-Move from isolated jobs to richer ongoing fleet/operations studies.
-
-### Expected outcomes
-- multiple jobs over time
-- stronger workload modeling
-- utilization-oriented metrics
-- repeated haul-cycle style simulation
-- richer resource-network realism
-
-### Why it comes here
-This is where the simulator becomes more like a true operations-study platform, but it should come after executable scenarios, stronger entity modeling, and batch evaluation support.
-
-### Out of scope
-- advanced coordination algorithm redesign
-- live UI-first development
-
----
-
-## Step 17 — Coordination upgrade
-
-### Goal
-Improve multi-vehicle coordination beyond the narrow deterministic reservation baseline.
-
-### Expected outcomes
-- stronger reservation indexing/scalability
-- better deadlock observability/prevention
-- bounded replanning or corridor/intersection semantics
-- deterministic regression cases for upgraded coordination
-
-### Why it comes after evaluation growth
-Coordination upgrades are high-risk and easy to destabilize. They should be introduced only after the simulator has strong scenario and regression harnesses to measure the change properly. The research explicitly warns that coordination upgrades are costly and can break determinism if introduced too early. :contentReference[oaicite:3]{index=3}
-
-### Out of scope
-- full optimal MAPF for all use cases
-- giant algorithmic framework rewrites
-
----
-
-## Step 18 — Control-command surface
-
-### Goal
-Add a replayable command/event surface for controlling a run.
-
-### Why this must come before interactive UI
-Real-time interaction should not directly mutate engine state arbitrarily. A control-command surface is the clean architectural bridge between deterministic simulation and interactive tooling. The research explicitly recommends a control command/event interface for replayability and auditability. :contentReference[oaicite:4]{index=4}
-
-### Expected outcomes
-- explicit commands such as:
-  - assign destination
-  - inject closure
-  - reposition vehicle
-  - pause/resume/step
-- commands recorded in a replayable form
-- deterministic offline mode and interactive mode can share the same runtime contract
-
-### Out of scope
-- polished end-user viewer
-- full UI framework commitment unless justified
-
----
-
-## Step 19 — Visualization state surface and first viewer
-
-### Goal
-Make the simulator watchable in real time through a thin visualization surface.
-
-### Expected outcomes
-- visualization/state stream or snapshot surface
-- minimal viewer that can:
-  - display map/topology
-  - display vehicle positions/state
-  - play/pause/step playback
-- deterministic replay of previously executed runs
-
-### Why it follows the command surface
-Visualization should consume stable simulator state/control surfaces rather than forcing architecture from the UI downward.
-
-### Out of scope
-- large dashboard
-- heavy animation framework
-- broad product UI
-
----
-
-## Step 20 — Interactive manipulation layer
-
-### Goal
-Support live interaction with running simulations.
+Support first real live interactions through the graphical viewer.
 
 ### Expected outcomes
 - click-to-assign destination
-- drag/reposition vehicle
-- inject closures/blocked edges during execution
-- inspect vehicle/job/resource state live
-- preserve replayability through recorded control commands
+- select/reposition vehicle in a bounded way
+- inject blocked edges / closures during a live session
+- inspect vehicle/state data live
 
-### Why it follows visualization
-Once the simulator can be watched and controlled through explicit surfaces, live manipulation becomes a natural extension rather than a source of architectural chaos.
+### Why it follows Step 25
+A live viewer should sit on top of a mature control loop bridge rather than invent its own runtime semantics.
 
 ---
 
-## Step 21 — Environment/map realism expansion
+## Step 27 — Streaming/state sync surface
 
 ### Goal
-Expand beyond the current narrow map semantics and grid-first scenario assumptions.
+Formalize a state/command synchronization surface between simulator runtime and viewer.
 
 ### Expected outcomes
-- richer map/environment semantics
-- zones/work areas/site metadata
-- better import/export paths for non-grid network data
-- stronger domain realism for specific operational settings
+- stable runtime snapshot/update surface
+- explicit control messages/events
+- clearer boundary for future multi-process or mixed-stack visualization
+- deterministic replay compatibility
 
-### Why it is later
-Map realism is valuable, but the research ranked it below scenario execution and entity/harness work because execution/control surfaces need to be stronger first. :contentReference[oaicite:5]{index=5}
+### Why it matters
+This is the step where the architecture becomes ready for a cleaner separation between simulator core and richer frontend stacks if needed.
 
 ---
 
-## Step 22 — Optional research wrapper
+## Step 28 — Profiling and benchmark harness
 
 ### Goal
-Add a minimal external experimentation wrapper only if it remains clearly optional.
+Measure performance and scaling behavior before optimization or language splitting.
 
-### Possible outcomes
-- policy comparison harness
-- optional Gymnasium-style wrapper
-- research-oriented control experiments
+### Expected outcomes
+- routing benchmarks
+- reservation/coordination benchmarks
+- scenario-pack throughput benchmarks
+- replay/export size and generation benchmarks
+- stable benchmark reporting
 
-### Constraints
-This should remain an adapter on top of stable simulator surfaces, not a redesign of the simulator around a research framework.
+### Why this comes before deep optimization
+The report explicitly points to likely bottlenecks in routing, reservation scanning, and replay/export growth, and recommends profiling/benchmarks before major performance work. :contentReference[oaicite:6]{index=6}
 
 ---
 
-## Recommended implementation order
+## Step 29 — Python-side scaling improvements
 
-1. Step 12 — Executable scenario harness
-2. Step 13 — Scenario schema for operations
-3. Step 14 — Persistent vehicle entity model
-4. Step 15 — Evaluation and scenario-pack harness
-5. Step 16 — Richer operations realism
-6. Step 17 — Coordination upgrade
-7. Step 18 — Control-command surface
-8. Step 19 — Visualization state surface and first viewer
-9. Step 20 — Interactive manipulation layer
-10. Step 21 — Environment/map realism expansion
-11. Step 22 — Optional research wrapper
+### Goal
+Improve performance inside the existing Python architecture first.
+
+### Expected outcomes
+- better reservation data structures
+- targeted routing or caching improvements
+- replay/export efficiency improvements
+- benchmark-backed performance gains
+
+### Why before mixed-language separation
+The research recommends algorithmic/data-structure upgrades and profiling before drastic architecture or language changes. :contentReference[oaicite:7]{index=7}
+
+---
+
+## Step 30 — Optional mixed-stack viewer separation
+
+### Goal
+If justified, separate the viewer/frontend into a stack better suited for graphical/live interaction.
+
+### Expected outcomes
+- simulator core remains authoritative
+- frontend consumes stable replay/runtime surfaces
+- mixed-language or mixed-runtime boundary is explicit
+- no simulator-core rewrite required
+
+### Likely candidates
+- web frontend
+- richer desktop UI stack
+
+### Why optional
+This should only happen if the Python-only viewer path becomes limiting in UX, capability, or development efficiency.
+
+---
+
+## Step 31 — Optional native performance kernel exploration
+
+### Goal
+If benchmark data justifies it, isolate one performance-critical subsystem for native acceleration.
+
+### Expected outcomes
+- one bounded hotspot selected by profiling
+- clear interface between Python orchestration and native kernel
+- benchmark comparison proving benefit
+
+### Likely candidates
+- reservation/conflict search
+- pathfinding/planning kernels
+- large-batch evaluation kernels
+
+### Why last
+Language separation should be earned by evidence, not assumed.
+
+---
+
+## Recommended order
+
+1. Step 23 — Graphical replay viewer foundation
+2. Step 24 — Playback control maturity
+3. Step 25 — Live control loop bridge
+4. Step 26 — Live interactive viewer actions
+5. Step 27 — Streaming/state sync surface
+6. Step 28 — Profiling and benchmark harness
+7. Step 29 — Python-side scaling improvements
+8. Step 30 — Optional mixed-stack viewer separation
+9. Step 31 — Optional native performance kernel exploration
+
+---
+
+## Why this order
+
+This sequence follows the current architecture and the research findings:
+
+- the repo already has strong replay/state/control layering, so the first gain should be a real graphical viewer on top of those surfaces :contentReference[oaicite:8]{index=8}
+- interactive UI/streaming is a major gap, but it should grow from control/replay surfaces rather than leapfrogging them :contentReference[oaicite:9]{index=9}
+- performance/scaling work should be benchmark-driven and comes after the next visualization/control milestones are concrete enough to measure against :contentReference[oaicite:10]{index=10}
+- mixed-language separation remains on the table, but only after the architecture and profiling data justify it
 
 ---
 
@@ -297,10 +222,10 @@ This should remain an adapter on top of stable simulator surfaces, not a redesig
 
 At any given time:
 - `docs/current_phase.md` defines the active step
-- `docs/step-*.md` defines the specific scope and done criteria for that step
+- `docs/step-*.md` defines step-specific scope and done criteria
 - `AGENTS.md` defines repo-wide development rules
 
-The intent is to keep future growth as disciplined as the original foundation roadmap:
+This roadmap should preserve the same disciplined development style as the first 22 steps:
 - additive where possible
 - explicit where necessary
-- measurable by deterministic tests, metrics, and regression fixtures
+- backed by deterministic tests, replay surfaces, and stable exports
