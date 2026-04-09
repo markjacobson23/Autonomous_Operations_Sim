@@ -9,6 +9,7 @@ def make_graph_map(
     nodes: tuple[dict[str, object], ...],
     edges: tuple[dict[str, object], ...],
     render_geometry: dict[str, object] | None = None,
+    world_model: dict[str, object] | None = None,
 ) -> Map:
     """Build a map from explicit node and edge records."""
 
@@ -33,7 +34,12 @@ def make_graph_map(
         )
         graph.add_edge(edge)
 
-    return Map(graph, coord_to_id, render_geometry=render_geometry)
+    return Map(
+        graph,
+        coord_to_id,
+        render_geometry=render_geometry,
+        world_model=world_model,
+    )
 
 
 def _position_from_record(value: object) -> tuple[float, float, float]:

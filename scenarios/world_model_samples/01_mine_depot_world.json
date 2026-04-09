@@ -1,0 +1,82 @@
+{
+  "name": "mine_depot_world_v2",
+  "seed": 4701,
+  "duration_s": 120.0,
+  "map": {
+    "kind": "graph",
+    "params": {
+      "nodes": [
+        {"id": 101, "position": [0.0, 0.0, 0.0], "node_type": "DEPOT"},
+        {"id": 102, "position": [5.0, 0.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 103, "position": [10.0, 0.0, 0.0], "node_type": "LOADING_ZONE"},
+        {"id": 104, "position": [5.0, -4.0, 0.0], "node_type": "UNLOADING_ZONE"}
+      ],
+      "edges": [
+        {"id": 1101, "start_node_id": 101, "end_node_id": 102, "distance": 5.0, "speed_limit": 4.0},
+        {"id": 1102, "start_node_id": 102, "end_node_id": 101, "distance": 5.0, "speed_limit": 4.0},
+        {"id": 1103, "start_node_id": 102, "end_node_id": 103, "distance": 5.0, "speed_limit": 4.0},
+        {"id": 1104, "start_node_id": 103, "end_node_id": 102, "distance": 5.0, "speed_limit": 4.0},
+        {"id": 1105, "start_node_id": 102, "end_node_id": 104, "distance": 4.0, "speed_limit": 3.0},
+        {"id": 1106, "start_node_id": 104, "end_node_id": 102, "distance": 4.0, "speed_limit": 3.0}
+      ],
+      "render_geometry": {
+        "roads": [
+          {"id": "mine-spine", "edge_ids": [1101, 1102], "centerline": [[0.0, 0.0, 0.0], [5.0, 0.0, 0.0]], "road_class": "haul", "directionality": "two_way", "lane_count": 2, "width_m": 2.1},
+          {"id": "load-branch", "edge_ids": [1103, 1104], "centerline": [[5.0, 0.0, 0.0], [10.0, 0.0, 0.0]], "road_class": "loading_access", "directionality": "two_way", "lane_count": 2, "width_m": 2.0},
+          {"id": "crusher-branch", "edge_ids": [1105, 1106], "centerline": [[5.0, 0.0, 0.0], [5.0, -4.0, 0.0]], "road_class": "service", "directionality": "two_way", "lane_count": 1, "width_m": 1.7}
+        ],
+        "intersections": [
+          {"id": "yard-junction", "node_id": 102, "polygon": [[4.2, -0.8, 0.0], [5.8, -0.8, 0.0], [5.8, 0.8, 0.0], [4.2, 0.8, 0.0]], "intersection_type": "yard_junction"}
+        ],
+        "areas": [
+          {"id": "mine-depot", "kind": "depot", "polygon": [[-1.0, -1.2, 0.0], [2.2, -1.2, 0.0], [2.2, 1.2, 0.0], [-1.0, 1.2, 0.0]], "label": "Mine Depot"},
+          {"id": "load-pocket", "kind": "loading_bay", "polygon": [[9.0, -1.2, 0.0], [11.4, -1.2, 0.0], [11.4, 1.2, 0.0], [9.0, 1.2, 0.0]], "label": "Loader"},
+          {"id": "workshop", "kind": "building", "polygon": [[1.0, -3.4, 0.0], [3.8, -3.4, 0.0], [3.8, -1.7, 0.0], [1.0, -1.7, 0.0]], "label": "Workshop"},
+          {"id": "blast-zone", "kind": "no_go_zone", "polygon": [[8.6, -4.8, 0.0], [11.8, -4.8, 0.0], [11.8, -2.6, 0.0], [8.6, -2.6, 0.0]], "label": "Blast Zone"}
+        ]
+      },
+      "world_model": {
+        "environment": {"family": "mine", "archetype": "mine_depot", "display_name": "Mine Depot"},
+        "layers": {
+          "roads": [
+            {"id": "haul-road", "kind": "haul_road", "reference_id": "mine-spine"},
+            {"id": "loading-road", "kind": "loading_access", "reference_id": "load-branch"}
+          ],
+          "intersections": [
+            {"id": "primary-junction", "kind": "yard_junction", "reference_id": "yard-junction"}
+          ],
+          "zones": [
+            {"id": "depot-zone", "kind": "depot_core", "reference_id": "mine-depot", "label": "Depot Core"},
+            {"id": "loading-zone", "kind": "loading_zone", "reference_id": "load-pocket", "label": "Loading Zone"}
+          ],
+          "buildings": [
+            {"id": "maintenance-shop", "kind": "maintenance_building", "reference_id": "workshop", "label": "Maintenance Shop"}
+          ],
+          "boundaries": [
+            {"id": "mine-boundary", "kind": "site_boundary", "polygon": [[-1.6, -5.2, 0.0], [12.2, -5.2, 0.0], [12.2, 2.0, 0.0], [-1.6, 2.0, 0.0]], "label": "Mine Site"}
+          ],
+          "no_go_areas": [
+            {"id": "blast-exclusion", "kind": "blast_zone", "reference_id": "blast-zone", "label": "Blast Exclusion"}
+          ]
+        },
+        "asset_layers": [
+          {"id": "terrain-base", "kind": "terrain_fill", "asset_key": "mine_gravel", "z_index": 0, "opacity": 1.0, "coverage": [[-2.0, -5.6, 0.0], [12.8, -5.6, 0.0], [12.8, 2.4, 0.0], [-2.0, 2.4, 0.0]]},
+          {"id": "dust-overlay", "kind": "ambient_overlay", "asset_key": "mine_dust", "z_index": 2, "opacity": 0.42, "coverage": [[3.0, -0.8, 0.0], [11.4, -0.8, 0.0], [11.4, 1.6, 0.0], [3.0, 1.6, 0.0]]}
+        ]
+      }
+    }
+  },
+  "vehicles": [
+    {"id": 1, "position": [0.0, 0.0, 0.0], "velocity": 0.0, "payload": 0.0, "max_payload": 20.0, "max_speed": 5.0, "vehicle_type": "GENERIC"}
+  ],
+  "execution": {
+    "kind": "single_vehicle_job",
+    "vehicle_id": 1,
+    "job": {
+      "id": "mine-world-job",
+      "tasks": [
+        {"kind": "move", "destination": [10.0, 0.0, 0.0]}
+      ]
+    }
+  }
+}

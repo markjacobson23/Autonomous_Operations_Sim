@@ -14,10 +14,12 @@ class Map:
             graph: Graph,
             coord_to_id: dict[tuple[float, float, float], int],
             render_geometry: dict[str, object] | None = None,
+            world_model: dict[str, object] | None = None,
     ):
         self._graph = graph
         self.coord_to_id = coord_to_id
         self._render_geometry = render_geometry or {}
+        self._world_model = world_model or {}
 
     @property
     def graph(self) -> Graph:
@@ -30,6 +32,12 @@ class Map:
         """Return optional rendered-geometry metadata layered on the routing graph."""
 
         return self._render_geometry
+
+    @property
+    def world_model(self) -> dict[str, object]:
+        """Return optional world-model metadata layered on the routing graph."""
+
+        return self._world_model
 
     def has_coordinate(self, position: tuple[float, float, float]) -> bool:
         """Return True if the given coordinate exists in the map."""

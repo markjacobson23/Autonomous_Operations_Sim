@@ -1,0 +1,85 @@
+{
+  "name": "city_street_world_v2",
+  "seed": 4703,
+  "duration_s": 120.0,
+  "map": {
+    "kind": "graph",
+    "params": {
+      "nodes": [
+        {"id": 301, "position": [0.0, 0.0, 0.0], "node_type": "DEPOT"},
+        {"id": 302, "position": [4.0, 0.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 303, "position": [8.0, 0.0, 0.0], "node_type": "UNLOADING_ZONE"},
+        {"id": 304, "position": [4.0, 4.0, 0.0], "node_type": "LOADING_ZONE"}
+      ],
+      "edges": [
+        {"id": 3101, "start_node_id": 301, "end_node_id": 302, "distance": 4.0, "speed_limit": 3.0},
+        {"id": 3102, "start_node_id": 302, "end_node_id": 301, "distance": 4.0, "speed_limit": 3.0},
+        {"id": 3103, "start_node_id": 302, "end_node_id": 303, "distance": 4.0, "speed_limit": 3.0},
+        {"id": 3104, "start_node_id": 303, "end_node_id": 302, "distance": 4.0, "speed_limit": 3.0},
+        {"id": 3105, "start_node_id": 302, "end_node_id": 304, "distance": 4.0, "speed_limit": 2.5},
+        {"id": 3106, "start_node_id": 304, "end_node_id": 302, "distance": 4.0, "speed_limit": 2.5}
+      ],
+      "render_geometry": {
+        "roads": [
+          {"id": "main-street-west", "edge_ids": [3101, 3102], "centerline": [[0.0, 0.0, 0.0], [4.0, 0.0, 0.0]], "road_class": "arterial", "directionality": "two_way", "lane_count": 2, "width_m": 2.0},
+          {"id": "main-street-east", "edge_ids": [3103, 3104], "centerline": [[4.0, 0.0, 0.0], [8.0, 0.0, 0.0]], "road_class": "arterial", "directionality": "two_way", "lane_count": 2, "width_m": 2.0},
+          {"id": "north-connector", "edge_ids": [3105, 3106], "centerline": [[4.0, 0.0, 0.0], [4.0, 4.0, 0.0]], "road_class": "collector", "directionality": "two_way", "lane_count": 2, "width_m": 1.8}
+        ],
+        "intersections": [
+          {"id": "main-cross", "node_id": 302, "polygon": [[3.2, -0.8, 0.0], [4.8, -0.8, 0.0], [4.8, 0.8, 0.0], [3.2, 0.8, 0.0]], "intersection_type": "signalized"}
+        ],
+        "areas": [
+          {"id": "curb-west", "kind": "curbside_zone", "polygon": [[-0.6, -1.6, 0.0], [2.4, -1.6, 0.0], [2.4, -0.5, 0.0], [-0.6, -0.5, 0.0]], "label": "Curb West"},
+          {"id": "corner-sidewalk", "kind": "sidewalk", "polygon": [[2.8, 0.8, 0.0], [5.4, 0.8, 0.0], [5.4, 2.6, 0.0], [2.8, 2.6, 0.0]], "label": "Corner Walk"},
+          {"id": "block-a", "kind": "building", "polygon": [[5.8, -2.6, 0.0], [8.8, -2.6, 0.0], [8.8, -0.8, 0.0], [5.8, -0.8, 0.0]], "label": "Block A"},
+          {"id": "median-exclusion", "kind": "no_go_zone", "polygon": [[3.7, -0.3, 0.0], [4.3, -0.3, 0.0], [4.3, 0.3, 0.0], [3.7, 0.3, 0.0]], "label": "Median"}
+        ]
+      },
+      "world_model": {
+        "environment": {"family": "city_street", "archetype": "urban_delivery_corridor", "display_name": "City Street"},
+        "layers": {
+          "roads": [
+            {"id": "west-arterial", "kind": "arterial", "reference_id": "main-street-west"},
+            {"id": "east-arterial", "kind": "arterial", "reference_id": "main-street-east"},
+            {"id": "north-collector", "kind": "collector", "reference_id": "north-connector"}
+          ],
+          "intersections": [
+            {"id": "crossing", "kind": "signalized_intersection", "reference_id": "main-cross"}
+          ],
+          "zones": [
+            {"id": "curbside-pickup", "kind": "curbside_loading", "reference_id": "curb-west", "label": "Curbside Pickup"}
+          ],
+          "buildings": [
+            {"id": "streetfront-block", "kind": "mixed_use_block", "reference_id": "block-a", "label": "Streetfront Block"}
+          ],
+          "sidewalks": [
+            {"id": "corner-walk", "kind": "pedestrian_sidewalk", "reference_id": "corner-sidewalk", "label": "Corner Sidewalk"}
+          ],
+          "no_go_areas": [
+            {"id": "median-protection", "kind": "median_exclusion", "reference_id": "median-exclusion", "label": "Median Exclusion"}
+          ],
+          "boundaries": [
+            {"id": "block-boundary", "kind": "street_boundary", "polygon": [[-1.0, -3.0, 0.0], [9.2, -3.0, 0.0], [9.2, 4.6, 0.0], [-1.0, 4.6, 0.0]], "label": "Block Envelope"}
+          ]
+        },
+        "asset_layers": [
+          {"id": "asphalt-base", "kind": "terrain_fill", "asset_key": "city_asphalt", "z_index": 0, "opacity": 1.0, "coverage": [[-1.2, -3.2, 0.0], [9.4, -3.2, 0.0], [9.4, 4.8, 0.0], [-1.2, 4.8, 0.0]]},
+          {"id": "lane-markings", "kind": "foreground_overlay", "asset_key": "city_lane_markings", "z_index": 2, "opacity": 0.7, "coverage": [[-0.2, -0.8, 0.0], [8.4, -0.8, 0.0], [8.4, 0.8, 0.0], [-0.2, 0.8, 0.0]]}
+        ]
+      }
+    }
+  },
+  "vehicles": [
+    {"id": 1, "position": [0.0, 0.0, 0.0], "velocity": 0.0, "payload": 0.0, "max_payload": 10.0, "max_speed": 4.0, "vehicle_type": "GENERIC"}
+  ],
+  "execution": {
+    "kind": "single_vehicle_job",
+    "vehicle_id": 1,
+    "job": {
+      "id": "city-world-job",
+      "tasks": [
+        {"kind": "move", "destination": [8.0, 0.0, 0.0]}
+      ]
+    }
+  }
+}

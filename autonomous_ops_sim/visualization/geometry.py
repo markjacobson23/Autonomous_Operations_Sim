@@ -5,6 +5,13 @@ from typing import Any
 
 from autonomous_ops_sim.maps.map import Map
 from autonomous_ops_sim.vehicles.vehicle import Position
+from autonomous_ops_sim.world.model import (
+    WorldAssetLayerSurface,
+    WorldFeatureSurface,
+    WorldModelSurface,
+    build_world_model_surface,
+    world_model_surface_to_dict,
+)
 
 
 @dataclass(frozen=True)
@@ -47,6 +54,7 @@ class RenderGeometrySurface:
     roads: tuple[RoadGeometrySurface, ...]
     intersections: tuple[IntersectionGeometrySurface, ...]
     areas: tuple[AreaGeometrySurface, ...]
+    world_model: WorldModelSurface
 
 
 def build_render_geometry_surface(simulation_map: Map) -> RenderGeometrySurface:
@@ -58,11 +66,13 @@ def build_render_geometry_surface(simulation_map: Map) -> RenderGeometrySurface:
             roads=_build_roads_from_metadata(simulation_map, metadata),
             intersections=_build_intersections_from_metadata(simulation_map, metadata),
             areas=_build_areas_from_metadata(metadata),
+            world_model=build_world_model_surface(simulation_map),
         )
     return RenderGeometrySurface(
         roads=_build_default_roads(simulation_map),
         intersections=_build_default_intersections(simulation_map),
         areas=_build_default_areas(simulation_map),
+        world_model=build_world_model_surface(simulation_map),
     )
 
 
@@ -102,6 +112,7 @@ def render_geometry_surface_to_dict(
             }
             for area in surface.areas
         ],
+        "world_model": world_model_surface_to_dict(surface.world_model),
     }
 
 
@@ -264,6 +275,9 @@ __all__ = [
     "IntersectionGeometrySurface",
     "RenderGeometrySurface",
     "RoadGeometrySurface",
+    "WorldAssetLayerSurface",
+    "WorldFeatureSurface",
+    "WorldModelSurface",
     "build_render_geometry_surface",
     "render_geometry_surface_to_dict",
 ]

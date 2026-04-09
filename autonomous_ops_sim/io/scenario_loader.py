@@ -194,6 +194,7 @@ def _validate_graph_map_params(params: dict[str, object]) -> None:
     nodes = params.get("nodes")
     edges = params.get("edges")
     render_geometry = params.get("render_geometry")
+    world_model = params.get("world_model")
 
     if not isinstance(nodes, list):
         raise ValueError("Graph map 'params.nodes' must be a list.")
@@ -304,6 +305,11 @@ def _validate_graph_map_params(params: dict[str, object]) -> None:
             render_geometry,
             node_ids=node_ids,
             edge_ids=edge_ids,
+        )
+    if world_model is not None:
+        _validate_graph_world_model(
+            world_model,
+            render_geometry=render_geometry,
         )
 
 
@@ -443,6 +449,180 @@ def _validate_graph_render_geometry(
                 point,
                 context=f"Graph map render area[{index}].polygon[{point_index}]",
             )
+
+
+def _validate_graph_world_model(
+    value: object,
+    *,
+    render_geometry: object | None,
+) -> None:
+    if not isinstance(value, dict):
+        raise ValueError("Graph map 'params.world_model' must be an object.")
+
+    environment = value.get("environment")
+    layers = value.get("layers", {})
+    asset_layers = value.get("asset_layers", [])
+
+    if not isinstance(environment, dict):
+        raise ValueError("Graph map 'params.world_model.environment' must be an object.")
+    family = environment.get("family")
+    archetype = environment.get("archetype")
+    display_name = environment.get("display_name")
+    if family not in {"mine", "construction_yard", "city_street"}:
+        raise ValueError(
+            "Graph map 'params.world_model.environment.family' must be one of: "
+            "mine, construction_yard, city_street."
+        )
+    if not isinstance(archetype, str) or not archetype:
+        raise ValueError(
+            "Graph map 'params.world_model.environment.archetype' must be a non-empty string."
+        )
+    if display_name is not None and (not isinstance(display_name, str) or not display_name):
+        raise ValueError(
+            "Graph map 'params.world_model.environment.display_name' must be a non-empty string if provided."
+        )
+
+    if not isinstance(layers, dict):
+        raise ValueError("Graph map 'params.world_model.layers' must be an object.")
+    if not isinstance(asset_layers, list):
+        raise ValueError("Graph map 'params.world_model.asset_layers' must be a list.")
+
+    render_geometry_ids = _collect_render_geometry_reference_ids(render_geometry)
+    allowed_layers = (
+        "roads",
+        "intersections",
+        "zones",
+        "buildings",
+        "sidewalks",
+        "boundaries",
+        "no_go_areas",
+    )
+    feature_ids: set[str] = set()
+    for layer_name in allowed_layers:
+        layer_items = layers.get(layer_name, [])
+        if not isinstance(layer_items, list):
+            raise ValueError(
+                f"Graph map 'params.world_model.layers.{layer_name}' must be a list."
+            )
+        for index, feature in enumerate(layer_items):
+            if not isinstance(feature, dict):
+                raise ValueError(
+                    f"Graph map world layer {layer_name}[{index}] must be an object."
+                )
+            feature_id = feature.get("id")
+            feature_kind = feature.get("kind")
+            label = feature.get("label")
+            polygon = feature.get("polygon")
+            reference_id = feature.get("reference_id")
+
+            if not isinstance(feature_id, str) or not feature_id:
+                raise ValueError(
+                    f"Graph map world layer {layer_name}[{index}].id must be a non-empty string."
+                )
+            if feature_id in feature_ids:
+                raise ValueError("Graph map world layer feature ids must be unique.")
+            feature_ids.add(feature_id)
+            if not isinstance(feature_kind, str) or not feature_kind:
+                raise ValueError(
+                    f"Graph map world layer {layer_name}[{index}].kind must be a non-empty string."
+                )
+            if label is not None and (not isinstance(label, str) or not label):
+                raise ValueError(
+                    f"Graph map world layer {layer_name}[{index}].label must be a non-empty string if provided."
+                )
+            if polygon is None and reference_id is None:
+                raise ValueError(
+                    f"Graph map world layer {layer_name}[{index}] must define polygon or reference_id."
+                )
+            if polygon is not None:
+                if not isinstance(polygon, list) or len(polygon) < 3:
+                    raise ValueError(
+                        f"Graph map world layer {layer_name}[{index}].polygon must contain at least 3 positions."
+                    )
+                for point_index, point in enumerate(polygon):
+                    _parse_position_value(
+                        point,
+                        context=(
+                            f"Graph map world layer {layer_name}[{index}].polygon[{point_index}]"
+                        ),
+                    )
+            if reference_id is not None:
+                if not isinstance(reference_id, str) or not reference_id:
+                    raise ValueError(
+                        f"Graph map world layer {layer_name}[{index}].reference_id must be a non-empty string."
+                    )
+                if reference_id not in render_geometry_ids:
+                    raise ValueError(
+                        f"Graph map world layer {layer_name}[{index}].reference_id must reference configured render geometry ids."
+                    )
+
+    asset_ids: set[str] = set()
+    for index, asset_layer in enumerate(asset_layers):
+        if not isinstance(asset_layer, dict):
+            raise ValueError(
+                f"Graph map world asset_layers[{index}] must be an object."
+            )
+        asset_id = asset_layer.get("id")
+        asset_kind = asset_layer.get("kind")
+        asset_key = asset_layer.get("asset_key")
+        z_index = asset_layer.get("z_index", 0)
+        opacity = asset_layer.get("opacity", 1.0)
+        coverage = asset_layer.get("coverage")
+
+        if not isinstance(asset_id, str) or not asset_id:
+            raise ValueError(
+                f"Graph map world asset_layers[{index}].id must be a non-empty string."
+            )
+        if asset_id in asset_ids:
+            raise ValueError("Graph map world asset layer ids must be unique.")
+        asset_ids.add(asset_id)
+        if not isinstance(asset_kind, str) or not asset_kind:
+            raise ValueError(
+                f"Graph map world asset_layers[{index}].kind must be a non-empty string."
+            )
+        if not isinstance(asset_key, str) or not asset_key:
+            raise ValueError(
+                f"Graph map world asset_layers[{index}].asset_key must be a non-empty string."
+            )
+        if not isinstance(z_index, int):
+            raise ValueError(
+                f"Graph map world asset_layers[{index}].z_index must be an int."
+            )
+        if not isinstance(opacity, (int, float)) or not 0.0 <= float(opacity) <= 1.0:
+            raise ValueError(
+                f"Graph map world asset_layers[{index}].opacity must be numeric in [0.0, 1.0]."
+            )
+        if coverage is not None:
+            if not isinstance(coverage, list) or len(coverage) < 3:
+                raise ValueError(
+                    f"Graph map world asset_layers[{index}].coverage must contain at least 3 positions."
+                )
+            for point_index, point in enumerate(coverage):
+                _parse_position_value(
+                    point,
+                    context=(
+                        f"Graph map world asset_layers[{index}].coverage[{point_index}]"
+                    ),
+                )
+
+
+def _collect_render_geometry_reference_ids(
+    render_geometry: object | None,
+) -> set[str]:
+    if not isinstance(render_geometry, dict):
+        return set()
+
+    reference_ids: set[str] = set()
+    for road in render_geometry.get("roads", []):
+        if isinstance(road, dict) and isinstance(road.get("id"), str):
+            reference_ids.add(road["id"])
+    for intersection in render_geometry.get("intersections", []):
+        if isinstance(intersection, dict) and isinstance(intersection.get("id"), str):
+            reference_ids.add(intersection["id"])
+    for area in render_geometry.get("areas", []):
+        if isinstance(area, dict) and isinstance(area.get("id"), str):
+            reference_ids.add(area["id"])
+    return reference_ids
 
 
 def _parse_vehicle_spec(data: object) -> VehicleSpec:

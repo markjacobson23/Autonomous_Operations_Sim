@@ -1,0 +1,82 @@
+{
+  "name": "construction_yard_world_v2",
+  "seed": 4702,
+  "duration_s": 120.0,
+  "map": {
+    "kind": "graph",
+    "params": {
+      "nodes": [
+        {"id": 201, "position": [0.0, 0.0, 0.0], "node_type": "DEPOT"},
+        {"id": 202, "position": [4.0, 0.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 203, "position": [8.0, 0.0, 0.0], "node_type": "LOADING_ZONE"},
+        {"id": 204, "position": [4.0, 3.5, 0.0], "node_type": "UNLOADING_ZONE"}
+      ],
+      "edges": [
+        {"id": 2101, "start_node_id": 201, "end_node_id": 202, "distance": 4.0, "speed_limit": 3.5},
+        {"id": 2102, "start_node_id": 202, "end_node_id": 201, "distance": 4.0, "speed_limit": 3.5},
+        {"id": 2103, "start_node_id": 202, "end_node_id": 203, "distance": 4.0, "speed_limit": 3.0},
+        {"id": 2104, "start_node_id": 203, "end_node_id": 202, "distance": 4.0, "speed_limit": 3.0},
+        {"id": 2105, "start_node_id": 202, "end_node_id": 204, "distance": 3.5, "speed_limit": 2.5},
+        {"id": 2106, "start_node_id": 204, "end_node_id": 202, "distance": 3.5, "speed_limit": 2.5}
+      ],
+      "render_geometry": {
+        "roads": [
+          {"id": "yard-entry", "edge_ids": [2101, 2102], "centerline": [[0.0, 0.0, 0.0], [4.0, 0.0, 0.0]], "road_class": "site_access", "directionality": "two_way", "lane_count": 2, "width_m": 1.9},
+          {"id": "laydown-spine", "edge_ids": [2103, 2104], "centerline": [[4.0, 0.0, 0.0], [8.0, 0.0, 0.0]], "road_class": "yard_connector", "directionality": "two_way", "lane_count": 2, "width_m": 1.8},
+          {"id": "crane-lane", "edge_ids": [2105, 2106], "centerline": [[4.0, 0.0, 0.0], [4.0, 3.5, 0.0]], "road_class": "service", "directionality": "two_way", "lane_count": 1, "width_m": 1.5}
+        ],
+        "intersections": [
+          {"id": "staging-junction", "node_id": 202, "polygon": [[3.2, -0.8, 0.0], [4.8, -0.8, 0.0], [4.8, 0.8, 0.0], [3.2, 0.8, 0.0]], "intersection_type": "staging_junction"}
+        ],
+        "areas": [
+          {"id": "staging-pad", "kind": "staging_zone", "polygon": [[-0.8, -1.5, 0.0], [2.5, -1.5, 0.0], [2.5, 1.5, 0.0], [-0.8, 1.5, 0.0]], "label": "Staging"},
+          {"id": "laydown-yard", "kind": "laydown_yard", "polygon": [[6.0, -1.6, 0.0], [9.6, -1.6, 0.0], [9.6, 1.8, 0.0], [6.0, 1.8, 0.0]], "label": "Laydown"},
+          {"id": "site-office", "kind": "office", "polygon": [[1.4, 2.0, 0.0], [3.6, 2.0, 0.0], [3.6, 3.6, 0.0], [1.4, 3.6, 0.0]], "label": "Site Office"},
+          {"id": "ped-walk", "kind": "walkway", "polygon": [[0.0, 1.8, 0.0], [5.0, 1.8, 0.0], [5.0, 2.4, 0.0], [0.0, 2.4, 0.0]], "label": "Pedestrian Walk"}
+        ]
+      },
+      "world_model": {
+        "environment": {"family": "construction_yard", "archetype": "construction_staging_yard", "display_name": "Construction Yard"},
+        "layers": {
+          "roads": [
+            {"id": "access-road", "kind": "site_access", "reference_id": "yard-entry"},
+            {"id": "laydown-road", "kind": "yard_connector", "reference_id": "laydown-spine"}
+          ],
+          "intersections": [
+            {"id": "staging-hub", "kind": "staging_junction", "reference_id": "staging-junction"}
+          ],
+          "zones": [
+            {"id": "staging-zone", "kind": "equipment_staging", "reference_id": "staging-pad", "label": "Equipment Staging"},
+            {"id": "material-yard", "kind": "material_laydown", "reference_id": "laydown-yard", "label": "Material Laydown"}
+          ],
+          "buildings": [
+            {"id": "field-office", "kind": "site_office", "reference_id": "site-office", "label": "Field Office"}
+          ],
+          "sidewalks": [
+            {"id": "crew-walk", "kind": "pedestrian_route", "reference_id": "ped-walk", "label": "Crew Walk"}
+          ],
+          "boundaries": [
+            {"id": "yard-perimeter", "kind": "site_boundary", "polygon": [[-1.4, -2.0, 0.0], [10.4, -2.0, 0.0], [10.4, 4.2, 0.0], [-1.4, 4.2, 0.0]], "label": "Perimeter"}
+          ]
+        },
+        "asset_layers": [
+          {"id": "soil-base", "kind": "terrain_fill", "asset_key": "compacted_soil", "z_index": 0, "opacity": 1.0, "coverage": [[-1.6, -2.2, 0.0], [10.6, -2.2, 0.0], [10.6, 4.4, 0.0], [-1.6, 4.4, 0.0]]},
+          {"id": "equipment-markers", "kind": "foreground_overlay", "asset_key": "crane_staging_markers", "z_index": 3, "opacity": 0.55, "coverage": [[5.6, -1.8, 0.0], [9.8, -1.8, 0.0], [9.8, 2.0, 0.0], [5.6, 2.0, 0.0]]}
+        ]
+      }
+    }
+  },
+  "vehicles": [
+    {"id": 1, "position": [0.0, 0.0, 0.0], "velocity": 0.0, "payload": 0.0, "max_payload": 16.0, "max_speed": 4.5, "vehicle_type": "GENERIC"}
+  ],
+  "execution": {
+    "kind": "single_vehicle_job",
+    "vehicle_id": 1,
+    "job": {
+      "id": "yard-world-job",
+      "tasks": [
+        {"kind": "move", "destination": [8.0, 0.0, 0.0]}
+      ]
+    }
+  }
+}
