@@ -69,7 +69,7 @@ def build_serious_viewer_html(
     surface_name = _require_string(metadata, "surface_name")
     plan = build_viewer_foundation_plan()
     viewer_title = title or f"Autonomous Ops Serious Viewer ({surface_name})"
-    script_payload = html.escape(json.dumps(bundle, sort_keys=True))
+    script_payload = json.dumps(bundle, sort_keys=True).replace("</script>", "<\\/script>")
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>

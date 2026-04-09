@@ -83,6 +83,7 @@ tests/test_motion.py
 tests/test_multi_vehicle_conflicts.py
 tests/test_pathfinding.py
 tests/test_perf_harness.py
+tests/test_render_geometry.py
 tests/test_research_wrapper.py
 tests/test_router.py
 tests/test_scenario_execution.py
