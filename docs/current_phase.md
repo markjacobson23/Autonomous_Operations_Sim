@@ -1,7 +1,7 @@
 # Current Phase
 
 ## Active roadmap step
-Step 25 — Live control loop bridge
+Step 26 — Live interactive viewer actions
 
 ## Step status summary
 - Step 1: complete
@@ -28,8 +28,9 @@ Step 25 — Live control loop bridge
 - Step 22: complete
 - Step 23: complete
 - Step 24: complete
-- Step 25: active
-- Step 26: not started
+- Step 25: complete
+- Step 26: active
+- Step 27: not started
 
 ## What already exists
 The repository already has:
@@ -38,47 +39,52 @@ The repository already has:
 - typed command/control surfaces with deterministic history
 - visualization replay state
 - text and graphical replay viewers
+- stronger playback controls and frame metadata
 - viewer-facing interactions translated into commands
 - graph-map realism
-- optional research comparison tooling
+- research comparison tooling
+- a live simulation session bridge with explicit progression and session-aware replay output
 
 ## Goal of the current phase
-Bridge the existing command/control surfaces into a more realistic live runtime control loop without breaking determinism or making the viewer the source of simulator truth.
+Add the first real live interactive viewer actions on top of the existing interaction, command, and live-session architecture.
 
-The main Step 25 objective is:
-- introduce a narrow live runtime session concept
-- support command application during an active controlled session
-- preserve deterministic ordering and replayability
-- prepare the architecture for later live interactive viewer actions
+The main Step 26 objective is:
+- make the graphical viewer capable of issuing bounded live actions
+- route those actions through the existing interaction and command layers
+- preserve deterministic session, trace, and replay behavior
+- improve the simulator from “watchable” to “manipulable”
 
 ## In-scope work
 Work that is allowed right now:
-- add a runtime session / live control bridge layer
-- support controlled stepping or bounded live progression of a session
-- allow typed commands to be applied during that active session
-- ensure resulting trace/command/replay surfaces remain coherent
-- add deterministic tests for session progression and command timing/order
-- perform additive refactors and targeted normal refactors needed to keep the live control bridge clean
+- connect the graphical viewer to a live session
+- support a narrow initial live action set such as:
+  - click/select vehicle
+  - assign destination to selected vehicle
+  - inject blocked edge / closure
+  - bounded reposition workflow if it stays clean
+- translate viewer actions into interactions/commands rather than direct engine mutation
+- refresh visualization state coherently after live actions
+- add deterministic tests for live viewer action handling
+- perform additive refactors and targeted normal refactors needed to keep viewer/session boundaries clean
 
 ## Out-of-scope work
 Do not do any of the following in the current phase:
-- add full viewer-side click interaction yet
-- bypass the command surface
-- redesign the simulator around async/event-loop infrastructure
-- build streaming/network architecture yet
-- overbuild a generic runtime framework
-- turn the graphical viewer into the owner of live state
+- redesign the simulator around async/networked streaming
+- bypass interactions/commands and mutate engine state directly from the GUI
+- build a large polished product UI
+- introduce broad multi-user or remote control architecture
+- start performance/scaling work yet
 
 ## Architectural guidance for this phase
-- The simulator core remains authoritative.
-- Commands must remain explicit and validated.
-- A live session should still be deterministic for the same starting state and command sequence.
-- Keep the live control bridge separate from future viewer UX concerns.
+- Viewer actions must translate into interactions and then typed commands.
+- The live session remains the authoritative runtime host.
+- Keep the initial action vocabulary small and explicit.
+- Refresh derived visualization state from authoritative runtime/session data.
 - Avoid dangerous rewrites.
 
-## Completion criteria for Step 25
-Step 25 is complete when:
-- a narrow live runtime session/control bridge exists
-- typed commands can be applied coherently during a controlled active session
+## Completion criteria for Step 26
+Step 26 is complete when:
+- the graphical viewer can perform at least one meaningful live action
+- those actions flow through interaction/command/session layers coherently
 - deterministic replay/export behavior remains intact
 - tests/lint/type checks pass
