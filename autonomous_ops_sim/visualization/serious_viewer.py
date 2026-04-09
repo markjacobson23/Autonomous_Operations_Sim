@@ -16,9 +16,12 @@ class ViewerFoundationPlan:
     """Chosen medium-term viewer direction on top of the Simulation API."""
 
     foundation_version: int
-    recommended_stack: str
+    primary_stack: str
+    fallback_stack: str
     rendering_strategy: str
     transport_surface: str
+    backend_authority: str
+    frontend_workspace: str
     rationale: tuple[str, ...]
 
 
@@ -27,13 +30,16 @@ def build_viewer_foundation_plan() -> ViewerFoundationPlan:
 
     return ViewerFoundationPlan(
         foundation_version=SERIOUS_VIEWER_FOUNDATION_VERSION,
-        recommended_stack="web_client",
+        primary_stack="react_typescript_vite_svg",
+        fallback_stack="standalone_serious_viewer_html",
         rendering_strategy="responsive_svg_scene",
         transport_surface="simulation_api_bundle_json",
+        backend_authority="python_simulator",
+        frontend_workspace="frontend/serious_ui",
         rationale=(
-            "Higher rendering and interaction ceiling than the Tk prototype.",
+            "Higher rendering and interaction ceiling than the standalone HTML exporter.",
             "Consumes the versioned Simulation API boundary without simulator rewrites.",
-            "Keeps future paths open for richer browser or external frontend clients.",
+            "Keeps Python simulator authority explicit while opening a serious frontend path.",
         ),
     )
 
@@ -330,7 +336,7 @@ def build_serious_viewer_html(
         <div>
           <div class="eyebrow">Serious Viewer Foundation</div>
           <h1>{html.escape(viewer_title)}</h1>
-          <div class="meta">Medium-term path: {html.escape(plan.recommended_stack)} via {html.escape(plan.transport_surface)}</div>
+          <div class="meta">Medium-term path: {html.escape(plan.primary_stack)} via {html.escape(plan.transport_surface)}</div>
         </div>
         <div class="badge-row">
           <span class="badge" id="surfaceBadge"></span>

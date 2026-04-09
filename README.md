@@ -4,6 +4,27 @@
 
 This README is intended to reflect the project through **Step 40** of the roadmap.
 
+## Step 41 frontend foundation
+
+Step 41 locks the serious frontend direction for the next phase without changing simulator authority:
+
+- Primary stack: `React + TypeScript + Vite`
+- Primary rendering baseline: responsive `SVG` scene rendering inside a dedicated frontend app
+- Fallback stack: existing standalone serious-viewer HTML export
+- Authority boundary: Python remains authoritative; the frontend consumes versioned Simulation API surfaces and future typed-command/session boundaries
+
+The architecture note for this decision lives at `docs/frontend_architecture.md`.
+
+The dedicated serious frontend workspace now lives at `frontend/serious_ui/`.
+
+Typical local frontend commands once Node tooling is installed:
+
+```bash
+cd frontend/serious_ui
+npm install
+npm run dev
+```
+
 ## Current status
 
 What the project can do today:

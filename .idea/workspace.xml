@@ -5,11 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="80a83f02-da50-42e5-b2f5-61cccc1dbda7" name="Changes" comment="added simple demos">
-      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/perf/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/perf/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/perf/suite.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/perf/suite.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/simulation/reservations.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/simulation/reservations.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_perf_harness.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_perf_harness.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
