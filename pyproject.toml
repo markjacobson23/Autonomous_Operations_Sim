@@ -25,3 +25,6 @@ python_version = "3.11"
 
 [tool.setuptools.packages.find]
 include = ["autonomous_ops_sim*"]
+
+[tool.setuptools.package-data]
+autonomous_ops_sim = ["native/*.c"]

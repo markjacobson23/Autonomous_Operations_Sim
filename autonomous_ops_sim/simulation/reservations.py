@@ -1,5 +1,16 @@
-from dataclasses import dataclass
+from array import array
+from dataclasses import dataclass, field
 import math
+
+from autonomous_ops_sim.native import get_native_reservation_departure_accelerator
+
+
+@dataclass
+class _ReservationWindowBucket:
+    reservations: list[object] = field(default_factory=list)
+
+    def append(self, reservation: object) -> None:
+        self.reservations.append(reservation)
 
 
 @dataclass(frozen=True)
@@ -77,17 +88,22 @@ class CorridorReservation:
 class ReservationTable:
     """Deterministic reservation store for a narrow multi-vehicle baseline."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, use_native_acceleration: bool = True) -> None:
         self._node_reservations: list[NodeReservation] = []
         self._edge_reservations: list[EdgeReservation] = []
         self._corridor_reservations: list[CorridorReservation] = []
-        self._node_reservations_by_node: dict[int, list[NodeReservation]] = {}
-        self._edge_reservations_by_segment: dict[
-            tuple[int, int], list[EdgeReservation]
-        ] = {}
-        self._corridor_reservations_by_path: dict[
-            tuple[int, ...], list[CorridorReservation]
-        ] = {}
+        self._node_reservations_by_node: dict[int, _ReservationWindowBucket] = {}
+        self._edge_reservations_by_segment: dict[tuple[int, int], _ReservationWindowBucket] = {}
+        self._corridor_reservations_by_path: dict[tuple[int, ...], _ReservationWindowBucket] = {}
+        self._departure_accelerator = (
+            get_native_reservation_departure_accelerator()
+            if use_native_acceleration
+            else None
+        )
+
+    @property
+    def departure_acceleration_mode(self) -> str:
+        return "native" if self._departure_accelerator is not None else "python"
 
     @property
     def node_reservations(self) -> tuple[NodeReservation, ...]:
@@ -121,7 +137,9 @@ class ReservationTable:
             reason=reason,
         )
         self._node_reservations.append(reservation)
-        self._node_reservations_by_node.setdefault(node_id, []).append(reservation)
+        self._node_reservations_by_node.setdefault(node_id, _ReservationWindowBucket()).append(
+            reservation
+        )
         return reservation
 
     def reserve_edge(
@@ -147,7 +165,8 @@ class ReservationTable:
         )
         self._edge_reservations.append(reservation)
         self._edge_reservations_by_segment.setdefault(
-            reservation.segment_key, []
+            reservation.segment_key,
+            _ReservationWindowBucket(),
         ).append(reservation)
         return reservation
 
@@ -173,7 +192,10 @@ class ReservationTable:
             end_time_s=end_time_s,
         )
         self._corridor_reservations.append(reservation)
-        self._corridor_reservations_by_path.setdefault(node_ids, []).append(reservation)
+        self._corridor_reservations_by_path.setdefault(
+            node_ids,
+            _ReservationWindowBucket(),
+        ).append(reservation)
         return reservation
 
     def earliest_departure_time(
@@ -211,6 +233,18 @@ class ReservationTable:
                     "corridor_travel_time_s must be finite and positive when "
                     "corridor_node_ids are provided"
                 )
+
+        native_candidate = self._maybe_native_earliest_departure_time(
+            vehicle_id=vehicle_id,
+            current_node_id=current_node_id,
+            next_node_id=next_node_id,
+            not_before_s=not_before_s,
+            travel_time_s=travel_time_s,
+            corridor_node_ids=corridor_node_ids,
+            corridor_travel_time_s=corridor_travel_time_s,
+        )
+        if native_candidate is not None:
+            return native_candidate
 
         candidate = not_before_s
         while True:
@@ -273,7 +307,11 @@ class ReservationTable:
         start_time_s: float,
         end_time_s: float,
     ) -> NodeReservation | None:
-        for reservation in self._node_reservations_by_node.get(node_id, ()):
+        bucket = self._node_reservations_by_node.get(node_id)
+        if bucket is None:
+            return None
+        for reservation in bucket.reservations:
+            assert isinstance(reservation, NodeReservation)
             if reservation.vehicle_id == vehicle_id:
                 continue
             if reservation.node_id != node_id:
@@ -294,7 +332,11 @@ class ReservationTable:
         node_id: int,
         arrival_time_s: float,
     ) -> NodeReservation | None:
-        for reservation in self._node_reservations_by_node.get(node_id, ()):
+        bucket = self._node_reservations_by_node.get(node_id)
+        if bucket is None:
+            return None
+        for reservation in bucket.reservations:
+            assert isinstance(reservation, NodeReservation)
             if reservation.vehicle_id == vehicle_id:
                 continue
             if reservation.node_id != node_id:
@@ -316,7 +358,11 @@ class ReservationTable:
             min(start_node_id, end_node_id),
             max(start_node_id, end_node_id),
         )
-        for reservation in self._edge_reservations_by_segment.get(requested_segment, ()):
+        bucket = self._edge_reservations_by_segment.get(requested_segment)
+        if bucket is None:
+            return None
+        for reservation in bucket.reservations:
+            assert isinstance(reservation, EdgeReservation)
             if reservation.vehicle_id == vehicle_id:
                 continue
             if _windows_overlap(
@@ -336,14 +382,19 @@ class ReservationTable:
         start_time_s: float,
         end_time_s: float,
     ) -> CorridorReservation | None:
-        candidate_reservations = self._corridor_reservations_by_path.get(node_ids)
-        if candidate_reservations is None:
+        bucket = self._corridor_reservations_by_path.get(node_ids)
+        if bucket is None:
             requested_segment_keys = _segment_keys_for_nodes(node_ids)
             requested_segments = set(requested_segment_keys)
             candidate_reservations = [
                 reservation
                 for reservation in self._corridor_reservations
                 if not requested_segments.isdisjoint(reservation.segment_keys)
+            ]
+        else:
+            candidate_reservations = [
+                reservation for reservation in bucket.reservations
+                if isinstance(reservation, CorridorReservation)
             ]
 
         for reservation in candidate_reservations:
@@ -357,6 +408,72 @@ class ReservationTable:
             ):
                 return reservation
         return None
+
+    def _maybe_native_earliest_departure_time(
+        self,
+        *,
+        vehicle_id: int,
+        current_node_id: int,
+        next_node_id: int,
+        not_before_s: float,
+        travel_time_s: float,
+        corridor_node_ids: tuple[int, ...] | None,
+        corridor_travel_time_s: float | None,
+    ) -> float | None:
+        if self._departure_accelerator is None:
+            return None
+
+        corridor_bucket = None
+        if corridor_node_ids is not None:
+            corridor_bucket = self._corridor_reservations_by_path.get(corridor_node_ids)
+            if corridor_bucket is None:
+                return None
+
+        edge_bucket = self._edge_reservations_by_segment.get(
+            (
+                min(current_node_id, next_node_id),
+                max(current_node_id, next_node_id),
+            ),
+            _ReservationWindowBucket(),
+        )
+        node_wait_bucket = self._node_reservations_by_node.get(
+            current_node_id,
+            _ReservationWindowBucket(),
+        )
+        node_arrival_bucket = self._node_reservations_by_node.get(
+            next_node_id,
+            _ReservationWindowBucket(),
+        )
+        active_corridor_bucket = corridor_bucket or _ReservationWindowBucket()
+        node_wait_vehicle_ids, node_wait_starts_s, node_wait_ends_s = _bucket_arrays(
+            node_wait_bucket
+        )
+        edge_vehicle_ids, edge_starts_s, edge_ends_s = _bucket_arrays(edge_bucket)
+        node_arrival_vehicle_ids, node_arrival_starts_s, node_arrival_ends_s = _bucket_arrays(
+            node_arrival_bucket
+        )
+        corridor_vehicle_ids, corridor_starts_s, corridor_ends_s = _bucket_arrays(
+            active_corridor_bucket
+        )
+
+        return self._departure_accelerator.earliest_departure_time(
+            vehicle_id=vehicle_id,
+            not_before_s=not_before_s,
+            travel_time_s=travel_time_s,
+            node_wait_vehicle_ids=node_wait_vehicle_ids,
+            node_wait_starts_s=node_wait_starts_s,
+            node_wait_ends_s=node_wait_ends_s,
+            edge_vehicle_ids=edge_vehicle_ids,
+            edge_starts_s=edge_starts_s,
+            edge_ends_s=edge_ends_s,
+            node_arrival_vehicle_ids=node_arrival_vehicle_ids,
+            node_arrival_starts_s=node_arrival_starts_s,
+            node_arrival_ends_s=node_arrival_ends_s,
+            corridor_vehicle_ids=corridor_vehicle_ids,
+            corridor_starts_s=corridor_starts_s,
+            corridor_ends_s=corridor_ends_s,
+            corridor_travel_time_s=corridor_travel_time_s,
+        )
 
 
 def _segment_keys_for_nodes(
@@ -388,3 +505,18 @@ def _windows_overlap(
     end_b: float,
 ) -> bool:
     return start_a < end_b and start_b < end_a
+
+
+def _bucket_arrays(bucket: _ReservationWindowBucket) -> tuple[array, array, array]:
+    vehicle_ids = array("q")
+    starts_s = array("d")
+    ends_s = array("d")
+    for reservation in bucket.reservations:
+        if isinstance(
+            reservation,
+            (NodeReservation, EdgeReservation, CorridorReservation),
+        ):
+            vehicle_ids.append(reservation.vehicle_id)
+            starts_s.append(reservation.start_time_s)
+            ends_s.append(reservation.end_time_s)
+    return vehicle_ids, starts_s, ends_s

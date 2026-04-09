@@ -18,6 +18,7 @@ from autonomous_ops_sim.perf.suite import (
     build_default_benchmark_suite,
     run_default_benchmark_suite,
 )
+from autonomous_ops_sim.native import get_native_reservation_departure_accelerator
 
 __all__ = [
     "BENCHMARK_SCHEMA_VERSION",
@@ -33,6 +34,7 @@ __all__ = [
     "benchmark_timing_to_dict",
     "build_default_benchmark_suite",
     "export_benchmark_suite_json",
+    "get_native_reservation_departure_accelerator",
     "run_benchmark_case",
     "run_benchmark_suite",
     "run_default_benchmark_suite",

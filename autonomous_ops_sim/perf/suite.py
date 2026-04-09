@@ -49,6 +49,12 @@ def build_default_benchmark_suite(
         _build_reservation_benchmark_case(
             repetitions=repetitions,
             warmup_iterations=warmup_iterations,
+            requested_acceleration="python",
+        ),
+        _build_reservation_benchmark_case(
+            repetitions=repetitions,
+            warmup_iterations=warmup_iterations,
+            requested_acceleration="native",
         ),
         _build_scenario_execution_benchmark_case(
             repetitions=repetitions,
@@ -162,8 +168,13 @@ def _build_reservation_benchmark_case(
     *,
     repetitions: int,
     warmup_iterations: int,
+    requested_acceleration: str,
 ) -> BenchmarkCase:
-    reservation_table = ReservationTable()
+    if requested_acceleration not in {"python", "native"}:
+        raise ValueError(f"Unsupported reservation acceleration mode: {requested_acceleration}")
+    reservation_table = ReservationTable(
+        use_native_acceleration=requested_acceleration == "native"
+    )
     for offset in range(40):
         reservation_table.reserve_node(
             vehicle_id=100 + offset,
@@ -212,6 +223,7 @@ def _build_reservation_benchmark_case(
             for index, request in enumerate(requests)
         ]
         return {
+            "acceleration_mode": reservation_table.departure_acceleration_mode,
             "request_count": len(requests),
             "departure_times_s": departures,
             "total_departure_time_s": sum(departures),
@@ -221,11 +233,12 @@ def _build_reservation_benchmark_case(
         }
 
     return BenchmarkCase(
-        name="reservation_departure_scan",
+        name=f"reservation_departure_scan_{requested_acceleration}",
         category="coordination",
         repetitions=repetitions,
         warmup_iterations=warmup_iterations,
         config={
+            "requested_acceleration": requested_acceleration,
             "request_count": len(requests),
             "node_reservation_count": len(reservation_table.node_reservations),
             "edge_reservation_count": len(reservation_table.edge_reservations),

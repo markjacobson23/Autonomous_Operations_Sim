@@ -132,7 +132,8 @@ def test_default_benchmark_suite_produces_structurally_consistent_results() -> N
     assert first_record["schema_version"] == BENCHMARK_SCHEMA_VERSION
     assert [case["name"] for case in first_record["case_results"]] == [
         "routing_grid_paths",
-        "reservation_departure_scan",
+        "reservation_departure_scan_python",
+        "reservation_departure_scan_native",
         "scenario_execution_graph_map",
         "scenario_pack_execution_baseline",
         "visualization_export_graph_map",
@@ -159,4 +160,4 @@ def test_cli_benchmark_emits_json_results(capsys) -> None:
     assert captured.err == ""
     assert export_record["schema_version"] == BENCHMARK_SCHEMA_VERSION
     assert export_record["suite_name"] == "step_29_baseline"
-    assert len(export_record["case_results"]) == 6
+    assert len(export_record["case_results"]) == 7
