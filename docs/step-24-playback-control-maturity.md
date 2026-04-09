@@ -1,56 +1,54 @@
-# Step 24 Playback Control Maturity
+# Step 25 Live Control Loop Bridge
 
 ## Goal
-Finish Step 24 cleanly by improving playback navigation and control for the graphical replay viewer.
+Finish Step 25 cleanly by adding a narrow live runtime session/control bridge on top of the existing deterministic command surface.
 
 ## Required implementation
-Extend the graphical replay viewer and replay controller with stronger deterministic playback/navigation behavior.
+Add a bounded session-oriented control layer that supports progression of a live run and command application during that run.
 
 ## Required design
 - Reuse the existing:
-  - `VisualizationState`
-  - replay helpers
-  - `ReplayController`
-  - graphical viewer
-- Improve playback controls in a bounded way, such as:
-  - previous frame
-  - first / last frame
-  - jump to frame index
-  - playback speed adjustment
-  - richer frame metadata/status display
+  - `SimulationEngine`
+  - `SimulationController`
+  - typed commands
+  - trace / command history
+  - visualization state / replay surfaces
+- Add a small session/runtime bridge module such as:
+  - `autonomous_ops_sim/simulation/live_session.py`
+  - or `autonomous_ops_sim/simulation/runtime_session.py`
 
 ## Required behavior
-- Playback navigation is stronger than the Step 23 baseline
-- The same replay input still produces the same frame progression
-- The viewer remains a consumer of completed replay state
-- Navigation and frame selection remain deterministic
+- A run can exist as an active controlled session
+- Session progression is explicit and deterministic
+- Commands can be applied during the active session
+- Replay/export surfaces remain coherent after session progression and command application
 
 ## Minimum expected scope
-At minimum, Step 24 should support:
-- at least two meaningful new replay controls beyond play/pause/next/reset
-- deterministic navigation over completed frames
-- stable metadata/status updates tied to the selected frame
-- tests covering navigation behavior and frame selection
+At minimum, Step 25 should support:
+- creating a live/active session from an existing scenario or engine setup
+- bounded progression of that session
+- typed command application during the session
+- deterministic trace/command ordering for repeated runs with the same inputs
 
 ## Design constraints
-- Do not add live runtime control yet
-- Do not inject commands from the viewer yet
-- Do not redesign the simulator around a live loop
-- Do not overbuild UI features beyond replay maturity
+- Do not add full viewer click interaction yet
+- Do not bypass the typed command surface
+- Do not redesign the simulator around async/event-loop frameworks
+- Do not introduce networking/streaming yet
 - Keep the implementation small and production-like
 
 ## Preferred strategy
-- Extend the current replay controller rather than replacing it
-- Keep the control surface explicit and frame-oriented
-- Improve inspectability first, live control later
-- Preserve compatibility with existing visualization state
+- Start with a narrow session abstraction and implement it well
+- Keep session progression explicit rather than magical
+- Reuse existing control and replay/export surfaces directly
+- Preserve deterministic ownership and event ordering
 
 ## Tests to add
 Add tests for:
-- previous/first/last/jump navigation behavior
-- deterministic playback speed or timing behavior if added
-- stable status/frame metadata updates
-- repeated navigation sequences producing identical results
+- deterministic session progression
+- deterministic command application during a session
+- stable trace/command ordering after session control
+- repeated session runs producing identical results
 
 ## Definition of done
 All of the following must succeed:
