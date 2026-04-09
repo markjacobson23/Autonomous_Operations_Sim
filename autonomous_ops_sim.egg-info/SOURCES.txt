@@ -3,6 +3,7 @@ pyproject.toml
 autonomous_ops_sim/__init__.py
 autonomous_ops_sim/api.py
 autonomous_ops_sim/cli.py
+autonomous_ops_sim/showcase.py
 autonomous_ops_sim.egg-info/PKG-INFO
 autonomous_ops_sim.egg-info/SOURCES.txt
 autonomous_ops_sim.egg-info/dependency_links.txt
@@ -55,6 +56,7 @@ autonomous_ops_sim/simulation/world_state.py
 autonomous_ops_sim/vehicles/__init__.py
 autonomous_ops_sim/vehicles/vehicle.py
 autonomous_ops_sim/visualization/__init__.py
+autonomous_ops_sim/visualization/command_center.py
 autonomous_ops_sim/visualization/geometry.py
 autonomous_ops_sim/visualization/gui_viewer.py
 autonomous_ops_sim/visualization/interactions.py
@@ -64,9 +66,11 @@ autonomous_ops_sim/visualization/motion.py
 autonomous_ops_sim/visualization/replay.py
 autonomous_ops_sim/visualization/serious_viewer.py
 autonomous_ops_sim/visualization/state.py
+autonomous_ops_sim/visualization/traffic.py
 autonomous_ops_sim/visualization/viewer.py
 tests/test_behavior.py
 tests/test_cli.py
+tests/test_command_center.py
 tests/test_control_commands.py
 tests/test_dispatcher.py
 tests/test_engine.py
@@ -90,9 +94,11 @@ tests/test_scenario_execution.py
 tests/test_scenario_loader.py
 tests/test_scenario_pack_runner.py
 tests/test_serious_viewer.py
+tests/test_showcase.py
 tests/test_simulation_api.py
 tests/test_single_vehicle_execution.py
 tests/test_step_17_coordination.py
+tests/test_traffic.py
 tests/test_visualization.py
 tests/test_workload_runner.py
 tests/test_world_state.py
