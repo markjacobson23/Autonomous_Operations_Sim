@@ -123,8 +123,10 @@ def test_serious_viewer_html_renders_replay_bundle_controls_and_embedded_data() 
     assert "simulation-api-bundle" in html_output
     assert "viewerScene" in html_output
     assert "timelineInput" in html_output
+    assert "playButton" in html_output
     assert "web_client" in html_output
     assert "replay_bundle" in html_output
+    assert "motion_segments" in html_output
 
 
 def test_serious_viewer_html_supports_live_session_and_live_sync_bundles() -> None:
@@ -146,6 +148,8 @@ def test_serious_viewer_html_supports_live_session_and_live_sync_bundles() -> No
     assert "live_sync_bundle" in live_sync_html
     assert "live snapshot" in live_session_html
     assert "live snapshot" in live_sync_html
+    assert "motion_segments" in live_session_html
+    assert "motion_segments" in live_sync_html
 
 
 def test_serious_viewer_cli_loads_bundle_and_writes_html(tmp_path, capsys) -> None:

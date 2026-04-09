@@ -123,6 +123,7 @@ def test_replay_bundle_is_versioned_and_matches_existing_replay_surface() -> Non
     ]
     assert [result.sequence for result in bundle.command_results] == [0, 1, 2, 3]
     assert bundle.command_results[0].blocked_edge_ids == (2,)
+    assert [segment.edge_id for segment in bundle.motion_segments] == [3, 4, 5, 4]
     assert [
         (vehicle.vehicle_id, vehicle.node_id, vehicle.operational_state)
         for vehicle in bundle.command_results[-1].vehicles
@@ -143,6 +144,8 @@ def test_live_session_and_live_sync_bundles_share_one_api_version() -> None:
     assert sync_bundle.map_surface == live_bundle.map_surface
     assert [result.sequence for result in live_bundle.command_results] == [0, 1, 2, 3]
     assert [result.sequence for result in sync_bundle.command_results] == [0, 1, 2, 3]
+    assert len(live_bundle.motion_segments) == 4
+    assert len(sync_bundle.motion_segments) == 4
     assert sync_bundle.command_results[1].emitted_update_indices == (
         2,
         3,

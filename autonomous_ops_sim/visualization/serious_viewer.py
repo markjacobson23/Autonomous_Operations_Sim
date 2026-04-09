@@ -351,6 +351,10 @@ def build_serious_viewer_html(
           <h2>Timeline</h2>
           <div class="mono" id="timelineLabel"></div>
         </div>
+        <div class="badge-row" style="margin-bottom:10px">
+          <button class="badge" id="playButton" type="button">Play</button>
+          <button class="badge" id="pauseButton" type="button">Pause</button>
+        </div>
         <input class="timeline-input" id="timelineInput" type="range" min="0" value="0">
       </div>
     </section>
@@ -383,20 +387,37 @@ def build_serious_viewer_html(
     const metadata = bundle.metadata;
     const surfaceName = metadata.surface_name;
     const mapSurface = bundle.map_surface;
+    const motionSegments = Array.isArray(bundle.motion_segments) ? bundle.motion_segments : [];
     const timelineEntries = buildTimelineEntries(bundle);
     let selectedVehicleId = null;
     let timelineIndex = Math.max(0, timelineEntries.length - 1);
+    let currentTimeS = resolveFinalTime(bundle, timelineEntries);
+    let isPlaying = false;
+    let lastAnimationTimestampMs = null;
 
     document.getElementById("surfaceBadge").textContent = surfaceName.replaceAll("_", " ");
     document.getElementById("seedBadge").textContent = `seed ${{String(bundle.seed)}}`;
-    document.getElementById("timelineBadge").textContent = `${{timelineEntries.length}} timeline steps`;
+    document.getElementById("timelineBadge").textContent = `${{motionSegments.length}} motion segments`;
 
     const slider = document.getElementById("timelineInput");
-    slider.max = String(Math.max(0, timelineEntries.length - 1));
-    slider.value = String(timelineIndex);
+    slider.max = String(Math.max(1, Math.round(currentTimeS * 1000.0)));
+    slider.value = String(Math.round(currentTimeS * 1000.0));
     slider.addEventListener("input", (event) => {{
-      timelineIndex = Number(event.target.value);
+      currentTimeS = Number(event.target.value) / 1000.0;
+      timelineIndex = findTimelineIndexForTime(currentTimeS);
       render();
+    }});
+    document.getElementById("playButton").addEventListener("click", () => {{
+      if (currentTimeS >= resolveFinalTime(bundle, timelineEntries)) {{
+        currentTimeS = 0.0;
+      }}
+      isPlaying = true;
+      lastAnimationTimestampMs = null;
+      window.requestAnimationFrame(tickPlayback);
+    }});
+    document.getElementById("pauseButton").addEventListener("click", () => {{
+      isPlaying = false;
+      lastAnimationTimestampMs = null;
     }});
 
     function buildTimelineEntries(payload) {{
@@ -448,6 +469,37 @@ def build_serious_viewer_html(
       return [initial].concat(sessions);
     }}
 
+    function resolveFinalTime(payload, entries) {{
+      if (typeof payload.final_time_s === "number") {{
+        return payload.final_time_s;
+      }}
+      if (typeof payload.simulated_time_s === "number") {{
+        return payload.simulated_time_s;
+      }}
+      if (payload.snapshot && typeof payload.snapshot.simulated_time_s === "number") {{
+        return payload.snapshot.simulated_time_s;
+      }}
+      if (entries.length === 0) {{
+        return 0.0;
+      }}
+      return Number(entries[entries.length - 1].timestamp_s);
+    }}
+
+    function findTimelineIndexForTime(timestampS) {{
+      let index = 0;
+      for (let currentIndex = 0; currentIndex < timelineEntries.length; currentIndex += 1) {{
+        if (Number(timelineEntries[currentIndex].timestamp_s) > timestampS) {{
+          break;
+        }}
+        index = currentIndex;
+      }}
+      return index;
+    }}
+
+    function timelineEntryForTime(timestampS) {{
+      return timelineEntries[findTimelineIndexForTime(timestampS)];
+    }}
+
     function buildSceneBounds(nodes) {{
       const xs = nodes.map((node) => Number(node.position[0]));
       const ys = nodes.map((node) => Number(node.position[1]));
@@ -472,7 +524,8 @@ def build_serious_viewer_html(
     }}
 
     function render() {{
-      const current = timelineEntries[timelineIndex];
+      const current = timelineEntryForTime(currentTimeS);
+      const sampledVehicles = sampleVehiclesAtTime(currentTimeS, current.vehicles);
       const svg = document.getElementById("viewerScene");
       svg.innerHTML = "";
 
@@ -516,7 +569,7 @@ def build_serious_viewer_html(
         nodeGroup.appendChild(label);
       }}
 
-      current.vehicles.forEach((vehicle) => {{
+      sampledVehicles.forEach((vehicle) => {{
         const point = project(vehicle.position, bounds);
         const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
         group.setAttribute("class", "vehicle-chip");
@@ -550,7 +603,7 @@ def build_serious_viewer_html(
       svg.appendChild(vehicleGroup);
 
       document.getElementById("timelineLabel").textContent =
-        `step ${{timelineIndex + 1}} / ${{timelineEntries.length}} at ${{Number(current.timestamp_s).toFixed(2)}}s`;
+        `time ${{Number(currentTimeS).toFixed(2)}}s  keyframe ${{timelineIndex + 1}} / ${{timelineEntries.length}}`;
       document.getElementById("overlayTrigger").textContent = `trigger ${{
         current.label
       }}`;
@@ -558,14 +611,15 @@ def build_serious_viewer_html(
         current.blocked_edge_ids.length
       }}`;
       document.getElementById("overlayVehicles").textContent = `vehicles ${{
-        current.vehicles.length
+        sampledVehicles.length
       }}`;
+      slider.value = String(Math.round(currentTimeS * 1000.0));
 
       renderOverlay(current);
-      renderInspector(current);
-      if (selectedVehicleId === null && current.vehicles.length > 0) {{
-        selectedVehicleId = current.vehicles[0].vehicle_id;
-        renderInspector(current);
+      renderInspector(sampledVehicles);
+      if (selectedVehicleId === null && sampledVehicles.length > 0) {{
+        selectedVehicleId = sampledVehicles[0].vehicle_id;
+        renderInspector(sampledVehicles);
       }}
     }}
 
@@ -601,17 +655,17 @@ def build_serious_viewer_html(
       ).join("");
     }}
 
-    function renderInspector(current) {{
+    function renderInspector(vehicles) {{
       const vehicleList = document.getElementById("vehicleList");
       const inspectorHint = document.getElementById("inspectorHint");
-      const selectedVehicle = current.vehicles.find((vehicle) => vehicle.vehicle_id === selectedVehicleId) || null;
+      const selectedVehicle = vehicles.find((vehicle) => vehicle.vehicle_id === selectedVehicleId) || null;
       if (!selectedVehicle) {{
         inspectorHint.textContent = "No vehicle selected for this timeline step.";
       }} else {{
-        inspectorHint.textContent = `Inspecting vehicle ${{selectedVehicle.vehicle_id}}`;
+        inspectorHint.textContent = `Inspecting vehicle ${{selectedVehicle.vehicle_id}} at ${{Number(currentTimeS).toFixed(2)}}s`;
       }}
 
-      vehicleList.innerHTML = current.vehicles.map((vehicle) => {{
+      vehicleList.innerHTML = vehicles.map((vehicle) => {{
         const selected = vehicle.vehicle_id === selectedVehicleId;
         const buttonBackground = selected
           ? "rgba(198, 91, 61, 0.14)"
@@ -623,10 +677,81 @@ def build_serious_viewer_html(
             onclick="window.__selectVehicle(${{vehicle.vehicle_id}})"
           >
             <strong>Vehicle ${{vehicle.vehicle_id}}</strong>
-            node ${{vehicle.node_id}} | ${{vehicle.operational_state}} | [${{vehicle.position.join(", ")}}]
+            node ${{vehicle.node_id}} | ${{vehicle.operational_state}} | speed ${{Number(vehicle.speed || 0).toFixed(2)}} | [${{vehicle.position.map((value) => Number(value).toFixed(2)).join(", ")}}]
           </button>
         `;
       }}).join("");
+    }}
+
+    function sampleVehiclesAtTime(timestampS, baseVehicles) {{
+      const sampled = new Map(baseVehicles.map((vehicle) => [vehicle.vehicle_id, {{
+        ...vehicle,
+        speed: 0.0,
+        heading_rad: 0.0,
+        is_interpolated: false,
+      }}]));
+
+      for (const segment of motionSegments) {{
+        if (!(Number(segment.start_time_s) <= timestampS && timestampS <= Number(segment.end_time_s))) {{
+          continue;
+        }}
+        const durationS = Number(segment.duration_s);
+        if (durationS <= 0.0) {{
+          continue;
+        }}
+        const normalized = Math.max(
+          0.0,
+          Math.min(1.0, (timestampS - Number(segment.start_time_s)) / durationS),
+        );
+        const eased = smoothstep(normalized);
+        sampled.set(segment.vehicle_id, {{
+          vehicle_id: segment.vehicle_id,
+          node_id: segment.start_node_id,
+          position: lerpPosition(segment.start_position, segment.end_position, eased),
+          operational_state: "moving",
+          speed: Number(segment.nominal_speed) * smoothstepDerivative(normalized),
+          heading_rad: Number(segment.heading_rad),
+          is_interpolated: true,
+        }});
+      }}
+
+      return Array.from(sampled.values()).sort((left, right) => left.vehicle_id - right.vehicle_id);
+    }}
+
+    function smoothstep(progress) {{
+      return progress * progress * (3.0 - 2.0 * progress);
+    }}
+
+    function smoothstepDerivative(progress) {{
+      return 6.0 * progress * (1.0 - progress);
+    }}
+
+    function lerpPosition(startPosition, endPosition, progress) {{
+      return [
+        Number(startPosition[0]) + (Number(endPosition[0]) - Number(startPosition[0])) * progress,
+        Number(startPosition[1]) + (Number(endPosition[1]) - Number(startPosition[1])) * progress,
+        Number(startPosition[2]) + (Number(endPosition[2]) - Number(startPosition[2])) * progress,
+      ];
+    }}
+
+    function tickPlayback(timestampMs) {{
+      if (!isPlaying) {{
+        return;
+      }}
+      if (lastAnimationTimestampMs === null) {{
+        lastAnimationTimestampMs = timestampMs;
+      }}
+      const deltaS = (timestampMs - lastAnimationTimestampMs) / 1000.0;
+      lastAnimationTimestampMs = timestampMs;
+      currentTimeS = Math.min(resolveFinalTime(bundle, timelineEntries), currentTimeS + deltaS);
+      timelineIndex = findTimelineIndexForTime(currentTimeS);
+      render();
+      if (currentTimeS >= resolveFinalTime(bundle, timelineEntries)) {{
+        isPlaying = false;
+        lastAnimationTimestampMs = null;
+        return;
+      }}
+      window.requestAnimationFrame(tickPlayback);
     }}
 
     function escapeHtml(value) {{

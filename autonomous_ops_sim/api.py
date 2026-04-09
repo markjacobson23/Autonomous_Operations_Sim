@@ -32,13 +32,17 @@ from autonomous_ops_sim.simulation.metrics import (
 )
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
 from autonomous_ops_sim.visualization.live_sync import (
-    LIVE_SYNC_SCHEMA_VERSION,
     LiveRuntimeSnapshot,
     LiveStateUpdate,
     build_live_runtime_snapshot,
     build_live_sync_surface,
     live_runtime_snapshot_to_dict,
     live_state_update_to_dict,
+)
+from autonomous_ops_sim.visualization.motion import (
+    VehicleMotionSegment,
+    build_vehicle_motion_segments,
+    motion_segment_to_dict,
 )
 from autonomous_ops_sim.visualization.state import (
     FrameTrigger,
@@ -51,9 +55,9 @@ from autonomous_ops_sim.visualization.state import (
 
 
 SIMULATION_API_VERSION = 1
-REPLAY_BUNDLE_SCHEMA_VERSION = 1
-LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 1
-LIVE_SYNC_BUNDLE_SCHEMA_VERSION = LIVE_SYNC_SCHEMA_VERSION
+REPLAY_BUNDLE_SCHEMA_VERSION = 2
+LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 2
+LIVE_SYNC_BUNDLE_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -95,6 +99,7 @@ class ReplayBundle:
     trace_events: tuple[dict[str, Any], ...]
     command_results: tuple[SimulationCommandResult, ...]
     session_history: tuple[SessionAdvanceRecord, ...]
+    motion_segments: tuple[VehicleMotionSegment, ...]
 
 
 @dataclass(frozen=True)
@@ -110,6 +115,7 @@ class LiveSessionBundle:
     trace_events: tuple[dict[str, Any], ...]
     session_history: tuple[SessionAdvanceRecord, ...]
     command_results: tuple[SimulationCommandResult, ...]
+    motion_segments: tuple[VehicleMotionSegment, ...]
 
 
 @dataclass(frozen=True)
@@ -122,6 +128,7 @@ class LiveSyncBundle:
     snapshot: LiveRuntimeSnapshot
     updates: tuple[LiveStateUpdate, ...]
     command_results: tuple[SimulationCommandResult, ...]
+    motion_segments: tuple[VehicleMotionSegment, ...]
 
 
 def apply_command_with_result(
@@ -170,6 +177,7 @@ def build_replay_bundle(
         command_history=command_history,
         session_history=session_history,
     )
+    motion_segments = build_vehicle_motion_segments(replay_state)
     command_results = _build_replay_command_results(
         command_history=tuple(command_history),
         frames=replay_state.frames,
@@ -191,6 +199,7 @@ def build_replay_bundle(
         ),
         command_results=command_results,
         session_history=tuple(session_history),
+        motion_segments=motion_segments,
     )
 
 
@@ -232,6 +241,7 @@ def build_live_session_bundle(
 
     metrics_summary = summary or summarize_engine_execution(session.engine)
     replay_state = build_visualization_state_from_live_session(session)
+    motion_segments = build_vehicle_motion_segments(replay_state)
     return LiveSessionBundle(
         metadata=SimulationApiMetadata(
             api_version=SIMULATION_API_VERSION,
@@ -251,6 +261,7 @@ def build_live_session_bundle(
             command_history=session.command_history,
             frames=replay_state.frames,
         ),
+        motion_segments=motion_segments,
     )
 
 
@@ -258,6 +269,7 @@ def build_live_sync_bundle(session: LiveSimulationSession) -> LiveSyncBundle:
     """Build the versioned live sync bundle for transport-agnostic viewers."""
 
     surface = build_live_sync_surface(session)
+    replay_state = build_visualization_state_from_live_session(session)
     return LiveSyncBundle(
         metadata=SimulationApiMetadata(
             api_version=SIMULATION_API_VERSION,
@@ -282,6 +294,7 @@ def build_live_sync_bundle(session: LiveSimulationSession) -> LiveSyncBundle:
             )
             for effect in surface.command_effects
         ),
+        motion_segments=build_vehicle_motion_segments(replay_state),
     )
 
 
@@ -339,6 +352,9 @@ def replay_bundle_to_dict(bundle: ReplayBundle) -> dict[str, Any]:
         "session_history": [
             session_advance_to_dict(record) for record in bundle.session_history
         ],
+        "motion_segments": [
+            motion_segment_to_dict(segment) for segment in bundle.motion_segments
+        ],
     }
 
 
@@ -360,6 +376,9 @@ def live_session_bundle_to_dict(bundle: LiveSessionBundle) -> dict[str, Any]:
             simulation_command_result_to_dict(result)
             for result in bundle.command_results
         ],
+        "motion_segments": [
+            motion_segment_to_dict(segment) for segment in bundle.motion_segments
+        ],
     }
 
 
@@ -375,6 +394,9 @@ def live_sync_bundle_to_dict(bundle: LiveSyncBundle) -> dict[str, Any]:
         "command_results": [
             simulation_command_result_to_dict(result)
             for result in bundle.command_results
+        ],
+        "motion_segments": [
+            motion_segment_to_dict(segment) for segment in bundle.motion_segments
         ],
     }
 
