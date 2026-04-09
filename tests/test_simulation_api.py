@@ -115,6 +115,7 @@ def test_replay_bundle_is_versioned_and_matches_existing_replay_surface() -> Non
     assert bundle.map_surface == replay_state.map_surface
     assert bundle.final_frame == replay_state.frames[-1]
     assert bundle.replay_timeline == replay_state.frames
+    assert bundle.render_geometry.roads != ()
     assert [result.status for result in bundle.command_results] == [
         "accepted",
         "accepted",

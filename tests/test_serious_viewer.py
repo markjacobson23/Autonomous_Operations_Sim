@@ -127,6 +127,7 @@ def test_serious_viewer_html_renders_replay_bundle_controls_and_embedded_data() 
     assert "web_client" in html_output
     assert "replay_bundle" in html_output
     assert "motion_segments" in html_output
+    assert "render_geometry" in html_output
 
 
 def test_serious_viewer_html_supports_live_session_and_live_sync_bundles() -> None:

@@ -1,3 +1,4 @@
 [console_scripts]
 autonomous-ops-gui-viewer = autonomous_ops_sim.visualization.gui_viewer:main
+autonomous-ops-serious-viewer = autonomous_ops_sim.visualization.serious_viewer:main
 autonomous-ops-sim = autonomous_ops_sim.cli:main

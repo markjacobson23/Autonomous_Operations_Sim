@@ -39,6 +39,11 @@ from autonomous_ops_sim.visualization.live_sync import (
     live_runtime_snapshot_to_dict,
     live_state_update_to_dict,
 )
+from autonomous_ops_sim.visualization.geometry import (
+    RenderGeometrySurface,
+    build_render_geometry_surface,
+    render_geometry_surface_to_dict,
+)
 from autonomous_ops_sim.visualization.motion import (
     VehicleMotionSegment,
     build_vehicle_motion_segments,
@@ -55,9 +60,9 @@ from autonomous_ops_sim.visualization.state import (
 
 
 SIMULATION_API_VERSION = 1
-REPLAY_BUNDLE_SCHEMA_VERSION = 2
-LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 2
-LIVE_SYNC_BUNDLE_SCHEMA_VERSION = 2
+REPLAY_BUNDLE_SCHEMA_VERSION = 3
+LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 3
+LIVE_SYNC_BUNDLE_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -94,6 +99,7 @@ class ReplayBundle:
     final_time_s: float
     summary: ExecutionMetricsSummary
     map_surface: MapSurface
+    render_geometry: RenderGeometrySurface
     final_frame: ReplayFrame
     replay_timeline: tuple[ReplayFrame, ...]
     trace_events: tuple[dict[str, Any], ...]
@@ -111,6 +117,7 @@ class LiveSessionBundle:
     simulated_time_s: float
     summary: ExecutionMetricsSummary
     map_surface: MapSurface
+    render_geometry: RenderGeometrySurface
     snapshot: LiveRuntimeSnapshot
     trace_events: tuple[dict[str, Any], ...]
     session_history: tuple[SessionAdvanceRecord, ...]
@@ -125,6 +132,7 @@ class LiveSyncBundle:
     metadata: SimulationApiMetadata
     seed: int
     map_surface: MapSurface
+    render_geometry: RenderGeometrySurface
     snapshot: LiveRuntimeSnapshot
     updates: tuple[LiveStateUpdate, ...]
     command_results: tuple[SimulationCommandResult, ...]
@@ -192,6 +200,7 @@ def build_replay_bundle(
         final_time_s=engine.simulated_time_s,
         summary=metrics_summary,
         map_surface=replay_state.map_surface,
+        render_geometry=build_render_geometry_surface(engine.map),
         final_frame=replay_state.frames[-1],
         replay_timeline=replay_state.frames,
         trace_events=tuple(
@@ -252,6 +261,7 @@ def build_live_session_bundle(
         simulated_time_s=session.engine.simulated_time_s,
         summary=metrics_summary,
         map_surface=replay_state.map_surface,
+        render_geometry=build_render_geometry_surface(session.engine.map),
         snapshot=build_live_runtime_snapshot(session),
         trace_events=tuple(
             trace_event_to_dict(event) for event in session.engine.trace.events
@@ -278,6 +288,7 @@ def build_live_sync_bundle(session: LiveSimulationSession) -> LiveSyncBundle:
         ),
         seed=surface.seed,
         map_surface=surface.map_surface,
+        render_geometry=build_render_geometry_surface(session.engine.map),
         snapshot=surface.snapshot,
         updates=surface.updates,
         command_results=tuple(
@@ -340,6 +351,7 @@ def replay_bundle_to_dict(bundle: ReplayBundle) -> dict[str, Any]:
         "final_time_s": bundle.final_time_s,
         "summary": metrics_summary_to_dict(bundle.summary),
         "map_surface": _map_surface_to_dict(bundle.map_surface),
+        "render_geometry": render_geometry_surface_to_dict(bundle.render_geometry),
         "final_frame": _replay_frame_to_dict(bundle.final_frame),
         "replay_timeline": [
             _replay_frame_to_dict(frame) for frame in bundle.replay_timeline
@@ -367,6 +379,7 @@ def live_session_bundle_to_dict(bundle: LiveSessionBundle) -> dict[str, Any]:
         "simulated_time_s": bundle.simulated_time_s,
         "summary": metrics_summary_to_dict(bundle.summary),
         "map_surface": _map_surface_to_dict(bundle.map_surface),
+        "render_geometry": render_geometry_surface_to_dict(bundle.render_geometry),
         "snapshot": live_runtime_snapshot_to_dict(bundle.snapshot),
         "trace_events": list(bundle.trace_events),
         "session_history": [
@@ -389,6 +402,7 @@ def live_sync_bundle_to_dict(bundle: LiveSyncBundle) -> dict[str, Any]:
         "metadata": simulation_api_metadata_to_dict(bundle.metadata),
         "seed": bundle.seed,
         "map_surface": _map_surface_to_dict(bundle.map_surface),
+        "render_geometry": render_geometry_surface_to_dict(bundle.render_geometry),
         "snapshot": live_runtime_snapshot_to_dict(bundle.snapshot),
         "updates": [live_state_update_to_dict(update) for update in bundle.updates],
         "command_results": [

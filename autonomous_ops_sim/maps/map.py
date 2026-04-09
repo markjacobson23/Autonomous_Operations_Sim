@@ -13,15 +13,23 @@ class Map:
             self,
             graph: Graph,
             coord_to_id: dict[tuple[float, float, float], int],
+            render_geometry: dict[str, object] | None = None,
     ):
         self._graph = graph
         self.coord_to_id = coord_to_id
+        self._render_geometry = render_geometry or {}
 
     @property
     def graph(self) -> Graph:
         """Return the immutable graph backing this map."""
 
         return self._graph
+
+    @property
+    def render_geometry(self) -> dict[str, object]:
+        """Return optional rendered-geometry metadata layered on the routing graph."""
+
+        return self._render_geometry
 
     def has_coordinate(self, position: tuple[float, float, float]) -> bool:
         """Return True if the given coordinate exists in the map."""

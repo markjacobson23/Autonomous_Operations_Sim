@@ -11,6 +11,14 @@ from autonomous_ops_sim.visualization.gui_viewer import (
     render_frame_plan_to_canvas,
     resolve_live_click_action,
 )
+from autonomous_ops_sim.visualization.geometry import (
+    AreaGeometrySurface,
+    IntersectionGeometrySurface,
+    RenderGeometrySurface,
+    RoadGeometrySurface,
+    build_render_geometry_surface,
+    render_geometry_surface_to_dict,
+)
 from autonomous_ops_sim.visualization.live_viewer import (
     AssignSelectedDestinationViewerAction,
     BlockEdgeViewerAction,
@@ -94,6 +102,7 @@ from autonomous_ops_sim.visualization.state import (
 )
 
 __all__ = [
+    "AreaGeometrySurface",
     "AssignDestinationInteraction",
     "AssignSelectedDestinationViewerAction",
     "BlockEdgeInteraction",
@@ -108,6 +117,7 @@ __all__ = [
     "GraphicalReplayViewer",
     "InterpolatedVehicleState",
     "InteractionValidationError",
+    "IntersectionGeometrySurface",
     "LIVE_SYNC_SCHEMA_VERSION",
     "LiveCommandEffect",
     "LiveRuntimeSnapshot",
@@ -123,10 +133,12 @@ __all__ = [
     "ReplayController",
     "ReplayFrame",
     "ReplayStep",
+    "RenderGeometrySurface",
     "RepositionVehicleInteraction",
     "RepositionSelectedVehicleViewerAction",
     "SelectVehicleViewerAction",
     "SERIOUS_VIEWER_FOUNDATION_VERSION",
+    "RoadGeometrySurface",
     "VehicleMotionSegment",
     "VisualizationInteraction",
     "ViewerFoundationPlan",
@@ -140,6 +152,7 @@ __all__ = [
     "build_live_runtime_snapshot",
     "build_live_state_updates",
     "build_live_sync_surface",
+    "build_render_geometry_surface",
     "build_vehicle_motion_segments",
     "build_serious_viewer_html",
     "build_viewer_foundation_plan",
@@ -167,6 +180,7 @@ __all__ = [
     "motion_segment_to_dict",
     "export_serious_viewer_html",
     "render_frame_plan_to_canvas",
+    "render_geometry_surface_to_dict",
     "resolve_live_click_action",
     "sample_motion",
     "translate_live_viewer_action",

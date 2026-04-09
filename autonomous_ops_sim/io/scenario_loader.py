@@ -193,6 +193,7 @@ def _validate_grid_map_params(params: dict[str, object]) -> None:
 def _validate_graph_map_params(params: dict[str, object]) -> None:
     nodes = params.get("nodes")
     edges = params.get("edges")
+    render_geometry = params.get("render_geometry")
 
     if not isinstance(nodes, list):
         raise ValueError("Graph map 'params.nodes' must be a list.")
@@ -297,6 +298,151 @@ def _validate_graph_map_params(params: dict[str, object]) -> None:
             raise ValueError(f"Graph map edge[{index}].distance must be positive.")
         if not isinstance(speed_limit, (int, float)) or float(speed_limit) <= 0:
             raise ValueError(f"Graph map edge[{index}].speed_limit must be positive.")
+
+    if render_geometry is not None:
+        _validate_graph_render_geometry(
+            render_geometry,
+            node_ids=node_ids,
+            edge_ids=edge_ids,
+        )
+
+
+def _validate_graph_render_geometry(
+    value: object,
+    *,
+    node_ids: set[int],
+    edge_ids: set[int],
+) -> None:
+    if not isinstance(value, dict):
+        raise ValueError("Graph map 'params.render_geometry' must be an object.")
+
+    roads = value.get("roads", [])
+    intersections = value.get("intersections", [])
+    areas = value.get("areas", [])
+
+    if not isinstance(roads, list):
+        raise ValueError("Graph map 'params.render_geometry.roads' must be a list.")
+    if not isinstance(intersections, list):
+        raise ValueError(
+            "Graph map 'params.render_geometry.intersections' must be a list."
+        )
+    if not isinstance(areas, list):
+        raise ValueError("Graph map 'params.render_geometry.areas' must be a list.")
+
+    road_ids: set[str] = set()
+    for index, road in enumerate(roads):
+        if not isinstance(road, dict):
+            raise ValueError(f"Graph map render road[{index}] must be an object.")
+        road_id = road.get("id")
+        edge_id_values = road.get("edge_ids")
+        centerline = road.get("centerline")
+        lane_count = road.get("lane_count", 1)
+        width_m = road.get("width_m", 1.0)
+        directionality = road.get("directionality", "one_way")
+
+        if not isinstance(road_id, str) or not road_id:
+            raise ValueError(
+                f"Graph map render road[{index}].id must be a non-empty string."
+            )
+        if road_id in road_ids:
+            raise ValueError("Graph map render road ids must be unique.")
+        road_ids.add(road_id)
+        if not isinstance(edge_id_values, list) or not edge_id_values:
+            raise ValueError(
+                f"Graph map render road[{index}].edge_ids must be a non-empty list."
+            )
+        for edge_id in edge_id_values:
+            if not isinstance(edge_id, int) or edge_id not in edge_ids:
+                raise ValueError(
+                    f"Graph map render road[{index}].edge_ids must reference configured edges."
+                )
+        if centerline is not None:
+            if not isinstance(centerline, list) or len(centerline) < 2:
+                raise ValueError(
+                    f"Graph map render road[{index}].centerline must contain at least 2 positions."
+                )
+            for point_index, point in enumerate(centerline):
+                _parse_position_value(
+                    point,
+                    context=(
+                        f"Graph map render road[{index}].centerline[{point_index}]"
+                    ),
+                )
+        if not isinstance(lane_count, int) or lane_count <= 0:
+            raise ValueError(
+                f"Graph map render road[{index}].lane_count must be a positive int."
+            )
+        if not isinstance(width_m, (int, float)) or float(width_m) <= 0.0:
+            raise ValueError(
+                f"Graph map render road[{index}].width_m must be positive numeric."
+            )
+        if not isinstance(directionality, str) or directionality not in {
+            "one_way",
+            "two_way",
+        }:
+            raise ValueError(
+                f"Graph map render road[{index}].directionality must be 'one_way' or 'two_way'."
+            )
+
+    intersection_ids: set[str] = set()
+    for index, intersection in enumerate(intersections):
+        if not isinstance(intersection, dict):
+            raise ValueError(
+                f"Graph map render intersection[{index}] must be an object."
+            )
+        intersection_id = intersection.get("id")
+        node_id = intersection.get("node_id")
+        polygon = intersection.get("polygon")
+        if not isinstance(intersection_id, str) or not intersection_id:
+            raise ValueError(
+                f"Graph map render intersection[{index}].id must be a non-empty string."
+            )
+        if intersection_id in intersection_ids:
+            raise ValueError("Graph map render intersection ids must be unique.")
+        intersection_ids.add(intersection_id)
+        if not isinstance(node_id, int) or node_id not in node_ids:
+            raise ValueError(
+                f"Graph map render intersection[{index}].node_id must reference a configured node."
+            )
+        if not isinstance(polygon, list) or len(polygon) < 3:
+            raise ValueError(
+                f"Graph map render intersection[{index}].polygon must contain at least 3 positions."
+            )
+        for point_index, point in enumerate(polygon):
+            _parse_position_value(
+                point,
+                context=(
+                    f"Graph map render intersection[{index}].polygon[{point_index}]"
+                ),
+            )
+
+    area_ids: set[str] = set()
+    for index, area in enumerate(areas):
+        if not isinstance(area, dict):
+            raise ValueError(f"Graph map render area[{index}] must be an object.")
+        area_id = area.get("id")
+        kind = area.get("kind")
+        polygon = area.get("polygon")
+        if not isinstance(area_id, str) or not area_id:
+            raise ValueError(
+                f"Graph map render area[{index}].id must be a non-empty string."
+            )
+        if area_id in area_ids:
+            raise ValueError("Graph map render area ids must be unique.")
+        area_ids.add(area_id)
+        if not isinstance(kind, str) or not kind:
+            raise ValueError(
+                f"Graph map render area[{index}].kind must be a non-empty string."
+            )
+        if not isinstance(polygon, list) or len(polygon) < 3:
+            raise ValueError(
+                f"Graph map render area[{index}].polygon must contain at least 3 positions."
+            )
+        for point_index, point in enumerate(polygon):
+            _parse_position_value(
+                point,
+                context=f"Graph map render area[{index}].polygon[{point_index}]",
+            )
 
 
 def _parse_vehicle_spec(data: object) -> VehicleSpec:

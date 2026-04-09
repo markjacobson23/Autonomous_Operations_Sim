@@ -96,11 +96,20 @@ def _build_map(*, map_spec: MapSpec):
     if map_spec.kind == "graph":
         nodes = map_spec.params.get("nodes")
         edges = map_spec.params.get("edges")
+        render_geometry = map_spec.params.get("render_geometry")
         if not isinstance(nodes, list) or not isinstance(edges, list):
             raise ValueError(
                 "Graph scenario execution requires list params.nodes and params.edges."
             )
-        return make_graph_map(nodes=tuple(nodes), edges=tuple(edges))
+        if render_geometry is not None and not isinstance(render_geometry, dict):
+            raise ValueError(
+                "Graph scenario execution params.render_geometry must be an object if provided."
+            )
+        return make_graph_map(
+            nodes=tuple(nodes),
+            edges=tuple(edges),
+            render_geometry=render_geometry,
+        )
 
     raise ValueError(f"Unsupported map kind for execution: {map_spec.kind!r}")
 

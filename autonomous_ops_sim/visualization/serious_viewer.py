@@ -387,6 +387,7 @@ def build_serious_viewer_html(
     const metadata = bundle.metadata;
     const surfaceName = metadata.surface_name;
     const mapSurface = bundle.map_surface;
+    const renderGeometry = bundle.render_geometry || {{ roads: [], intersections: [], areas: [] }};
     const motionSegments = Array.isArray(bundle.motion_segments) ? bundle.motion_segments : [];
     const timelineEntries = buildTimelineEntries(bundle);
     let selectedVehicleId = null;
@@ -531,9 +532,67 @@ def build_serious_viewer_html(
 
       const bounds = buildSceneBounds(mapSurface.nodes);
       const edgeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      const areaGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      const intersectionGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
       const nodeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
       const vehicleGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
       const blockedEdges = new Set(current.blocked_edge_ids);
+
+      for (const area of renderGeometry.areas || []) {{
+        const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+        const points = area.polygon.map((position) => {{
+          const point = project(position, bounds);
+          return `${{point.x}},${{point.y}}`;
+        }}).join(" ");
+        polygon.setAttribute("points", points);
+        polygon.setAttribute("fill", area.kind.includes("building") ? "rgba(94, 106, 115, 0.2)" : "rgba(13, 108, 116, 0.1)");
+        polygon.setAttribute("stroke", "rgba(30, 42, 54, 0.2)");
+        polygon.setAttribute("stroke-width", "2");
+        areaGroup.appendChild(polygon);
+      }}
+
+      for (const intersection of renderGeometry.intersections || []) {{
+        const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+        const points = intersection.polygon.map((position) => {{
+          const point = project(position, bounds);
+          return `${{point.x}},${{point.y}}`;
+        }}).join(" ");
+        polygon.setAttribute("points", points);
+        polygon.setAttribute("fill", "rgba(205, 191, 169, 0.45)");
+        polygon.setAttribute("stroke", "rgba(126, 107, 72, 0.4)");
+        polygon.setAttribute("stroke-width", "2");
+        intersectionGroup.appendChild(polygon);
+      }}
+
+      for (const road of renderGeometry.roads || []) {{
+        const points = road.centerline.map((position) => project(position, bounds));
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        path.setAttribute(
+          "points",
+          points.map((point) => `${{point.x}},${{point.y}}`).join(" "),
+        );
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", road.directionality === "two_way" ? "#73818a" : "#81929b");
+        path.setAttribute("stroke-width", String(Math.max(8, Number(road.width_m) * 7)));
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("stroke-linejoin", "round");
+        edgeGroup.appendChild(path);
+
+        if (road.directionality === "two_way") {{
+          const laneMark = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+          laneMark.setAttribute(
+            "points",
+            points.map((point) => `${{point.x}},${{point.y}}`).join(" "),
+          );
+          laneMark.setAttribute("fill", "none");
+          laneMark.setAttribute("stroke", "rgba(255, 250, 240, 0.8)");
+          laneMark.setAttribute("stroke-width", "2");
+          laneMark.setAttribute("stroke-dasharray", "10 8");
+          laneMark.setAttribute("stroke-linecap", "round");
+          laneMark.setAttribute("stroke-linejoin", "round");
+          edgeGroup.appendChild(laneMark);
+        }}
+      }}
 
       for (const edge of mapSurface.edges) {{
         const startNode = mapSurface.nodes.find((node) => node.node_id === edge.start_node_id);
@@ -598,7 +657,9 @@ def build_serious_viewer_html(
         vehicleGroup.appendChild(group);
       }});
 
+      svg.appendChild(areaGroup);
       svg.appendChild(edgeGroup);
+      svg.appendChild(intersectionGroup);
       svg.appendChild(nodeGroup);
       svg.appendChild(vehicleGroup);
 
@@ -632,6 +693,14 @@ def build_serious_viewer_html(
         {{
           label: "Current trigger",
           value: current.label,
+        }},
+        {{
+          label: "Roads",
+          value: String((renderGeometry.roads || []).length),
+        }},
+        {{
+          label: "Areas",
+          value: String((renderGeometry.areas || []).length),
         }},
         {{
           label: "Command results",
