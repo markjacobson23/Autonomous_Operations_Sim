@@ -25,10 +25,14 @@ from autonomous_ops_sim.visualization.command_center import (
     CommandCenterVehicleSurface,
     RoutePreviewRequest,
     RoutePreviewSurface,
+    VehicleDiagnosticSurface,
+    VehicleInspectionSurface,
     build_live_command_center_surface,
+    build_vehicle_inspection_surface,
     command_center_surface_to_dict,
     preview_route_command,
     route_preview_surface_to_dict,
+    vehicle_inspection_surface_to_dict,
 )
 from autonomous_ops_sim.visualization.live_viewer import (
     AssignSelectedDestinationViewerAction,
@@ -179,6 +183,8 @@ __all__ = [
     "TrafficSnapshot",
     "UnblockEdgeInteraction",
     "UnblockEdgeViewerAction",
+    "VehicleDiagnosticSurface",
+    "VehicleInspectionSurface",
     "VehicleMotionSegment",
     "VisualizationInteraction",
     "ViewerFoundationPlan",
@@ -191,6 +197,7 @@ __all__ = [
     "apply_interactions_to_live_session",
     "build_live_runtime_snapshot",
     "build_live_command_center_surface",
+    "build_vehicle_inspection_surface",
     "build_live_state_updates",
     "build_live_sync_surface",
     "build_render_geometry_surface",
@@ -233,5 +240,6 @@ __all__ = [
     "traffic_snapshot_to_dict",
     "translate_live_viewer_action",
     "translate_interactions",
+    "vehicle_inspection_surface_to_dict",
     "visualization_state_to_dict",
 ]

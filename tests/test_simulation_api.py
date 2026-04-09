@@ -162,6 +162,11 @@ def test_live_session_and_live_sync_bundles_share_one_api_version() -> None:
     assert live_bundle.command_center == sync_bundle.command_center
     assert live_bundle.command_center.selected_vehicle_ids == (77,)
     assert live_bundle.command_center.route_previews[0].node_ids == (3,)
+    assert live_bundle.command_center.vehicle_inspections[0].vehicle_id == 77
+    assert live_bundle.command_center.vehicle_inspections[0].payload == 0.0
+    assert live_bundle.command_center.vehicle_inspections[0].recent_commands[-1][
+        "command_type"
+    ] == "assign_vehicle_destination"
     assert sync_bundle.command_results[1].emitted_update_indices == (
         2,
         3,
@@ -218,3 +223,5 @@ def test_replay_live_and_sync_bundle_exports_are_deterministic() -> None:
     assert "traffic_baseline" in json.loads(sync_json_a)
     assert "command_center" in json.loads(live_json_a)
     assert "command_center" in json.loads(sync_json_a)
+    assert "vehicle_inspections" in json.loads(live_json_a)["command_center"]
+    assert "vehicle_inspections" in json.loads(sync_json_a)["command_center"]

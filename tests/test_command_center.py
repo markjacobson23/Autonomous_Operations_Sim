@@ -13,6 +13,7 @@ from autonomous_ops_sim.simulation import (
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
 from autonomous_ops_sim.visualization import (
     RoutePreviewRequest,
+    build_vehicle_inspection_surface,
     build_live_command_center_surface,
     preview_route_command,
 )
@@ -110,3 +111,35 @@ def test_command_center_surface_tracks_selection_edge_openings_and_preview_reque
     updated_surface = build_live_command_center_surface(session)
     assert updated_surface.edges[1].is_blocked is False
     assert updated_surface.edges[1].available_action == "block_edge"
+
+
+def test_vehicle_inspection_surface_exposes_payload_route_history_and_diagnostics() -> None:
+    session = LiveSimulationSession(build_command_center_engine())
+    session.apply(BlockEdgeCommand(edge_id=2))
+    preview = preview_route_command(session, vehicle_id=77, destination_node_id=3)
+
+    inspection = build_vehicle_inspection_surface(
+        session,
+        vehicle_id=77,
+        route_preview=preview,
+    )
+
+    assert inspection.vehicle_id == 77
+    assert inspection.current_node_id == 1
+    assert inspection.exact_position == (0.0, 0.0, 0.0)
+    assert inspection.speed == 0.0
+    assert inspection.payload == 0.0
+    assert inspection.max_payload == 10.0
+    assert inspection.operational_state == "idle"
+    assert inspection.current_job_id is None
+    assert inspection.wait_reason is None
+    assert inspection.route_ahead_node_ids == (1, 4, 3)
+    assert inspection.route_ahead_edge_ids == (3, 4)
+    assert inspection.eta_s == 0.4
+    assert inspection.recent_commands == ({"command_type": "block_edge", "edge_id": 2},)
+    assert inspection.recent_trace_events == ()
+    assert [diagnostic.code for diagnostic in inspection.diagnostics] == [
+        "payload_state",
+        "route_preview",
+        "ready_state",
+    ]

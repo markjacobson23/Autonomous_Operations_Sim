@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from autonomous_ops_sim.io.exports import trace_event_to_dict
 from autonomous_ops_sim.simulation import LiveSimulationSession, command_to_dict
 
 
@@ -40,6 +41,39 @@ class CommandCenterVehicleSurface:
 
 
 @dataclass(frozen=True)
+class VehicleDiagnosticSurface:
+    """Stable diagnostic hook surfaced to the operator for one vehicle."""
+
+    code: str
+    severity: str
+    message: str
+
+
+@dataclass(frozen=True)
+class VehicleInspectionSurface:
+    """Stable operator-facing inspection record for one selected vehicle."""
+
+    vehicle_id: int
+    current_node_id: int
+    exact_position: tuple[float, float, float]
+    speed: float
+    payload: float
+    max_payload: float
+    operational_state: str
+    current_job_id: str | None
+    current_task_index: int | None
+    current_task_type: str | None
+    assigned_resource_id: str | None
+    wait_reason: str | None
+    eta_s: float | None
+    route_ahead_node_ids: tuple[int, ...]
+    route_ahead_edge_ids: tuple[int, ...]
+    recent_commands: tuple[dict[str, Any], ...]
+    recent_trace_events: tuple[dict[str, Any], ...]
+    diagnostics: tuple[VehicleDiagnosticSurface, ...]
+
+
+@dataclass(frozen=True)
 class CommandCenterEdgeSurface:
     """Stable operator-facing open/close action summary for one edge."""
 
@@ -58,6 +92,7 @@ class CommandCenterSurface:
     edges: tuple[CommandCenterEdgeSurface, ...]
     recent_commands: tuple[dict[str, Any], ...]
     route_previews: tuple[RoutePreviewSurface, ...]
+    vehicle_inspections: tuple[VehicleInspectionSurface, ...]
 
 
 def preview_route_command(
@@ -151,6 +186,74 @@ def build_live_command_center_surface(
             )
             for request in route_preview_requests
         ),
+        vehicle_inspections=tuple(
+            build_vehicle_inspection_surface(
+                session,
+                vehicle_id=vehicle_id,
+                route_preview=_preview_for_vehicle(
+                    session,
+                    vehicle_id=vehicle_id,
+                    route_preview_requests=route_preview_requests,
+                ),
+            )
+            for vehicle_id in normalized_selection
+        ),
+    )
+
+
+def build_vehicle_inspection_surface(
+    session: LiveSimulationSession,
+    *,
+    vehicle_id: int,
+    route_preview: RoutePreviewSurface | None = None,
+) -> VehicleInspectionSurface:
+    """Build one richer inspection record from authoritative session state."""
+
+    vehicle = session.engine.get_vehicle(vehicle_id)
+    context = _active_execution_context(session, vehicle_id=vehicle_id)
+    targeted_commands = tuple(
+        command_to_dict(record.command)
+        for record in session.command_history
+        if _command_targets_vehicle(record.command, vehicle_id=vehicle_id)
+    )
+    recent_commands = (
+        targeted_commands[-6:]
+        if targeted_commands
+        else tuple(command_to_dict(record.command) for record in session.command_history[-6:])
+    )
+    recent_trace_events = tuple(
+        trace_event_to_dict(event)
+        for event in session.engine.trace.events
+        if event.vehicle_id == vehicle_id
+    )[-8:]
+    return VehicleInspectionSurface(
+        vehicle_id=vehicle_id,
+        current_node_id=vehicle.current_node_id,
+        exact_position=vehicle.position,
+        speed=vehicle.velocity,
+        payload=vehicle.payload,
+        max_payload=vehicle.max_payload,
+        operational_state=vehicle.operational_state,
+        current_job_id=context["current_job_id"],
+        current_task_index=context["current_task_index"],
+        current_task_type=context["current_task_type"],
+        assigned_resource_id=context["assigned_resource_id"],
+        wait_reason=context["wait_reason"],
+        eta_s=_estimate_eta_s(
+            session,
+            route_preview=route_preview,
+        ),
+        route_ahead_node_ids=route_preview.node_ids if route_preview is not None else (),
+        route_ahead_edge_ids=route_preview.edge_ids if route_preview is not None else (),
+        recent_commands=recent_commands,
+        recent_trace_events=recent_trace_events,
+        diagnostics=_build_vehicle_diagnostics(
+            vehicle_id=vehicle_id,
+            vehicle=vehicle,
+            route_preview=route_preview,
+            wait_reason=context["wait_reason"],
+            current_job_id=context["current_job_id"],
+        ),
     )
 
 
@@ -168,6 +271,40 @@ def route_preview_surface_to_dict(
         "node_ids": list(preview.node_ids),
         "edge_ids": list(preview.edge_ids),
         "total_distance": preview.total_distance,
+    }
+
+
+def vehicle_inspection_surface_to_dict(
+    inspection: VehicleInspectionSurface,
+) -> dict[str, Any]:
+    """Convert one vehicle inspection into a stable JSON-ready record."""
+
+    return {
+        "vehicle_id": inspection.vehicle_id,
+        "current_node_id": inspection.current_node_id,
+        "exact_position": list(inspection.exact_position),
+        "speed": inspection.speed,
+        "payload": inspection.payload,
+        "max_payload": inspection.max_payload,
+        "operational_state": inspection.operational_state,
+        "current_job_id": inspection.current_job_id,
+        "current_task_index": inspection.current_task_index,
+        "current_task_type": inspection.current_task_type,
+        "assigned_resource_id": inspection.assigned_resource_id,
+        "wait_reason": inspection.wait_reason,
+        "eta_s": inspection.eta_s,
+        "route_ahead_node_ids": list(inspection.route_ahead_node_ids),
+        "route_ahead_edge_ids": list(inspection.route_ahead_edge_ids),
+        "recent_commands": list(inspection.recent_commands),
+        "recent_trace_events": list(inspection.recent_trace_events),
+        "diagnostics": [
+            {
+                "code": diagnostic.code,
+                "severity": diagnostic.severity,
+                "message": diagnostic.message,
+            }
+            for diagnostic in inspection.diagnostics
+        ],
     }
 
 
@@ -201,6 +338,10 @@ def command_center_surface_to_dict(
         "route_previews": [
             route_preview_surface_to_dict(preview)
             for preview in surface.route_previews
+        ],
+        "vehicle_inspections": [
+            vehicle_inspection_surface_to_dict(inspection)
+            for inspection in surface.vehicle_inspections
         ],
     }
 
@@ -236,14 +377,162 @@ def _edge_ids_for_node_path(
     return tuple(edge_ids)
 
 
+def _active_execution_context(
+    session: LiveSimulationSession,
+    *,
+    vehicle_id: int,
+) -> dict[str, Any]:
+    current_job_id: str | None = None
+    current_task_index: int | None = None
+    current_task_type: str | None = None
+    assigned_resource_id: str | None = None
+    wait_reason: str | None = None
+
+    for event in session.engine.trace.events:
+        if event.vehicle_id != vehicle_id:
+            continue
+        event_type = event.event_type.value
+        if event_type == "job_start":
+            current_job_id = event.job_id
+        elif event_type == "task_start":
+            current_task_index = event.task_index
+            current_task_type = event.task_type
+        elif event_type in {"resource_wait_start", "service_start"}:
+            assigned_resource_id = event.resource_id
+        elif event_type in {"resource_wait_complete", "service_complete"}:
+            assigned_resource_id = None
+        elif event_type == "task_complete":
+            current_task_index = None
+            current_task_type = None
+            assigned_resource_id = None
+        elif event_type == "job_complete":
+            current_job_id = None
+        elif event_type == "behavior_transition" and event.to_behavior_state in {
+            "conflict_wait",
+            "resource_wait",
+            "failed",
+        }:
+            wait_reason = event.transition_reason
+        elif event_type == "behavior_transition" and event.to_behavior_state in {
+            "moving",
+            "idle",
+            "servicing",
+        }:
+            wait_reason = None
+
+    return {
+        "current_job_id": current_job_id,
+        "current_task_index": current_task_index,
+        "current_task_type": current_task_type,
+        "assigned_resource_id": assigned_resource_id,
+        "wait_reason": wait_reason,
+    }
+
+
+def _preview_for_vehicle(
+    session: LiveSimulationSession,
+    *,
+    vehicle_id: int,
+    route_preview_requests: tuple[RoutePreviewRequest, ...]
+    | list[RoutePreviewRequest],
+) -> RoutePreviewSurface | None:
+    for request in route_preview_requests:
+        if request.vehicle_id != vehicle_id:
+            continue
+        return preview_route_command(
+            session,
+            vehicle_id=request.vehicle_id,
+            destination_node_id=request.destination_node_id,
+        )
+    return None
+
+
+def _estimate_eta_s(
+    session: LiveSimulationSession,
+    *,
+    route_preview: RoutePreviewSurface | None,
+) -> float | None:
+    if route_preview is None or not route_preview.edge_ids:
+        return None
+    travel_time_s = 0.0
+    vehicle = session.engine.get_vehicle(route_preview.vehicle_id)
+    for edge_id in route_preview.edge_ids:
+        edge = session.engine.map.graph.edges[edge_id]
+        travel_time_s += edge.distance / min(vehicle.max_speed, edge.speed_limit)
+    return travel_time_s
+
+
+def _command_targets_vehicle(command: object, *, vehicle_id: int) -> bool:
+    command_vehicle_id = getattr(command, "vehicle_id", None)
+    return command_vehicle_id == vehicle_id
+
+
+def _build_vehicle_diagnostics(
+    *,
+    vehicle_id: int,
+    vehicle: object,
+    route_preview: RoutePreviewSurface | None,
+    wait_reason: str | None,
+    current_job_id: str | None,
+) -> tuple[VehicleDiagnosticSurface, ...]:
+    diagnostics: list[VehicleDiagnosticSurface] = []
+    payload = getattr(vehicle, "payload")
+    operational_state = getattr(vehicle, "operational_state")
+
+    diagnostics.append(
+        VehicleDiagnosticSurface(
+            code="payload_state",
+            severity="info",
+            message=(
+                "Vehicle payload is empty."
+                if payload == 0.0
+                else f"Vehicle carries payload {payload:.2f}."
+            ),
+        )
+    )
+    if route_preview is not None:
+        diagnostics.append(
+            VehicleDiagnosticSurface(
+                code="route_preview",
+                severity="info" if route_preview.is_actionable else "warning",
+                message=(
+                    "Route preview is actionable."
+                    if route_preview.is_actionable
+                    else f"Route preview is blocked: {route_preview.reason}."
+                ),
+            )
+        )
+    if wait_reason is not None:
+        diagnostics.append(
+            VehicleDiagnosticSurface(
+                code="wait_reason",
+                severity="warning",
+                message=f"Vehicle is waiting because of {wait_reason}.",
+            )
+        )
+    if operational_state == "idle" and current_job_id is None:
+        diagnostics.append(
+            VehicleDiagnosticSurface(
+                code="ready_state",
+                severity="info",
+                message=f"Vehicle {vehicle_id} is idle and ready for reassignment.",
+            )
+        )
+    return tuple(diagnostics)
+
+
 __all__ = [
     "CommandCenterEdgeSurface",
     "CommandCenterSurface",
     "CommandCenterVehicleSurface",
     "RoutePreviewRequest",
     "RoutePreviewSurface",
+    "VehicleDiagnosticSurface",
+    "VehicleInspectionSurface",
+    "build_vehicle_inspection_surface",
     "build_live_command_center_surface",
     "command_center_surface_to_dict",
     "preview_route_command",
     "route_preview_surface_to_dict",
+    "vehicle_inspection_surface_to_dict",
 ]

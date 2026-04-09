@@ -132,6 +132,8 @@ def test_serious_viewer_html_renders_replay_bundle_controls_and_embedded_data() 
     assert "sampleTrafficAtTime" in html_output
     assert "Traffic controls" in html_output
     assert "Command Center" in html_output
+    assert "Exact position" in html_output
+    assert "Diagnostics" in html_output
 
 
 def test_serious_viewer_html_supports_live_session_and_live_sync_bundles() -> None:
@@ -159,6 +161,8 @@ def test_serious_viewer_html_supports_live_session_and_live_sync_bundles() -> No
     assert "traffic_baseline" in live_sync_html
     assert "command_center" in live_session_html
     assert "command_center" in live_sync_html
+    assert "vehicle_inspections" in live_session_html
+    assert "vehicle_inspections" in live_sync_html
 
 
 def test_serious_viewer_cli_loads_bundle_and_writes_html(tmp_path, capsys) -> None:

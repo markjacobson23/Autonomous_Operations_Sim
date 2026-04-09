@@ -372,6 +372,7 @@ def build_serious_viewer_html(
         <h2>Vehicle Inspector</h2>
         <div class="tiny" id="inspectorHint">Select a vehicle from the scene or list.</div>
         <div class="inspector-list" id="vehicleList"></div>
+        <ul class="list" id="vehicleDetailList" style="margin-top:10px"></ul>
       </section>
       <section class="card">
         <h2>Foundation Rationale</h2>
@@ -394,12 +395,14 @@ def build_serious_viewer_html(
     const mapSurface = bundle.map_surface;
     const renderGeometry = bundle.render_geometry || {{ roads: [], intersections: [], areas: [] }};
     const trafficBaseline = bundle.traffic_baseline || {{ control_points: [], queue_records: [] }};
+    const traceEvents = Array.isArray(bundle.trace_events) ? bundle.trace_events : [];
     const commandCenter = bundle.command_center || {{
       selected_vehicle_ids: [],
       vehicles: [],
       edges: [],
       recent_commands: [],
       route_previews: [],
+      vehicle_inspections: [],
     }};
     const motionSegments = Array.isArray(bundle.motion_segments) ? bundle.motion_segments : [];
     const timelineEntries = buildTimelineEntries(bundle);
@@ -755,12 +758,18 @@ def build_serious_viewer_html(
 
     function renderInspector(vehicles) {{
       const vehicleList = document.getElementById("vehicleList");
+      const vehicleDetailList = document.getElementById("vehicleDetailList");
       const inspectorHint = document.getElementById("inspectorHint");
       const selectedVehicle = vehicles.find((vehicle) => vehicle.vehicle_id === selectedVehicleId) || null;
       if (!selectedVehicle) {{
         inspectorHint.textContent = "No vehicle selected for this timeline step.";
+        vehicleDetailList.innerHTML = "";
       }} else {{
         inspectorHint.textContent = `Inspecting vehicle ${{selectedVehicle.vehicle_id}} at ${{Number(currentTimeS).toFixed(2)}}s`;
+        const detail = buildVehicleDetail(selectedVehicle);
+        vehicleDetailList.innerHTML = detail.map((item) =>
+          `<li><strong>${{escapeHtml(item.label)}}</strong>${{escapeHtml(item.value)}}</li>`
+        ).join("");
       }}
 
       vehicleList.innerHTML = vehicles.map((vehicle) => {{
@@ -779,6 +788,64 @@ def build_serious_viewer_html(
           </button>
         `;
       }}).join("");
+    }}
+
+    function buildVehicleDetail(vehicle) {{
+      const commandCenterInspection = (commandCenter.vehicle_inspections || [])
+        .find((inspection) => inspection.vehicle_id === vehicle.vehicle_id) || null;
+      const routeAhead = deriveRouteAhead(vehicle.vehicle_id, vehicle.node_id, currentTimeS);
+      const recentEvents = recentTraceEvents(vehicle.vehicle_id, currentTimeS);
+      const activeTask = inferActiveTask(recentEvents, commandCenterInspection);
+      const waitReason = inferWaitReason(vehicle.operational_state, recentEvents, commandCenterInspection);
+      const diagnostics = commandCenterInspection?.diagnostics || deriveDiagnostics(vehicle, waitReason, routeAhead);
+      return [
+        {{
+          label: "Exact position",
+          value: `[${{vehicle.position.map((value) => Number(value).toFixed(2)).join(", ")}}]`,
+        }},
+        {{
+          label: "Speed",
+          value: Number(vehicle.speed || 0).toFixed(2),
+        }},
+        {{
+          label: "Payload",
+          value: commandCenterInspection
+            ? `${{Number(commandCenterInspection.payload).toFixed(2)}} / ${{Number(commandCenterInspection.max_payload).toFixed(2)}}`
+            : "n/a",
+        }},
+        {{
+          label: "State",
+          value: vehicle.operational_state,
+        }},
+        {{
+          label: "Current task",
+          value: activeTask,
+        }},
+        {{
+          label: "Wait reason",
+          value: waitReason || "none",
+        }},
+        {{
+          label: "ETA",
+          value: routeAhead.etaS === null ? "n/a" : `${{Number(routeAhead.etaS).toFixed(2)}}s`,
+        }},
+        {{
+          label: "Route ahead",
+          value: routeAhead.nodeIds.length > 0 ? routeAhead.nodeIds.join(" -> ") : "none",
+        }},
+        {{
+          label: "Recent commands",
+          value: recentCommandsForVehicle(vehicle.vehicle_id, commandCenterInspection),
+        }},
+        {{
+          label: "Recent events",
+          value: recentEvents.slice(-4).map((event) => event.event_type).join(", ") || "none",
+        }},
+        {{
+          label: "Diagnostics",
+          value: diagnostics.map((diagnostic) => diagnostic.message || diagnostic.code).join(" | ") || "none",
+        }},
+      ];
     }}
 
     function renderCommandCenter() {{
@@ -812,10 +879,90 @@ def build_serious_viewer_html(
             .map((preview) => `V${{preview.vehicle_id}} -> N${{preview.destination_node_id}} [${{preview.node_ids.join(" -> ")}}]`)
             .join(" | ") || "none",
         }},
+        {{
+          label: "Inspection panels",
+          value: String((commandCenter.vehicle_inspections || []).length),
+        }},
       ];
       commandCenterList.innerHTML = lines.map((item) =>
         `<li><strong>${{escapeHtml(item.label)}}</strong>${{escapeHtml(item.value)}}</li>`
       ).join("");
+    }}
+
+    function deriveRouteAhead(vehicleId, currentNodeId, timestampS) {{
+      const relevantSegments = motionSegments
+        .filter((segment) => segment.vehicle_id === vehicleId && Number(segment.end_time_s) >= timestampS)
+        .sort((left, right) => Number(left.start_time_s) - Number(right.start_time_s));
+      if (relevantSegments.length === 0) {{
+        return {{ nodeIds: [], edgeIds: [], etaS: null }};
+      }}
+      let etaS = 0.0;
+      const edgeIds = relevantSegments.map((segment) => segment.edge_id);
+      const nodeIds = [currentNodeId];
+      relevantSegments.forEach((segment, index) => {{
+        if (index === 0) {{
+          etaS += Math.max(0.0, Number(segment.end_time_s) - timestampS);
+        }} else {{
+          etaS += Number(segment.duration_s);
+        }}
+        nodeIds.push(segment.end_node_id);
+      }});
+      return {{ nodeIds, edgeIds, etaS }};
+    }}
+
+    function recentTraceEvents(vehicleId, timestampS) {{
+      return traceEvents
+        .filter((event) => event.vehicle_id === vehicleId && Number(event.timestamp_s) <= timestampS)
+        .sort((left, right) => Number(left.sequence) - Number(right.sequence));
+    }}
+
+    function inferActiveTask(recentEvents, inspection) {{
+      if (inspection && inspection.current_task_type) {{
+        return `job ${{inspection.current_job_id || "n/a"}} task ${{inspection.current_task_index ?? "n/a"}} (${{inspection.current_task_type}})`;
+      }}
+      const taskStart = [...recentEvents].reverse().find((event) => event.event_type === "task_start");
+      const taskComplete = [...recentEvents].reverse().find((event) => event.event_type === "task_complete");
+      if (!taskStart) {{
+        return "none";
+      }}
+      if (taskComplete && Number(taskComplete.sequence) >= Number(taskStart.sequence)) {{
+        return "none";
+      }}
+      return `job ${{taskStart.job_id || "n/a"}} task ${{taskStart.task_index ?? "n/a"}} (${{taskStart.task_type || "unknown"}})`;
+    }}
+
+    function inferWaitReason(operationalState, recentEvents, inspection) {{
+      if (inspection && inspection.wait_reason) {{
+        return inspection.wait_reason;
+      }}
+      if (!["conflict_wait", "resource_wait", "failed"].includes(operationalState)) {{
+        return null;
+      }}
+      const transition = [...recentEvents].reverse().find((event) =>
+        event.event_type === "behavior_transition"
+        && event.to_behavior_state === operationalState
+      );
+      return transition?.transition_reason || operationalState;
+    }}
+
+    function recentCommandsForVehicle(vehicleId, inspection) {{
+      const commands = inspection?.recent_commands
+        || (bundle.command_results || [])
+          .map((result) => result.command)
+          .filter((command) => command.vehicle_id === vehicleId)
+          .slice(-4);
+      return commands.map((command) => command.command_type).join(", ") || "none";
+    }}
+
+    function deriveDiagnostics(vehicle, waitReason, routeAhead) {{
+      const diagnostics = [];
+      if (waitReason) {{
+        diagnostics.push({{ code: "wait_reason", message: `Vehicle is waiting because of ${{waitReason}}.` }});
+      }}
+      if (vehicle.operational_state === "idle" && routeAhead.nodeIds.length === 0) {{
+        diagnostics.push({{ code: "ready_state", message: "Vehicle is idle and ready for reassignment." }});
+      }}
+      return diagnostics;
     }}
 
     function sampleTrafficAtTime(timestampS) {{
