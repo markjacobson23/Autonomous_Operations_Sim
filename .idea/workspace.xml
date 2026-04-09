@@ -4,7 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="80a83f02-da50-42e5-b2f5-61cccc1dbda7" name="Changes" comment="added simple demos" />
+    <list default="true" id="80a83f02-da50-42e5-b2f5-61cccc1dbda7" name="Changes" comment="added simple demos">
+      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim.egg-info/SOURCES.txt" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim.egg-info/SOURCES.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim.egg-info/entry_points.txt" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim.egg-info/entry_points.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/autonomous_ops_sim/visualization/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/autonomous_ops_sim/visualization/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_visualization.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_visualization.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />

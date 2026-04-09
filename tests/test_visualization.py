@@ -20,11 +20,34 @@ from autonomous_ops_sim.vehicles.vehicle import Vehicle
 from autonomous_ops_sim.visualization import (
     build_visualization_state,
     build_visualization_state_from_controller,
+    build_frame_render_plan,
     export_visualization_json,
     iter_replay_steps,
     load_visualization_json,
+    render_frame_plan_to_canvas,
 )
+from autonomous_ops_sim.visualization.gui_viewer import ReplayController
 from autonomous_ops_sim.visualization.viewer import main as viewer_main
+
+
+class RecordingCanvas:
+    def __init__(self) -> None:
+        self.operations: list[tuple[str, tuple[object, ...], dict[str, object]]] = []
+
+    def delete(self, *args: object) -> None:
+        self.operations.append(("delete", args, {}))
+
+    def create_line(self, *args: object, **kwargs: object) -> int:
+        self.operations.append(("line", args, kwargs))
+        return len(self.operations)
+
+    def create_oval(self, *args: object, **kwargs: object) -> int:
+        self.operations.append(("oval", args, kwargs))
+        return len(self.operations)
+
+    def create_text(self, *args: object, **kwargs: object) -> int:
+        self.operations.append(("text", args, kwargs))
+        return len(self.operations)
 
 
 def build_visualization_route_engine() -> SimulationEngine:
@@ -256,3 +279,110 @@ def test_text_viewer_consumes_visualization_state_json(tmp_path, capsys) -> None
         "blocked_edges=[]\n"
         "vehicle 77 node=1 state=idle position=(0.0, 0.0, 0.0)\n"
     )
+
+
+def test_graphical_replay_controller_consumes_frames_deterministically() -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+    replay = ReplayController(state)
+
+    replay.play()
+    observed = [
+        (
+            replay.current_frame().frame_index,
+            replay.current_frame().timestamp_s,
+            replay.current_frame().trigger.event_name,
+        )
+    ]
+
+    while replay.advance_playback():
+        frame = replay.current_frame()
+        observed.append(
+            (
+                frame.frame_index,
+                frame.timestamp_s,
+                frame.trigger.event_name,
+            )
+        )
+
+    assert replay.is_playing is False
+    assert replay.frame_index == len(state.frames) - 1
+    assert observed == [
+        (frame.frame_index, frame.timestamp_s, frame.trigger.event_name)
+        for frame in state.frames
+    ]
+
+    replay.reset()
+    assert replay.frame_index == 0
+    assert replay.current_frame().trigger.event_name == "initial_state"
+
+    replay.next_frame()
+    assert replay.frame_index == 1
+    assert replay.current_frame().trigger.event_name == "block_edge"
+
+
+def test_graphical_viewer_render_plan_is_stable_after_json_load(tmp_path) -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+    visualization_path = tmp_path / "visualization.json"
+    visualization_path.write_text(export_visualization_json(state), encoding="utf-8")
+
+    loaded_state = load_visualization_json(visualization_path)
+    original_plan = build_frame_render_plan(state, frame_index=5)
+    loaded_plan = build_frame_render_plan(loaded_state, frame_index=5)
+
+    assert loaded_state == state
+    assert loaded_plan == original_plan
+
+
+def test_graphical_viewer_renders_visualization_state_to_canvas_end_to_end(
+    tmp_path,
+) -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+    visualization_path = tmp_path / "visualization.json"
+    visualization_path.write_text(export_visualization_json(state), encoding="utf-8")
+
+    loaded_state = load_visualization_json(visualization_path)
+    plan = build_frame_render_plan(loaded_state, frame_index=1)
+    canvas = RecordingCanvas()
+    render_frame_plan_to_canvas(canvas, plan)
+
+    assert canvas.operations[0] == ("delete", ("all",), {})
+    assert [operation[0] for operation in canvas.operations].count("line") == 5
+    assert [operation[0] for operation in canvas.operations].count("oval") == 5
+    assert [operation[0] for operation in canvas.operations].count("text") == 6
+    assert any(
+        operation[2].get("fill") == "#dc2626"
+        for operation in canvas.operations
+        if operation[0] == "line"
+    )
+    assert any(
+        operation[2].get("fill") == "#2563eb"
+        for operation in canvas.operations
+        if operation[0] == "oval"
+    )
+
+
+def test_graphical_viewer_rejects_edges_with_missing_node_projection() -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+    invalid_state = state.__class__(
+        schema_version=state.schema_version,
+        seed=state.seed,
+        final_time_s=state.final_time_s,
+        map_surface=state.map_surface.__class__(
+            nodes=state.map_surface.nodes[:-1],
+            edges=state.map_surface.edges,
+        ),
+        frames=state.frames,
+    )
+
+    try:
+        build_frame_render_plan(invalid_state, frame_index=0)
+    except ValueError as exc:
+        assert str(exc) == (
+            "map surface edge references a node that is not present in the node list"
+        )
+    else:
+        raise AssertionError("expected render-plan validation failure")

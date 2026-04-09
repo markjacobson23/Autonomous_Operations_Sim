@@ -1,3 +1,10 @@
+from autonomous_ops_sim.visualization.gui_viewer import (
+    FrameRenderPlan,
+    GraphicalReplayViewer,
+    ReplayController,
+    build_frame_render_plan,
+    render_frame_plan_to_canvas,
+)
 from autonomous_ops_sim.visualization.interactions import (
     AssignDestinationInteraction,
     BlockEdgeInteraction,
@@ -37,9 +44,12 @@ __all__ = [
     "BlockEdgeInteraction",
     "EdgeSurface",
     "FrameTrigger",
+    "FrameRenderPlan",
+    "GraphicalReplayViewer",
     "InteractionValidationError",
     "MapSurface",
     "NodeSurface",
+    "ReplayController",
     "ReplayFrame",
     "ReplayStep",
     "RepositionVehicleInteraction",
@@ -52,12 +62,14 @@ __all__ = [
     "build_visualization_state",
     "build_visualization_state_from_controller",
     "build_visualization_state_from_interactions",
+    "build_frame_render_plan",
     "export_visualization_json",
     "get_replay_frame",
     "interaction_to_command",
     "interaction_to_dict",
     "iter_replay_steps",
     "load_visualization_json",
+    "render_frame_plan_to_canvas",
     "translate_interactions",
     "visualization_state_to_dict",
 ]
