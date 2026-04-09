@@ -2,16 +2,18 @@
 
 ## Purpose
 
-This repository is built as a deterministic, production-style autonomous operations simulator.
+This repository is a deterministic autonomous operations simulator focused on scenario-driven execution, operational tasks, coordination, replay, and controlled experimentation.
 
 Work in this repo should preserve:
-- deterministic behavior
-- explicit state boundaries
-- trace-centered observability
-- additive, scoped evolution
-- small, testable public interfaces
 
-This file is intentionally step-independent. It describes enduring repo rules and development philosophy. Step-specific scope belongs in:
+- determinism
+- explicit state ownership
+- trace-centered observability
+- additive, disciplined evolution
+- small, testable public interfaces
+- clean boundaries between core simulation, control, visualization, and optional research tooling
+
+This file is intentionally phase-independent. Step-specific scope belongs in:
 - `docs/current_phase.md`
 - `docs/step-*.md`
 
@@ -20,20 +22,20 @@ This file is intentionally step-independent. It describes enduring repo rules an
 ## Core architectural principles
 
 ### 1. Determinism is first-class
-The simulator is expected to produce stable results for the same inputs and seed.
+The simulator should produce stable results for the same inputs and seed.
 
 Preserve:
 - explicit seeds
-- stable trace ordering
-- deterministic export output
+- stable event ordering
 - deterministic tie-breaking
-- replayable behavior where possible
+- stable JSON exports
+- replayable command and visualization behavior where applicable
 
 Do not introduce hidden nondeterminism through:
-- unordered iteration over sets/dicts when order matters
-- implicit wall-clock behavior
-- uncontrolled random sources
-- ad hoc async/background behavior that changes run order
+- unordered iteration where order matters
+- uncontrolled randomness
+- wall-clock-driven simulation semantics
+- ad hoc background behavior that changes execution order
 
 ### 2. Static topology is separate from runtime state
 Static world structure and mutable run state must remain distinct.
@@ -41,55 +43,79 @@ Static world structure and mutable run state must remain distinct.
 Examples:
 - `Graph` / `Map` are reusable topology assets
 - `WorldState` owns runtime blocked-edge conditions
-- reservation/conflict state belongs to runtime coordination structures, not static topology
+- reservations belong to coordination/runtime structures, not topology assets
+- visualization state is derived output, not authoritative runtime state
 
 Do not mutate static topology objects to represent per-run conditions.
 
-### 3. Trace is the primary truth surface
-The simulator’s most stable outward-facing surface is the trace.
+### 3. Trace is the core observability surface
+Trace events are the main stable outward-facing execution record.
 
-Metrics, exports, and regression fixtures should derive from trace data rather than from ad hoc internal state peeking.
+Metrics, exports, replay state, and regression fixtures should derive from trace and explicit runtime state rather than ad hoc internal peeking.
 
-When adding new runtime behavior:
-- prefer emitting explicit trace events
-- keep trace semantics clear and stable
-- avoid adding duplicate shadow state when trace already captures the truth
+When adding behavior:
+- prefer explicit trace events
+- keep trace semantics stable and understandable
+- avoid shadow truth when trace already captures the event
 
-### 4. Prefer additive refactoring over rewrites
-The repo should evolve through small, explicit layers.
+### 4. Commands and interactions must remain explicit
+Viewer-facing interactions should translate into typed commands rather than bypassing runtime ownership.
 
-Prefer:
-- introducing a new focused module
-- extending an existing small interface
-- adding a narrow orchestration layer
-- making local refactors that reduce duplication
+Preserve:
+- typed command surfaces
+- validated application
+- deterministic command ordering
+- replayable command history
 
 Avoid:
-- broad rewrites without necessity
-- “framework first” abstractions
-- speculative architecture for future hypothetical needs
+- direct viewer mutation of engine internals
+- hidden control paths outside the command surface
 
-### 5. Keep responsibilities explicit
-The repo should preserve clean module boundaries.
+### 5. Visualization is a consumer, not an owner
+Viewers, replay tools, and future graphical frontends must consume stable visualization/control surfaces.
 
-Examples:
-- parsing/validation is separate from runtime instantiation
-- runtime execution is separate from visualization
-- routing is separate from dispatch
-- behavior state is separate from trace summarization
-- metrics/export are derived surfaces, not execution drivers
+They should not become the source of truth for:
+- vehicle state
+- routing state
+- world-state mutation
+- coordination logic
 
-### 6. Public surfaces should stay small
-When adding APIs, prefer narrow production-like interfaces over sprawling convenience layers.
+### 6. Prefer additive refactoring over rewrites
+Evolve the simulator through small, explicit layers.
 
-Examples of good public surfaces:
-- `Router.route(...)`
-- `SimulationEngine.run(...)`
-- `SimulationEngine.execute_job(...)`
-- `summarize_engine_execution(...)`
-- `export_engine_json(...)`
+Prefer:
+- adding a focused module
+- extending a narrow interface
+- extracting orchestration from overloaded modules
+- promoting stable concepts into explicit types
 
-Be cautious about expanding `__init__.py` exports if that risks circular imports or unclear boundaries.
+Avoid:
+- speculative frameworks
+- giant rewrites
+- premature infrastructure for hypothetical future needs
+
+### 7. Keep responsibilities explicit
+Maintain clean boundaries across:
+- parsing / validation
+- runtime instantiation
+- simulation execution
+- control / command application
+- visualization / replay generation
+- optional research wrappers
+
+### 8. Keep the architecture language-flexible
+The repository is currently Python-first, but future components do not need to stay all-Python.
+
+Healthy future splits may include:
+- graphical frontend in a different UI stack
+- performance-critical planners/kernels in Rust or C++
+- Python retained for orchestration, scenarios, experiments, and exports
+
+Do not split by language prematurely. Only do so when there is a clear payoff in:
+- capability
+- performance
+- development efficiency
+- maintainability
 
 ---
 
@@ -103,33 +129,36 @@ Before making changes, read:
 Do not pull later-phase architecture into the current step.
 
 ### 2. Reuse existing execution paths
-When adding a new feature, prefer wiring into existing engine / trace / metrics / export flows rather than creating parallel code paths.
+Prefer wiring new features into the existing engine / trace / metrics / export / control / visualization surfaces instead of building parallel systems.
 
 ### 3. Keep parsing and execution separate
 Scenario/config parsing should remain distinct from:
 - runtime object construction
-- simulation execution
-- metrics/export generation
+- execution orchestration
+- export/replay generation
 
 ### 4. Protect regression surfaces
 Changes that alter:
 - trace ordering
 - metrics summaries
-- export format
-- golden fixtures
+- command history
+- visualization state
+- exports / golden fixtures
 
-must be intentional, explained, and covered by updated tests.
+must be intentional and covered by tests.
 
 ### 5. Keep schema growth controlled
-When expanding scenario/config schema:
+When extending scenarios or visualization/control formats:
 - add only fields needed for the active step
-- keep backward compatibility where reasonable
-- avoid turning the schema into a grab-bag of future concepts
+- keep compatibility where reasonable
+- avoid turning formats into catch-all bags of future concepts
 
-### 6. Treat visualization and interactivity as consumers, not owners
-Future viewers, control surfaces, or interactive tools should consume simulator state through explicit interfaces.
-
-They should not become the place where simulator truth lives.
+### 6. Profile before optimizing or splitting
+When performance/scaling becomes a focus:
+- measure bottlenecks first
+- add benchmark/profiling surfaces
+- prefer data-informed optimization over intuition
+- consider mixed-language separation only after profiling
 
 ---
 
