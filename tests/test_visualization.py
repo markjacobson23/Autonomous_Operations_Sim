@@ -18,13 +18,20 @@ from autonomous_ops_sim.simulation import (
 from autonomous_ops_sim.simulation.scenario_executor import execute_scenario
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
 from autonomous_ops_sim.visualization import (
+    AssignSelectedDestinationViewerAction,
+    BlockEdgeViewerAction,
+    CanvasPoint,
+    RepositionSelectedVehicleViewerAction,
+    SelectVehicleViewerAction,
     build_visualization_state,
+    build_frame_inspector,
     build_visualization_state_from_controller,
     build_frame_render_plan,
     export_visualization_json,
     iter_replay_steps,
     load_visualization_json,
     render_frame_plan_to_canvas,
+    resolve_live_click_action,
 )
 from autonomous_ops_sim.visualization.gui_viewer import ReplayController
 from autonomous_ops_sim.visualization.viewer import main as viewer_main
@@ -33,12 +40,20 @@ from autonomous_ops_sim.visualization.viewer import main as viewer_main
 class RecordingCanvas:
     def __init__(self) -> None:
         self.operations: list[tuple[str, tuple[object, ...], dict[str, object]]] = []
+        self._config = {"width": 900, "height": 640}
 
     def delete(self, *args: object) -> None:
         self.operations.append(("delete", args, {}))
 
+    def cget(self, key: str) -> object:
+        return self._config[key]
+
     def create_line(self, *args: object, **kwargs: object) -> int:
         self.operations.append(("line", args, kwargs))
+        return len(self.operations)
+
+    def create_rectangle(self, *args: object, **kwargs: object) -> int:
+        self.operations.append(("rectangle", args, kwargs))
         return len(self.operations)
 
     def create_oval(self, *args: object, **kwargs: object) -> int:
@@ -369,9 +384,9 @@ def test_graphical_replay_controller_playback_speed_and_status_are_stable() -> N
     assert status.vehicle_states == (("idle", 1),)
     assert (
         status.summary_text()
-        == "paused frame=1/18 time=0.0s trigger=command:block_edge speed=2.0x"
+        == "Paused  Frame 2 of 19  Time 0.00s  Trigger command:block_edge  Speed 2.0x"
     )
-    assert status.metadata_text() == "blocked_edges=[2] vehicles=1 states=idle=1"
+    assert status.metadata_text() == "Vehicles 1  States idle 1  Blocked edges 2"
 
 
 def test_graphical_replay_controller_rejects_invalid_navigation_inputs() -> None:
@@ -483,6 +498,7 @@ def test_graphical_viewer_render_plan_is_stable_after_json_load(tmp_path) -> Non
 
     assert loaded_state == state
     assert loaded_plan == original_plan
+    assert loaded_plan.frame_subtitle == "1 vehicles  |  1 blocked edges"
 
 
 def test_graphical_viewer_renders_visualization_state_to_canvas_end_to_end(
@@ -499,9 +515,10 @@ def test_graphical_viewer_renders_visualization_state_to_canvas_end_to_end(
     render_frame_plan_to_canvas(canvas, plan)
 
     assert canvas.operations[0] == ("delete", ("all",), {})
-    assert [operation[0] for operation in canvas.operations].count("line") == 5
+    assert [operation[0] for operation in canvas.operations].count("rectangle") >= 2
+    assert [operation[0] for operation in canvas.operations].count("line") >= 16
     assert [operation[0] for operation in canvas.operations].count("oval") == 5
-    assert [operation[0] for operation in canvas.operations].count("text") == 6
+    assert [operation[0] for operation in canvas.operations].count("text") >= 11
     assert any(
         operation[2].get("fill") == "#dc2626"
         for operation in canvas.operations
@@ -512,6 +529,70 @@ def test_graphical_viewer_renders_visualization_state_to_canvas_end_to_end(
         for operation in canvas.operations
         if operation[0] == "oval"
     )
+    assert any(
+        operation[2].get("text") == "Frame 1  command:block_edge"
+        for operation in canvas.operations
+        if operation[0] == "text"
+    )
+
+
+def test_frame_inspector_and_live_click_resolution_are_stable() -> None:
+    controller, _ = build_visualization_controller()
+    state = build_visualization_state_from_controller(controller)
+    plan = build_frame_render_plan(
+        state,
+        frame_index=1,
+        selected_vehicle_id=77,
+    )
+    inspector = build_frame_inspector(
+        state,
+        frame_index=1,
+        playback_state="paused",
+        playback_speed=2.0,
+        selected_vehicle_id=77,
+        interaction_mode="assign_destination",
+    )
+
+    assert inspector.headline == "Paused  Frame 2/19  Time 0.00s"
+    assert inspector.trigger_text == "Trigger command:block_edge  sequence 0"
+    assert inspector.blocked_text == "E2"
+    assert inspector.selection_title == "Selected vehicle V77"
+    assert inspector.selection_details == (
+        "Node 1\n"
+        "State idle\n"
+        "Position (0.0, 0.0, 0.0)"
+    )
+    assert inspector.hint_text == "Click a node to assign a destination to V77."
+
+    vehicle_action = resolve_live_click_action(
+        plan,
+        CanvasPoint(x=plan.vehicles[0].center.x, y=plan.vehicles[0].center.y),
+        interaction_mode="select_vehicle",
+        selected_vehicle_id=None,
+    )
+    assign_action = resolve_live_click_action(
+        plan,
+        CanvasPoint(x=plan.nodes[1].center.x, y=plan.nodes[1].center.y),
+        interaction_mode="assign_destination",
+        selected_vehicle_id=77,
+    )
+    reposition_action = resolve_live_click_action(
+        plan,
+        CanvasPoint(x=plan.nodes[0].center.x, y=plan.nodes[0].center.y),
+        interaction_mode="reposition_vehicle",
+        selected_vehicle_id=77,
+    )
+    edge_action = resolve_live_click_action(
+        plan,
+        CanvasPoint(x=plan.edges[1].midpoint.x, y=plan.edges[1].midpoint.y),
+        interaction_mode="block_edge",
+        selected_vehicle_id=77,
+    )
+
+    assert vehicle_action == SelectVehicleViewerAction(vehicle_id=77)
+    assert assign_action == AssignSelectedDestinationViewerAction(destination_node_id=2)
+    assert reposition_action == RepositionSelectedVehicleViewerAction(node_id=1)
+    assert edge_action == BlockEdgeViewerAction(edge_id=2)
 
 
 def test_graphical_viewer_rejects_edges_with_missing_node_projection() -> None:
