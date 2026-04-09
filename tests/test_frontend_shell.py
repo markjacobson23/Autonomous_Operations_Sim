@@ -9,7 +9,7 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
         REPO_ROOT / "frontend" / "serious_ui" / "src" / "App.tsx"
     ).read_text(encoding="utf-8")
 
-    assert "Step 45 Interaction Baseline" in app_source
+    assert "Step 46 Visual Polish Pass" in app_source
     assert "Command-Center Region" in app_source
     assert "Inspector Region" in app_source
     assert "Alerts Region" in app_source
@@ -18,8 +18,9 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "Autonomous Ops Command Deck" in app_source
     assert "Fit Scene" in app_source
     assert "Focus Selected" in app_source
-    assert "Direct selection baseline is now live" in app_source
-    assert "hover summaries" in app_source
+    assert "Visual polish pass is now live" in app_source
+    assert "presentation-grade operator shell" in app_source
+    assert "scene-legend" in app_source
     assert "selectVehicle" in app_source
     assert "selectRoad" in app_source
     assert "selectQueue" in app_source
@@ -40,6 +41,9 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".layer-toolbar" in css_source
     assert ".minimap" in css_source
     assert ".hover-card" in css_source
+    assert ".shell-accent" in css_source
+    assert ".scene-rim" in css_source
+    assert ".scene-legend" in css_source
     assert ".scene-road.selected" in css_source
     assert ".scene-reservation.selected" in css_source
     assert ".scene-hazard.selected" in css_source

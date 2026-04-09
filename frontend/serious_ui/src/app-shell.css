@@ -1,24 +1,25 @@
 :root {
   color-scheme: light;
-  --bg: #ece7de;
-  --panel: rgba(255, 251, 245, 0.88);
-  --panel-strong: rgba(255, 252, 248, 0.96);
-  --ink: #1c2430;
-  --muted: #61707d;
-  --line: rgba(72, 84, 92, 0.16);
-  --accent: #006c67;
-  --accent-soft: rgba(0, 108, 103, 0.14);
-  --accent-2: #1d4ed8;
-  --accent-2-soft: rgba(29, 78, 216, 0.12);
-  --warm: #c96a18;
-  --warm-soft: rgba(201, 106, 24, 0.14);
-  --alert: #b64b3a;
-  --alert-soft: rgba(182, 75, 58, 0.12);
-  --shadow: 0 24px 60px rgba(28, 36, 48, 0.12);
-  --radius-xl: 28px;
-  --radius-lg: 20px;
-  --radius-md: 14px;
-  --font-display: "Avenir Next", "Segoe UI", sans-serif;
+  --bg: #e8e2d7;
+  --panel: rgba(252, 248, 241, 0.84);
+  --panel-strong: rgba(255, 251, 246, 0.96);
+  --ink: #18212c;
+  --muted: #5f6d79;
+  --line: rgba(66, 78, 88, 0.14);
+  --accent: #0a766c;
+  --accent-soft: rgba(10, 118, 108, 0.14);
+  --accent-2: #2453c7;
+  --accent-2-soft: rgba(36, 83, 199, 0.12);
+  --warm: #bb651e;
+  --warm-soft: rgba(187, 101, 30, 0.15);
+  --alert: #b24a3b;
+  --alert-soft: rgba(178, 74, 59, 0.14);
+  --shadow: 0 24px 70px rgba(24, 33, 44, 0.12);
+  --shadow-strong: 0 22px 46px rgba(24, 33, 44, 0.18);
+  --radius-xl: 30px;
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
   --font-body: "Avenir Next", "Segoe UI", sans-serif;
 }
 
@@ -35,10 +36,10 @@ body,
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(0, 108, 103, 0.16), transparent 28%),
-    radial-gradient(circle at top right, rgba(29, 78, 216, 0.12), transparent 22%),
-    radial-gradient(circle at bottom right, rgba(201, 106, 24, 0.14), transparent 26%),
-    linear-gradient(180deg, #faf6ef 0%, var(--bg) 100%);
+    radial-gradient(circle at top left, rgba(10, 118, 108, 0.18), transparent 26%),
+    radial-gradient(circle at top right, rgba(36, 83, 199, 0.12), transparent 20%),
+    radial-gradient(circle at 70% 80%, rgba(187, 101, 30, 0.15), transparent 24%),
+    linear-gradient(180deg, #fbf7f0 0%, var(--bg) 100%);
   color: var(--ink);
   font-family: var(--font-body);
 }
@@ -48,6 +49,31 @@ body {
   padding: 24px;
   display: grid;
   gap: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.shell-accent {
+  position: fixed;
+  width: 28rem;
+  height: 28rem;
+  border-radius: 999px;
+  filter: blur(70px);
+  opacity: 0.34;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.shell-accent-left {
+  top: -9rem;
+  left: -10rem;
+  background: rgba(10, 118, 108, 0.2);
+}
+
+.shell-accent-right {
+  right: -8rem;
+  bottom: -10rem;
+  background: rgba(187, 101, 30, 0.18);
 }
 
 .panel {
@@ -56,6 +82,8 @@ body {
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow);
   backdrop-filter: blur(14px);
+  position: relative;
+  z-index: 1;
 }
 
 .masthead {
@@ -65,6 +93,9 @@ body {
   gap: 24px;
   align-items: flex-start;
   flex-wrap: wrap;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
 }
 
 .masthead-copy {
@@ -82,7 +113,7 @@ body {
   margin: 0 0 8px;
   font-size: 0.74rem;
   font-weight: 700;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -97,6 +128,7 @@ h3 {
 
 h1 {
   font-size: clamp(2.2rem, 4vw, 3.25rem);
+  line-height: 0.98;
 }
 
 h2 {
@@ -111,7 +143,8 @@ h3 {
   max-width: 50rem;
   margin: 12px 0 0;
   color: var(--muted);
-  line-height: 1.6;
+  line-height: 1.65;
+  font-size: 1.02rem;
 }
 
 .badge-row,
@@ -145,6 +178,7 @@ h3 {
 .badge {
   background: var(--accent-soft);
   color: var(--accent);
+  border: 1px solid rgba(10, 118, 108, 0.12);
 }
 
 .accent-2 {
@@ -152,12 +186,18 @@ h3 {
   color: var(--accent-2);
 }
 
+.status-pill.accent {
+  background: linear-gradient(135deg, rgba(36, 83, 199, 0.14), rgba(10, 118, 108, 0.14));
+  color: var(--accent-2);
+}
+
 .toolbar-button {
   border: 1px solid rgba(97, 112, 125, 0.18);
-  background: var(--panel-strong);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 241, 233, 0.9));
   color: var(--ink);
   cursor: default;
   padding: 10px 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .session-bar {
@@ -169,12 +209,14 @@ h3 {
 }
 
 .metric-pill {
-  background: var(--panel-strong);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 243, 236, 0.92));
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: 12px 14px;
   display: grid;
   gap: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
 }
 
 .metric-label {
@@ -271,12 +313,13 @@ h3 {
 .scene-button,
 .layer-chip {
   border: 1px solid rgba(97, 112, 125, 0.18);
-  background: var(--panel-strong);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(247, 241, 234, 0.92));
   color: var(--ink);
   border-radius: 999px;
   padding: 9px 13px;
   font-size: 0.8rem;
   font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .scene-button:disabled {
@@ -284,7 +327,7 @@ h3 {
 }
 
 .layer-chip-active {
-  background: var(--accent-soft);
+  background: linear-gradient(180deg, rgba(10, 118, 108, 0.16), rgba(10, 118, 108, 0.08));
   color: var(--accent);
 }
 
@@ -300,10 +343,33 @@ h3 {
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(240, 233, 223, 0.94)),
+    radial-gradient(circle at 20% 18%, rgba(10, 118, 108, 0.1), transparent 20%),
+    radial-gradient(circle at 78% 26%, rgba(36, 83, 199, 0.08), transparent 14%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(236, 229, 219, 0.96)),
     linear-gradient(90deg, rgba(97, 112, 125, 0.08) 1px, transparent 1px),
     linear-gradient(rgba(97, 112, 125, 0.08) 1px, transparent 1px);
   background-size: auto, 52px 52px, 52px 52px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+.scene-rim {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  height: 24px;
+  border-radius: 999px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.scene-rim-top {
+  top: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0));
+}
+
+.scene-rim-bottom {
+  bottom: 12px;
+  background: linear-gradient(0deg, rgba(24, 33, 44, 0.08), rgba(24, 33, 44, 0));
 }
 
 .scene-routes {
@@ -337,8 +403,10 @@ h3 {
 .inspection-card,
 .empty-state {
   border-radius: var(--radius-lg);
-  background: var(--panel-strong);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 243, 236, 0.94));
   border: 1px solid var(--line);
+  box-shadow: var(--shadow-strong);
 }
 
 .focus-card {
@@ -359,8 +427,50 @@ h3 {
   padding: 14px 16px;
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
-  background: rgba(255, 252, 248, 0.96);
-  box-shadow: 0 14px 34px rgba(28, 36, 48, 0.14);
+  background: linear-gradient(180deg, rgba(255, 252, 248, 0.98), rgba(247, 241, 235, 0.96));
+  box-shadow: 0 14px 34px rgba(28, 36, 48, 0.18);
+}
+
+.scene-legend {
+  position: absolute;
+  left: 28px;
+  bottom: 168px;
+  z-index: 1;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 251, 245, 0.9);
+  border: 1px solid rgba(66, 78, 88, 0.12);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.legend-swatch.road {
+  background: rgba(52, 64, 74, 0.82);
+}
+
+.legend-swatch.vehicle {
+  background: rgba(10, 118, 108, 0.95);
+}
+
+.legend-swatch.hazard {
+  background: rgba(178, 74, 59, 0.9);
 }
 
 .focus-card p,
@@ -401,14 +511,14 @@ h3 {
   height: 18px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: rgba(97, 112, 125, 0.1);
+  background: rgba(97, 112, 125, 0.08);
   overflow: hidden;
 }
 
 .timeline-fill {
   width: 46%;
   height: 100%;
-  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 55%, var(--warm) 100%);
 }
 
 .timeline-metrics {
@@ -502,12 +612,12 @@ h3 {
 }
 
 .scene-backdrop {
-  fill: rgba(255, 255, 255, 0.36);
+  fill: rgba(255, 255, 255, 0.22);
 }
 
 .scene-area {
-  fill: rgba(97, 112, 125, 0.12);
-  stroke: rgba(97, 112, 125, 0.18);
+  fill: rgba(97, 112, 125, 0.11);
+  stroke: rgba(97, 112, 125, 0.2);
   stroke-width: 0.08;
 }
 
@@ -527,6 +637,7 @@ h3 {
   stroke-linecap: round;
   stroke-linejoin: round;
   cursor: pointer;
+  filter: drop-shadow(0 0.12px 0.12px rgba(255, 255, 255, 0.45));
 }
 
 .scene-road-primary {
@@ -544,6 +655,7 @@ h3 {
   stroke: rgba(0, 108, 103, 0.8);
   stroke-width: 0.32;
   stroke-dasharray: 0.9 0.6;
+  filter: drop-shadow(0 0 0.18px rgba(10, 118, 108, 0.42));
 }
 
 .scene-reservation {
@@ -557,6 +669,7 @@ h3 {
   stroke: rgba(182, 75, 58, 0.82);
   stroke-width: 0.42;
   cursor: pointer;
+  filter: drop-shadow(0 0 0.18px rgba(178, 74, 59, 0.4));
 }
 
 .scene-vehicle circle {
@@ -564,6 +677,7 @@ h3 {
   stroke: white;
   stroke-width: 0.14;
   cursor: pointer;
+  filter: drop-shadow(0 0.14px 0.12px rgba(24, 33, 44, 0.18));
 }
 
 .scene-vehicle text {
@@ -600,7 +714,8 @@ h3 {
   margin-top: 12px;
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.44);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(246, 240, 231, 0.72));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
 }
 
 .minimap-bg {

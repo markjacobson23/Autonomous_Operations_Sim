@@ -483,14 +483,16 @@ function App(): JSX.Element {
 
   return (
     <div className="shell">
+      <div className="shell-accent shell-accent-left" aria-hidden="true" />
+      <div className="shell-accent shell-accent-right" aria-hidden="true" />
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 45 Interaction Baseline</p>
+          <p className="eyebrow">Step 46 Visual Polish Pass</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
-            The serious frontend now supports direct click selection for vehicles,
-            roads, queues, and blocked edges, plus hover summaries and selected-object
-            highlighting on top of the existing navigation shell.
+            The serious frontend now carries a presentation-grade operator shell:
+            sharper visual hierarchy, cleaner overlays, richer scene atmosphere, and
+            clearer inspection surfaces on top of the live interaction baseline.
           </p>
         </div>
         <div className="masthead-meta">
@@ -550,6 +552,7 @@ function App(): JSX.Element {
               <div className="status-stack">
                 <span className="status-pill">Camera controls active</span>
                 <span className="status-pill secondary">Hover and selection active</span>
+                <span className="status-pill accent">Presentation polish active</span>
               </div>
             </div>
 
@@ -604,6 +607,8 @@ function App(): JSX.Element {
 
             <div className="stage-grid">
               <div className="stage-canvas-frame">
+                <div className="scene-rim scene-rim-top" aria-hidden="true" />
+                <div className="scene-rim scene-rim-bottom" aria-hidden="true" />
                 <svg
                   className="stage-canvas"
                   viewBox={`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`}
@@ -783,12 +788,26 @@ function App(): JSX.Element {
                 </svg>
 
                 <div className="focus-card">
-                  <strong>Direct selection baseline is now live</strong>
+                  <strong>Visual polish pass is now live</strong>
                   <p>
-                    Vehicles, roads, queues, and blocked edges now support direct click
-                    selection and hover summaries. Batch actions and edit tools still wait
-                    for later steps.
+                    This pass sharpens the command deck without changing simulator
+                    authority: better scene depth, cleaner panels, clearer overlays, and
+                    a more presentation-ready mining control aesthetic.
                   </p>
+                </div>
+                <div className="scene-legend">
+                  <span className="legend-item">
+                    <span className="legend-swatch road" />
+                    Roads
+                  </span>
+                  <span className="legend-item">
+                    <span className="legend-swatch vehicle" />
+                    Vehicles
+                  </span>
+                  <span className="legend-item">
+                    <span className="legend-swatch hazard" />
+                    Hazards
+                  </span>
                 </div>
                 {hoverTarget ? (
                   <div className="hover-card" aria-live="polite">
@@ -856,6 +875,15 @@ function App(): JSX.Element {
                     <li>
                       Selection: {describeSelectedTarget(selectedTarget, selectedVehicleId)}
                     </li>
+                  </ul>
+                </div>
+
+                <div className="overview-card">
+                  <p className="eyebrow">Visual Readout</p>
+                  <ul className="mini-list">
+                    <li>Overlay palette tuned for road, route, queue, and hazard contrast</li>
+                    <li>Panels elevated for quicker operator scanning on laptop displays</li>
+                    <li>Scene framing reserved for more cinematic polish in later passes</li>
                   </ul>
                 </div>
               </aside>
