@@ -4,6 +4,7 @@ from pathlib import Path
 
 from autonomous_ops_sim.io.scenario_loader import load_scenario
 from autonomous_ops_sim.io.scenario_summary import format_scenario_summary
+from autonomous_ops_sim.perf import export_benchmark_suite_json, run_default_benchmark_suite
 from autonomous_ops_sim.simulation.scenario_executor import execute_scenario
 
 
@@ -38,6 +39,15 @@ def _execute_scenario_command(scenario_path: str) -> int:
     return 0
 
 
+def _benchmark_command(*, repetitions: int, warmup_iterations: int) -> int:
+    result = run_default_benchmark_suite(
+        repetitions=repetitions,
+        warmup_iterations=warmup_iterations,
+    )
+    print(export_benchmark_suite_json(result), end="")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="autonomous-ops-sim",
@@ -63,6 +73,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     execute_parser.add_argument("scenario_path", help="Path to a scenario JSON file.")
 
+    benchmark_parser = subparsers.add_parser(
+        "benchmark",
+        help="Run the repeatable Step 29 benchmark suite and emit JSON results.",
+    )
+    benchmark_parser.add_argument(
+        "--repetitions",
+        type=int,
+        default=3,
+        help="Measured repetitions per benchmark case.",
+    )
+    benchmark_parser.add_argument(
+        "--warmup-iterations",
+        type=int,
+        default=1,
+        help="Warmup iterations per benchmark case before measurement.",
+    )
+
     return parser
 
 
@@ -74,6 +101,11 @@ def main(argv: list[str] | None = None) -> int:
         return _run_scenario_command(args.scenario_path)
     if args.command == "execute":
         return _execute_scenario_command(args.scenario_path)
+    if args.command == "benchmark":
+        return _benchmark_command(
+            repetitions=args.repetitions,
+            warmup_iterations=args.warmup_iterations,
+        )
 
     parser.print_help()
     return 0
@@ -81,7 +113,6 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
 
 
 
