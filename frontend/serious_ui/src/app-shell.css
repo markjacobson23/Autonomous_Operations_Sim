@@ -326,6 +326,12 @@ h3 {
   opacity: 0.45;
 }
 
+.action-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .layer-chip-active {
   background: linear-gradient(180deg, rgba(10, 118, 108, 0.16), rgba(10, 118, 108, 0.08));
   color: var(--accent);
@@ -471,6 +477,10 @@ h3 {
 
 .legend-swatch.hazard {
   background: rgba(178, 74, 59, 0.9);
+}
+
+.legend-swatch.handle {
+  background: rgba(36, 83, 199, 0.9);
 }
 
 .focus-card p,
@@ -631,6 +641,12 @@ h3 {
   fill: rgba(201, 106, 24, 0.12);
 }
 
+.scene-area.selected {
+  fill: rgba(36, 83, 199, 0.18);
+  stroke: rgba(36, 83, 199, 0.55);
+  stroke-width: 0.12;
+}
+
 .scene-road {
   fill: none;
   stroke: rgba(52, 64, 74, 0.76);
@@ -706,6 +722,25 @@ h3 {
 .scene-hazard.selected {
   stroke: rgba(201, 106, 24, 1);
   stroke-width: 0.65;
+}
+
+.scene-edit-handle {
+  stroke: white;
+  stroke-width: 0.12;
+  cursor: grab;
+  filter: drop-shadow(0 0.2px 0.18px rgba(24, 33, 44, 0.2));
+}
+
+.scene-edit-handle.node {
+  fill: rgba(36, 83, 199, 0.94);
+}
+
+.scene-edit-handle.road {
+  fill: rgba(10, 118, 108, 0.94);
+}
+
+.scene-edit-handle.area {
+  fill: rgba(187, 101, 30, 0.94);
 }
 
 .minimap {

@@ -1,23 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 
-type BootstrapSummary = {
-  loadState: "idle" | "loading" | "loaded" | "error";
-  surfaceName: string;
-  seed: number | null;
-  simulatedTimeS: number | null;
-  vehicleCount: number | null;
-  blockedEdgeCount: number | null;
-  traceEventCount: number | null;
-  selectedVehicleCount: number | null;
-  recentCommandCount: number | null;
-  suggestionCount: number | null;
-  anomalyCount: number | null;
-  routePreviewCount: number | null;
-  message: string;
-  commandCenter: CommandCenterPayload;
-  summary: BundleSummaryPayload | null;
-  bundle: BundlePayload | null;
-};
+type Position3 = [number, number, number];
 
 type ViewportState = {
   x: number;
@@ -103,14 +86,6 @@ type AnomalyPayload = {
   vehicle_id?: number | null;
 };
 
-type Position3 = [number, number, number];
-
-type RenderGeometryPayload = {
-  roads?: RoadPayload[];
-  intersections?: IntersectionPayload[];
-  areas?: AreaPayload[];
-};
-
 type RoadPayload = {
   road_id?: string;
   edge_ids?: number[];
@@ -135,9 +110,10 @@ type AreaPayload = {
   label?: string | null;
 };
 
-type MapSurfacePayload = {
-  nodes?: NodePayload[];
-  edges?: EdgePayload[];
+type RenderGeometryPayload = {
+  roads?: RoadPayload[];
+  intersections?: IntersectionPayload[];
+  areas?: AreaPayload[];
 };
 
 type NodePayload = {
@@ -154,6 +130,11 @@ type EdgePayload = {
   speed_limit?: number;
 };
 
+type MapSurfacePayload = {
+  nodes?: NodePayload[];
+  edges?: EdgePayload[];
+};
+
 type VehicleSnapshotPayload = {
   vehicle_id?: number;
   node_id?: number;
@@ -166,6 +147,18 @@ type TrafficBaselinePayload = {
   queue_records?: Array<{ edge_id?: number; vehicle_ids?: number[] }>;
 };
 
+type AuthoringPayload = {
+  mode?: string;
+  save_endpoint?: string;
+  reload_endpoint?: string;
+  validate_endpoint?: string;
+  source_scenario_path?: string;
+  working_scenario_path?: string;
+  editable_node_count?: number;
+  editable_road_count?: number;
+  editable_area_count?: number;
+};
+
 type BundlePayload = {
   metadata?: { surface_name?: string };
   seed?: number;
@@ -176,11 +169,43 @@ type BundlePayload = {
   map_surface?: MapSurfacePayload;
   render_geometry?: RenderGeometryPayload;
   traffic_baseline?: TrafficBaselinePayload;
+  authoring?: AuthoringPayload;
   snapshot?: {
     simulated_time_s?: number;
     blocked_edge_ids?: number[];
     vehicles?: VehicleSnapshotPayload[];
   };
+};
+
+type BootstrapSummary = {
+  loadState: "idle" | "loading" | "loaded" | "error";
+  surfaceName: string;
+  seed: number | null;
+  simulatedTimeS: number | null;
+  vehicleCount: number | null;
+  blockedEdgeCount: number | null;
+  traceEventCount: number | null;
+  selectedVehicleCount: number | null;
+  recentCommandCount: number | null;
+  suggestionCount: number | null;
+  anomalyCount: number | null;
+  routePreviewCount: number | null;
+  message: string;
+  commandCenter: CommandCenterPayload;
+  summary: BundleSummaryPayload | null;
+  bundle: BundlePayload | null;
+};
+
+type SelectedTarget =
+  | { kind: "vehicle"; vehicleId: number }
+  | { kind: "road"; roadId: string }
+  | { kind: "area"; areaId: string }
+  | { kind: "queue"; edgeId: number }
+  | { kind: "hazard"; edgeId: number };
+
+type HoverTarget = {
+  label: string;
+  detail: string;
 };
 
 type Bounds = {
@@ -192,28 +217,55 @@ type Bounds = {
   height: number;
 };
 
-type SelectedTarget =
-  | { kind: "vehicle"; vehicleId: number }
-  | { kind: "road"; roadId: string }
-  | { kind: "queue"; edgeId: number }
-  | { kind: "hazard"; edgeId: number };
-
-type HoverTarget = {
-  label: string;
-  detail: string;
+type ValidationMessage = {
+  severity?: string;
+  code?: string;
+  message?: string;
+  target_kind?: string | null;
+  target_id?: string | number | null;
 };
+
+type MoveNodeEditOperation = {
+  kind: "move_node";
+  target_id: number;
+  position: Position3;
+};
+
+type RoadEditOperation = {
+  kind: "set_road_centerline";
+  target_id: string;
+  points: Position3[];
+};
+
+type AreaEditOperation = {
+  kind: "set_area_polygon";
+  target_id: string;
+  points: Position3[];
+};
+
+type EditOperation = MoveNodeEditOperation | RoadEditOperation | AreaEditOperation;
+
+type EditTransaction = {
+  label: string;
+  operations: EditOperation[];
+};
+
+type DragState =
+  | { kind: "node"; nodeId: number; z: number }
+  | { kind: "road-point"; roadId: string; pointIndex: number; z: number }
+  | { kind: "area-point"; areaId: string; pointIndex: number; z: number };
 
 const architecture = {
   primaryStack: "React + TypeScript + Vite",
   authority: "Python simulator remains authoritative",
-  launchMode: "Live session bootstrap through versioned bundle surfaces",
+  launchMode: "Live session + live authoring through versioned bundle surfaces",
 };
 
 const sessionActions = [
   "Launch Live Run",
   "Reconnect Bundle",
-  "Focus Selected Vehicle",
-  "Open Timeline",
+  "Edit Scene",
+  "Save Scenario",
 ];
 
 const defaultLayers: LayerState = {
@@ -226,11 +278,22 @@ const defaultLayers: LayerState = {
   hazards: true,
 };
 
+const emptyTransaction: EditTransaction = {
+  label: "live_geometry_edit",
+  operations: [],
+};
+
 function App(): JSX.Element {
   const minimapRef = useRef<SVGSVGElement | null>(null);
+  const sceneRef = useRef<SVGSVGElement | null>(null);
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
   const [selectedTarget, setSelectedTarget] = useState<SelectedTarget | null>(null);
   const [hoverTarget, setHoverTarget] = useState<HoverTarget | null>(null);
+  const [editorEnabled, setEditorEnabled] = useState(false);
+  const [draftTransaction, setDraftTransaction] = useState<EditTransaction>(emptyTransaction);
+  const [validationMessages, setValidationMessages] = useState<ValidationMessage[]>([]);
+  const [editorMessage, setEditorMessage] = useState("Authoring surface is standing by.");
+  const [dragState, setDragState] = useState<DragState | null>(null);
   const [bootstrap, setBootstrap] = useState<BootstrapSummary>({
     loadState: "idle",
     surfaceName: "unbound",
@@ -280,45 +343,7 @@ function App(): JSX.Element {
         if (cancelled) {
           return;
         }
-        const snapshot = bundle.snapshot ?? {};
-        const commandCenter = bundle.command_center ?? {};
-        const aiAssist = commandCenter.ai_assist ?? {};
-        const summary = bundle.summary ?? null;
-        const fittedViewport = fitViewportToBundle(bundle);
-
-        setViewport(fittedViewport);
-        setBootstrap({
-          loadState: "loaded",
-          surfaceName: bundle.metadata?.surface_name ?? "unknown_surface",
-          seed: bundle.seed ?? null,
-          simulatedTimeS: bundle.simulated_time_s ?? snapshot.simulated_time_s ?? null,
-          vehicleCount: Array.isArray(snapshot.vehicles) ? snapshot.vehicles.length : null,
-          blockedEdgeCount: Array.isArray(snapshot.blocked_edge_ids)
-            ? snapshot.blocked_edge_ids.length
-            : null,
-          traceEventCount: Array.isArray(bundle.trace_events)
-            ? bundle.trace_events.length
-            : summary?.trace_event_count ?? null,
-          selectedVehicleCount: Array.isArray(commandCenter.selected_vehicle_ids)
-            ? commandCenter.selected_vehicle_ids.length
-            : null,
-          recentCommandCount: Array.isArray(commandCenter.recent_commands)
-            ? commandCenter.recent_commands.length
-            : null,
-          suggestionCount: Array.isArray(aiAssist.suggestions)
-            ? aiAssist.suggestions.length
-            : null,
-          anomalyCount: Array.isArray(aiAssist.anomalies)
-            ? aiAssist.anomalies.length
-            : null,
-          routePreviewCount: Array.isArray(commandCenter.route_previews)
-            ? commandCenter.route_previews.length
-            : null,
-          message: "Live bundle bootstrap connected.",
-          commandCenter,
-          summary,
-          bundle,
-        });
+        applyLoadedBundle(bundle, "Live bundle bootstrap connected.");
       })
       .catch((error: unknown) => {
         if (cancelled) {
@@ -350,7 +375,54 @@ function App(): JSX.Element {
     };
   }, []);
 
-  const bundle = bootstrap.bundle;
+  useEffect(() => {
+    const authoring = bootstrap.bundle?.authoring;
+    if (!authoring?.validate_endpoint || draftTransaction.operations.length === 0) {
+      setValidationMessages([]);
+      return;
+    }
+
+    let cancelled = false;
+    void fetch(authoring.validate_endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(draftTransaction),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Validation request failed with ${response.status}`);
+        }
+        return response.json() as Promise<{
+          ok?: boolean;
+          validation_messages?: ValidationMessage[];
+        }>;
+      })
+      .then((payload) => {
+        if (!cancelled) {
+          setValidationMessages(payload.validation_messages ?? []);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : "Validation request failed";
+          setValidationMessages([
+            {
+              severity: "error",
+              code: "validation_request_failed",
+              message,
+            },
+          ]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bootstrap.bundle, draftTransaction]);
+
+  const bundle = applyTransactionToBundle(bootstrap.bundle, draftTransaction);
   const bounds = computeSceneBounds(bundle);
   const routePreviews = bootstrap.commandCenter.route_previews ?? [];
   const inspections = bootstrap.commandCenter.vehicle_inspections ?? [];
@@ -372,6 +444,12 @@ function App(): JSX.Element {
           (road) => road.road_id === selectedTarget.roadId,
         ) ?? null
       : null;
+  const selectedArea =
+    selectedTarget?.kind === "area"
+      ? (bundle?.render_geometry?.areas ?? []).find(
+          (area) => area.area_id === selectedTarget.areaId,
+        ) ?? null
+      : null;
   const selectedQueueRecord =
     selectedTarget?.kind === "queue"
       ? (bundle?.traffic_baseline?.queue_records ?? []).find(
@@ -382,6 +460,17 @@ function App(): JSX.Element {
     selectedTarget?.kind === "hazard"
       ? findEdgeById(bundle?.map_surface?.edges ?? [], selectedTarget.edgeId)
       : null;
+  const authoring = bootstrap.bundle?.authoring;
+  const editCount = draftTransaction.operations.length;
+
+  function applyLoadedBundle(bundlePayload: BundlePayload, message: string): void {
+    const nextViewport = fitViewportToBundle(bundlePayload);
+    setViewport(nextViewport);
+    setDraftTransaction(emptyTransaction);
+    setValidationMessages([]);
+    setDragState(null);
+    setBootstrap(buildBootstrapSummary(bundlePayload, message));
+  }
 
   function panView(deltaX: number, deltaY: number): void {
     setViewport((current) => ({
@@ -447,31 +536,228 @@ function App(): JSX.Element {
   }
 
   function selectVehicle(vehicleId: number | undefined): void {
-    if (vehicleId === undefined) {
-      return;
+    if (vehicleId !== undefined) {
+      setSelectedTarget({ kind: "vehicle", vehicleId });
     }
-    setSelectedTarget({ kind: "vehicle", vehicleId });
   }
 
   function selectRoad(roadId: string | undefined): void {
-    if (!roadId) {
-      return;
+    if (roadId) {
+      setSelectedTarget({ kind: "road", roadId });
     }
-    setSelectedTarget({ kind: "road", roadId });
+  }
+
+  function selectArea(areaId: string | undefined): void {
+    if (areaId) {
+      setSelectedTarget({ kind: "area", areaId });
+    }
   }
 
   function selectQueue(edgeId: number | undefined): void {
-    if (edgeId === undefined) {
-      return;
+    if (edgeId !== undefined) {
+      setSelectedTarget({ kind: "queue", edgeId });
     }
-    setSelectedTarget({ kind: "queue", edgeId });
   }
 
   function selectHazard(edgeId: number | undefined): void {
-    if (edgeId === undefined) {
+    if (edgeId !== undefined) {
+      setSelectedTarget({ kind: "hazard", edgeId });
+    }
+  }
+
+  function toggleEditMode(): void {
+    setEditorEnabled((current) => !current);
+    setEditorMessage(
+      !editorEnabled
+        ? "Edit mode enabled. Drag node, road, or zone handles to stage geometry mutations."
+        : "Edit mode paused. Draft mutations are preserved until you save or reload.",
+    );
+  }
+
+  function saveScenario(): void {
+    if (!authoring?.save_endpoint || editCount === 0) {
       return;
     }
-    setSelectedTarget({ kind: "hazard", edgeId });
+    setEditorMessage("Saving live geometry edits into the working scenario...");
+    void fetch(authoring.save_endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(draftTransaction),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Save request failed with ${response.status}`);
+        }
+        return response.json() as Promise<{
+          ok?: boolean;
+          bundle?: BundlePayload;
+          validation_messages?: ValidationMessage[];
+        }>;
+      })
+      .then((payload) => {
+        setValidationMessages(payload.validation_messages ?? []);
+        if (!payload.ok || !payload.bundle) {
+          setEditorMessage("Save rejected. Resolve validation issues and try again.");
+          return;
+        }
+        applyLoadedBundle(payload.bundle, "Live authoring save completed.");
+        setEditorMessage("Scenario changes saved and live bundle reloaded.");
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "Save request failed";
+        setEditorMessage(message);
+      });
+  }
+
+  function reloadScenario(): void {
+    if (!authoring?.reload_endpoint) {
+      return;
+    }
+    setEditorMessage("Reloading working scenario from the Python authoring surface...");
+    void fetch(authoring.reload_endpoint)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Reload request failed with ${response.status}`);
+        }
+        return response.json() as Promise<{ ok?: boolean; bundle?: BundlePayload }>;
+      })
+      .then((payload) => {
+        if (!payload.ok || !payload.bundle) {
+          throw new Error("Reload response did not include a bundle.");
+        }
+        applyLoadedBundle(payload.bundle, "Working scenario reloaded.");
+        setEditorMessage("Working scenario reloaded and draft edits cleared.");
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "Reload request failed";
+        setEditorMessage(message);
+      });
+  }
+
+  function upsertOperation(nextOperation: EditOperation): void {
+    setDraftTransaction((current) => {
+      const nextOperations = current.operations.filter(
+        (operation) =>
+          !(
+            operation.kind === nextOperation.kind &&
+            operation.target_id === nextOperation.target_id
+          ),
+      );
+      nextOperations.push(nextOperation);
+      return {
+        ...current,
+        operations: nextOperations,
+      };
+    });
+  }
+
+  function beginNodeDrag(event: MouseEvent<SVGCircleElement>, node: NodePayload): void {
+    if (!editorEnabled || node.node_id === undefined) {
+      return;
+    }
+    event.stopPropagation();
+    const z = node.position?.[2] ?? 0;
+    setSelectedTarget(null);
+    setDragState({
+      kind: "node",
+      nodeId: node.node_id,
+      z,
+    });
+  }
+
+  function beginRoadPointDrag(
+    event: MouseEvent<SVGCircleElement>,
+    roadId: string,
+    pointIndex: number,
+    z: number,
+  ): void {
+    if (!editorEnabled) {
+      return;
+    }
+    event.stopPropagation();
+    setDragState({
+      kind: "road-point",
+      roadId,
+      pointIndex,
+      z,
+    });
+  }
+
+  function beginAreaPointDrag(
+    event: MouseEvent<SVGCircleElement>,
+    areaId: string,
+    pointIndex: number,
+    z: number,
+  ): void {
+    if (!editorEnabled) {
+      return;
+    }
+    event.stopPropagation();
+    setDragState({
+      kind: "area-point",
+      areaId,
+      pointIndex,
+      z,
+    });
+  }
+
+  function handleSceneMouseMove(event: MouseEvent<SVGSVGElement>): void {
+    if (!dragState || !bundle) {
+      return;
+    }
+    const scenePoint = clientPointToScene(event, sceneRef.current, viewport, dragState.z);
+    if (!scenePoint) {
+      return;
+    }
+
+    if (dragState.kind === "node") {
+      upsertOperation({
+        kind: "move_node",
+        target_id: dragState.nodeId,
+        position: scenePoint,
+      });
+      return;
+    }
+
+    if (dragState.kind === "road-point") {
+      const road = (bundle.render_geometry?.roads ?? []).find(
+        (entry) => entry.road_id === dragState.roadId,
+      );
+      if (!road?.centerline) {
+        return;
+      }
+      const nextPoints = road.centerline.map((point) => [...point] as Position3);
+      nextPoints[dragState.pointIndex] = scenePoint;
+      upsertOperation({
+        kind: "set_road_centerline",
+        target_id: dragState.roadId,
+        points: nextPoints,
+      });
+      return;
+    }
+
+    const area = (bundle.render_geometry?.areas ?? []).find(
+      (entry) => entry.area_id === dragState.areaId,
+    );
+    if (!area?.polygon) {
+      return;
+    }
+    const nextPoints = area.polygon.map((point) => [...point] as Position3);
+    nextPoints[dragState.pointIndex] = scenePoint;
+    upsertOperation({
+      kind: "set_area_polygon",
+      target_id: dragState.areaId,
+      points: nextPoints,
+    });
+  }
+
+  function stopDragging(): void {
+    if (dragState) {
+      setEditorMessage("Draft geometry edit staged. Save the scenario to persist it.");
+    }
+    setDragState(null);
   }
 
   const minimapRect = {
@@ -487,12 +773,13 @@ function App(): JSX.Element {
       <div className="shell-accent shell-accent-right" aria-hidden="true" />
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 46 Visual Polish Pass</p>
+          <p className="eyebrow">Step 50 Live Map Editing Baseline</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
-            The serious frontend now carries a presentation-grade operator shell:
-            sharper visual hierarchy, cleaner overlays, richer scene atmosphere, and
-            clearer inspection surfaces on top of the live interaction baseline.
+            The serious frontend now carries the first real authoring loop:
+            edit handles for graph nodes, road centerlines, and zone polygons,
+            with deterministic Python-side validation and a live save/reload
+            workflow layered onto the existing operator shell.
           </p>
         </div>
         <div className="masthead-meta">
@@ -529,12 +816,12 @@ function App(): JSX.Element {
           <strong>{formatMaybeNumber(bootstrap.vehicleCount)}</strong>
         </div>
         <div className="metric-pill">
-          <span className="metric-label">Blocked Edges</span>
-          <strong>{formatMaybeNumber(bootstrap.blockedEdgeCount)}</strong>
+          <span className="metric-label">Pending Edits</span>
+          <strong>{formatMaybeNumber(editCount)}</strong>
         </div>
         <div className="metric-pill">
-          <span className="metric-label">Trace Events</span>
-          <strong>{formatMaybeNumber(bootstrap.traceEventCount)}</strong>
+          <span className="metric-label">Validation</span>
+          <strong>{validationMessages.length === 0 ? "clean" : `${validationMessages.length} issue(s)`}</strong>
         </div>
         <div className={`health-pill health-pill-${bootstrap.loadState}`}>
           {bootstrap.loadState.toUpperCase()}
@@ -551,8 +838,10 @@ function App(): JSX.Element {
               </div>
               <div className="status-stack">
                 <span className="status-pill">Camera controls active</span>
-                <span className="status-pill secondary">Hover and selection active</span>
-                <span className="status-pill accent">Presentation polish active</span>
+                <span className="status-pill secondary">Selection active</span>
+                <span className="status-pill accent">
+                  {editorEnabled ? "Edit handles active" : "Edit handles armed"}
+                </span>
               </div>
             </div>
 
@@ -590,6 +879,27 @@ function App(): JSX.Element {
                   Focus Selected
                 </button>
               </div>
+              <div className="tool-group">
+                <button className="scene-button" type="button" onClick={toggleEditMode}>
+                  {editorEnabled ? "Pause Edit Mode" : "Edit Scene"}
+                </button>
+                <button
+                  className="scene-button"
+                  type="button"
+                  onClick={saveScenario}
+                  disabled={!authoring?.save_endpoint || editCount === 0}
+                >
+                  Save Scenario
+                </button>
+                <button
+                  className="scene-button"
+                  type="button"
+                  onClick={reloadScenario}
+                  disabled={!authoring?.reload_endpoint}
+                >
+                  Reload Scenario
+                </button>
+              </div>
             </div>
 
             <div className="layer-toolbar" aria-label="Layer toggles">
@@ -610,10 +920,16 @@ function App(): JSX.Element {
                 <div className="scene-rim scene-rim-top" aria-hidden="true" />
                 <div className="scene-rim scene-rim-bottom" aria-hidden="true" />
                 <svg
+                  ref={sceneRef}
                   className="stage-canvas"
                   viewBox={`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`}
                   aria-label="Simulation scene graph"
-                  onMouseLeave={() => setHoverTarget(null)}
+                  onMouseLeave={() => {
+                    setHoverTarget(null);
+                    stopDragging();
+                  }}
+                  onMouseMove={handleSceneMouseMove}
+                  onMouseUp={stopDragging}
                 >
                   <rect
                     x={bounds.minX}
@@ -628,7 +944,18 @@ function App(): JSX.Element {
                       <polygon
                         key={area.area_id ?? `area-${index}`}
                         points={toPointString(area.polygon)}
-                        className={`scene-area scene-area-${area.kind ?? "generic"}`}
+                        className={`scene-area scene-area-${area.kind ?? "generic"} ${
+                          selectedTarget?.kind === "area" && selectedTarget.areaId === area.area_id
+                            ? "selected"
+                            : ""
+                        }`}
+                        onClick={() => selectArea(area.area_id)}
+                        onMouseEnter={() =>
+                          setHoverTarget({
+                            label: area.label ?? area.area_id ?? "zone",
+                            detail: area.kind ?? "zone",
+                          })
+                        }
                       />
                     ))}
 
@@ -762,6 +1089,61 @@ function App(): JSX.Element {
                       );
                     })}
 
+                  {editorEnabled &&
+                    (bundle?.map_surface?.nodes ?? []).map((node, index) => {
+                      if (node.node_id === undefined || !node.position) {
+                        return null;
+                      }
+                      return (
+                        <circle
+                          key={node.node_id ?? `node-handle-${index}`}
+                          cx={node.position[0]}
+                          cy={node.position[1]}
+                          r={0.32}
+                          className="scene-edit-handle node"
+                          onMouseDown={(event) => beginNodeDrag(event, node)}
+                        />
+                      );
+                    })}
+
+                  {editorEnabled &&
+                    selectedRoad?.centerline?.map((point, index) => (
+                      <circle
+                        key={`${selectedRoad.road_id ?? "road"}-point-${index}`}
+                        cx={point[0]}
+                        cy={point[1]}
+                        r={0.3}
+                        className="scene-edit-handle road"
+                        onMouseDown={(event) =>
+                          beginRoadPointDrag(
+                            event,
+                            selectedRoad.road_id ?? "road",
+                            index,
+                            point[2] ?? 0,
+                          )
+                        }
+                      />
+                    ))}
+
+                  {editorEnabled &&
+                    selectedArea?.polygon?.map((point, index) => (
+                      <circle
+                        key={`${selectedArea.area_id ?? "area"}-point-${index}`}
+                        cx={point[0]}
+                        cy={point[1]}
+                        r={0.3}
+                        className="scene-edit-handle area"
+                        onMouseDown={(event) =>
+                          beginAreaPointDrag(
+                            event,
+                            selectedArea.area_id ?? "area",
+                            index,
+                            point[2] ?? 0,
+                          )
+                        }
+                      />
+                    ))}
+
                   {layers.vehicles &&
                     (bundle?.snapshot?.vehicles ?? []).map((vehicle, vehicleIndex) => {
                       const position = vehicle.position ?? [0, 0, 0];
@@ -788,11 +1170,11 @@ function App(): JSX.Element {
                 </svg>
 
                 <div className="focus-card">
-                  <strong>Visual polish pass is now live</strong>
+                  <strong>Live map editing is now staged through Python authority</strong>
                   <p>
-                    This pass sharpens the command deck without changing simulator
-                    authority: better scene depth, cleaner panels, clearer overlays, and
-                    a more presentation-ready mining control aesthetic.
+                    Drag node, road, and zone handles to assemble geometry edits.
+                    Draft changes stay in the frontend until the simulator-owned
+                    authoring endpoint validates and saves them into the working scenario.
                   </p>
                 </div>
                 <div className="scene-legend">
@@ -807,6 +1189,10 @@ function App(): JSX.Element {
                   <span className="legend-item">
                     <span className="legend-swatch hazard" />
                     Hazards
+                  </span>
+                  <span className="legend-item">
+                    <span className="legend-swatch handle" />
+                    Edit handles
                   </span>
                 </div>
                 {hoverTarget ? (
@@ -879,11 +1265,13 @@ function App(): JSX.Element {
                 </div>
 
                 <div className="overview-card">
-                  <p className="eyebrow">Visual Readout</p>
+                  <p className="eyebrow">Authoring State</p>
                   <ul className="mini-list">
-                    <li>Overlay palette tuned for road, route, queue, and hazard contrast</li>
-                    <li>Panels elevated for quicker operator scanning on laptop displays</li>
-                    <li>Scene framing reserved for more cinematic polish in later passes</li>
+                    <li>{editorEnabled ? "Edit mode is active" : "Edit mode is paused"}</li>
+                    <li>Working copy: {authoring?.working_scenario_path ?? "unavailable"}</li>
+                    <li>Nodes: {formatMaybeNumber(authoring?.editable_node_count ?? null)}</li>
+                    <li>Roads: {formatMaybeNumber(authoring?.editable_road_count ?? null)}</li>
+                    <li>Zones: {formatMaybeNumber(authoring?.editable_area_count ?? null)}</li>
                   </ul>
                 </div>
               </aside>
@@ -929,6 +1317,74 @@ function App(): JSX.Element {
         </section>
 
         <aside className="sidebar">
+          <section className="panel info-panel" aria-labelledby="editor-title">
+            <div className="panel-header compact">
+              <div>
+                <p className="eyebrow">Authoring Region</p>
+                <h2 id="editor-title">Live Geometry Editing</h2>
+              </div>
+              <span className="status-pill secondary">{editCount} staged</span>
+            </div>
+            <div className="section-stack">
+              <div className="subsection">
+                <h3>Authoring Controls</h3>
+                <div className="action-row">
+                  <button className="scene-button" type="button" onClick={toggleEditMode}>
+                    {editorEnabled ? "Pause Edit Mode" : "Edit Scene"}
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={saveScenario}
+                    disabled={!authoring?.save_endpoint || editCount === 0}
+                  >
+                    Save Scenario
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={reloadScenario}
+                    disabled={!authoring?.reload_endpoint}
+                  >
+                    Reload Scenario
+                  </button>
+                </div>
+                <p className="status-copy">{editorMessage}</p>
+              </div>
+
+              <div className="subsection">
+                <h3>Validation Messages</h3>
+                <ul className="data-list">
+                  {validationMessages.length > 0 ? (
+                    validationMessages.map((message, index) => (
+                      <li key={`${message.code ?? "validation"}-${index}`}>
+                        {(message.severity ?? "info").toUpperCase()} ·{" "}
+                        {message.message ?? "No validation message"}
+                      </li>
+                    ))
+                  ) : (
+                    <li>No validation issues are currently blocking the draft.</li>
+                  )}
+                </ul>
+              </div>
+
+              <div className="subsection">
+                <h3>Draft Operations</h3>
+                <ul className="data-list">
+                  {draftTransaction.operations.length > 0 ? (
+                    draftTransaction.operations.map((operation, index) => (
+                      <li key={`${operation.kind}-${operation.target_id}-${index}`}>
+                        {describeOperation(operation)}
+                      </li>
+                    ))
+                  ) : (
+                    <li>No geometry edits are staged yet.</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </section>
+
           <section className="panel info-panel" aria-labelledby="command-center-title">
             <div className="panel-header compact">
               <div>
@@ -994,6 +1450,20 @@ function App(): JSX.Element {
                     <li>Lanes: {formatMaybeNumber(selectedRoad.lane_count ?? null)}</li>
                     <li>Width: {selectedRoad.width_m ?? "pending"}m</li>
                     <li>Edges: {(selectedRoad.edge_ids ?? []).join(", ") || "none"}</li>
+                  </ul>
+                </article>
+              ) : null}
+
+              {selectedTarget?.kind === "area" && selectedArea ? (
+                <article className="inspection-card">
+                  <div className="inspection-header">
+                    <strong>{selectedArea.label ?? selectedArea.area_id ?? "zone"}</strong>
+                    <span>{selectedArea.kind ?? "area"}</span>
+                  </div>
+                  <ul className="mini-list">
+                    <li>Polygon vertices: {selectedArea.polygon?.length ?? 0}</li>
+                    <li>Area id: {selectedArea.area_id ?? "unknown"}</li>
+                    <li>Editing target: zone polygon</li>
                   </ul>
                 </article>
               ) : null}
@@ -1068,17 +1538,6 @@ function App(): JSX.Element {
                       <li>Job: {inspection.current_job_id ?? "none"}</li>
                       <li>Wait: {inspection.wait_reason ?? "none"}</li>
                     </ul>
-                    <div className="diagnostic-row">
-                      {(inspection.diagnostics ?? []).slice(0, 2).map((diagnostic, diagIndex) => (
-                        <span
-                          key={`${diagnostic.code ?? "diag"}-${diagIndex}`}
-                          className="diagnostic-pill"
-                        >
-                          {(diagnostic.severity ?? "info").toUpperCase()}:{" "}
-                          {diagnostic.code ?? "diagnostic"}
-                        </span>
-                      ))}
-                    </div>
                   </article>
                 ))
               ) : null}
@@ -1153,6 +1612,143 @@ function App(): JSX.Element {
       </main>
     </div>
   );
+}
+
+function buildBootstrapSummary(
+  bundle: BundlePayload,
+  message: string,
+): BootstrapSummary {
+  const snapshot = bundle.snapshot ?? {};
+  const commandCenter = bundle.command_center ?? {};
+  const aiAssist = commandCenter.ai_assist ?? {};
+  const summary = bundle.summary ?? null;
+  return {
+    loadState: "loaded",
+    surfaceName: bundle.metadata?.surface_name ?? "unknown_surface",
+    seed: bundle.seed ?? null,
+    simulatedTimeS: bundle.simulated_time_s ?? snapshot.simulated_time_s ?? null,
+    vehicleCount: Array.isArray(snapshot.vehicles) ? snapshot.vehicles.length : null,
+    blockedEdgeCount: Array.isArray(snapshot.blocked_edge_ids)
+      ? snapshot.blocked_edge_ids.length
+      : null,
+    traceEventCount: Array.isArray(bundle.trace_events)
+      ? bundle.trace_events.length
+      : summary?.trace_event_count ?? null,
+    selectedVehicleCount: Array.isArray(commandCenter.selected_vehicle_ids)
+      ? commandCenter.selected_vehicle_ids.length
+      : null,
+    recentCommandCount: Array.isArray(commandCenter.recent_commands)
+      ? commandCenter.recent_commands.length
+      : null,
+    suggestionCount: Array.isArray(aiAssist.suggestions)
+      ? aiAssist.suggestions.length
+      : null,
+    anomalyCount: Array.isArray(aiAssist.anomalies)
+      ? aiAssist.anomalies.length
+      : null,
+    routePreviewCount: Array.isArray(commandCenter.route_previews)
+      ? commandCenter.route_previews.length
+      : null,
+    message,
+    commandCenter,
+    summary,
+    bundle,
+  };
+}
+
+function applyTransactionToBundle(
+  bundle: BundlePayload | null,
+  transaction: EditTransaction,
+): BundlePayload | null {
+  if (!bundle || transaction.operations.length === 0) {
+    return bundle;
+  }
+  const draft = deepClone(bundle);
+  for (const operation of transaction.operations) {
+    if (operation.kind === "move_node") {
+      applyMoveNodeOperation(draft, operation);
+    } else if (operation.kind === "set_road_centerline") {
+      const road = (draft.render_geometry?.roads ?? []).find(
+        (entry) => entry.road_id === operation.target_id,
+      );
+      if (road) {
+        road.centerline = operation.points.map((point) => [...point] as Position3);
+      }
+    } else if (operation.kind === "set_area_polygon") {
+      const area = (draft.render_geometry?.areas ?? []).find(
+        (entry) => entry.area_id === operation.target_id,
+      );
+      if (area) {
+        area.polygon = operation.points.map((point) => [...point] as Position3);
+      }
+    }
+  }
+  return draft;
+}
+
+function applyMoveNodeOperation(
+  bundle: BundlePayload,
+  operation: MoveNodeEditOperation,
+): void {
+  const node = (bundle.map_surface?.nodes ?? []).find(
+    (entry) => entry.node_id === operation.target_id,
+  );
+  if (!node?.position) {
+    return;
+  }
+  const oldPosition = [...node.position] as Position3;
+  node.position = [...operation.position] as Position3;
+
+  for (const road of bundle.render_geometry?.roads ?? []) {
+    const edgeIds = new Set(road.edge_ids ?? []);
+    const connected = (bundle.map_surface?.edges ?? []).some(
+      (edge) =>
+        edge.edge_id !== undefined &&
+        edgeIds.has(edge.edge_id) &&
+        (edge.start_node_id === operation.target_id || edge.end_node_id === operation.target_id),
+    );
+    if (!connected || !road.centerline) {
+      continue;
+    }
+    if (pointsEqual(road.centerline[0], oldPosition)) {
+      road.centerline[0] = [...operation.position] as Position3;
+    }
+    if (pointsEqual(road.centerline[road.centerline.length - 1], oldPosition)) {
+      road.centerline[road.centerline.length - 1] = [...operation.position] as Position3;
+    }
+  }
+
+  for (const intersection of bundle.render_geometry?.intersections ?? []) {
+    if (intersection.node_id !== operation.target_id || !intersection.polygon) {
+      continue;
+    }
+    const deltaX = operation.position[0] - oldPosition[0];
+    const deltaY = operation.position[1] - oldPosition[1];
+    const deltaZ = operation.position[2] - oldPosition[2];
+    intersection.polygon = intersection.polygon.map(([x, y, z]) => [
+      x + deltaX,
+      y + deltaY,
+      z + deltaZ,
+    ]);
+  }
+}
+
+function clientPointToScene(
+  event: MouseEvent<SVGSVGElement>,
+  svg: SVGSVGElement | null,
+  viewport: ViewportState,
+  z: number,
+): Position3 | null {
+  if (!svg) {
+    return null;
+  }
+  const rect = svg.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) {
+    return null;
+  }
+  const x = viewport.x + ((event.clientX - rect.left) / rect.width) * viewport.width;
+  const y = viewport.y + ((event.clientY - rect.top) / rect.height) * viewport.height;
+  return [roundPointValue(x), roundPointValue(y), z];
 }
 
 function fitViewportToBundle(bundle: BundlePayload | null): ViewportState {
@@ -1289,6 +1885,9 @@ function describeSelectedTarget(
   if (selectedTarget?.kind === "road") {
     return `road ${selectedTarget.roadId}`;
   }
+  if (selectedTarget?.kind === "area") {
+    return `zone ${selectedTarget.areaId}`;
+  }
   if (selectedTarget?.kind === "queue") {
     return `queue edge ${selectedTarget.edgeId}`;
   }
@@ -1308,10 +1907,40 @@ function describeSelectedBadge(selectedTarget: SelectedTarget): string {
   if (selectedTarget.kind === "road") {
     return "road";
   }
+  if (selectedTarget.kind === "area") {
+    return "zone";
+  }
   if (selectedTarget.kind === "queue") {
     return "queue";
   }
   return "hazard";
+}
+
+function describeOperation(operation: EditOperation): string {
+  if (operation.kind === "move_node") {
+    return `move node ${operation.target_id} to ${operation.position.join(", ")}`;
+  }
+  if (operation.kind === "set_road_centerline") {
+    return `edit road ${operation.target_id} with ${operation.points.length} centerline point(s)`;
+  }
+  return `edit zone ${operation.target_id} with ${operation.points.length} polygon vertex/vertices`;
+}
+
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function pointsEqual(left: Position3 | undefined, right: Position3): boolean {
+  return (
+    Array.isArray(left) &&
+    left[0] === right[0] &&
+    left[1] === right[1] &&
+    left[2] === right[2]
+  );
+}
+
+function roundPointValue(value: number): number {
+  return Math.round(value * 1000) / 1000;
 }
 
 function formatMaybeNumber(value: number | null): string {

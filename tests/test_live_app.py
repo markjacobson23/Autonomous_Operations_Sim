@@ -1,6 +1,8 @@
 import json
+from urllib import request
 
 from autonomous_ops_sim.live_app import (
+    LiveAppServer,
     build_live_app_url,
     export_live_app_artifacts,
     launch_live_app,
@@ -20,10 +22,12 @@ def test_export_live_app_artifacts_falls_back_to_standalone_viewer_when_no_front
     assert artifacts.launch_path == tmp_path / "live_session.viewer.html"
     assert artifacts.launch_path.exists()
     assert artifacts.live_session_bundle_path.exists()
+    assert artifacts.working_scenario_path.exists()
 
     bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
     assert bundle["metadata"]["surface_name"] == "live_session_bundle"
     assert bundle["seed"] == 3801
+    assert bundle["authoring"]["working_scenario_path"] == str(artifacts.working_scenario_path)
 
 
 def test_export_live_app_artifacts_prefers_frontend_dist_when_available(tmp_path) -> None:
@@ -71,3 +75,80 @@ def test_launch_live_app_returns_file_uri_for_fallback_without_opening_browser(t
 
     assert result.served is False
     assert result.launch_target == artifacts.launch_path.resolve().as_uri()
+
+
+def test_live_app_frontend_server_supports_validate_save_and_reload_authoring_api(tmp_path) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        validate_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/authoring/validate",
+                data=json.dumps(
+                    {
+                        "label": "invalid-node-overlap",
+                        "operations": [
+                            {
+                                "kind": "move_node",
+                                "target_id": 100,
+                                "position": [3, 0, 0],
+                            }
+                        ],
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        validate_payload = json.loads(validate_response.read().decode("utf-8"))
+        assert validate_payload["ok"] is False
+        assert validate_payload["validation_messages"] != []
+
+        save_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/authoring/save",
+                data=json.dumps(
+                    {
+                        "label": "edit-road",
+                        "operations": [
+                            {
+                                "kind": "set_road_centerline",
+                                "target_id": "dispatch-spine",
+                                "points": [[0, 0, 0], [1.2, 0.4, 0], [3, 0, 0]],
+                            }
+                        ],
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        save_payload = json.loads(save_response.read().decode("utf-8"))
+        assert save_payload["ok"] is True
+        assert save_payload["bundle"]["render_geometry"]["roads"][0]["centerline"][1] == [
+            1.2,
+            0.4,
+            0.0,
+        ]
+
+        reload_response = request.urlopen(f"{base_url}/api/authoring/reload")
+        reload_payload = json.loads(reload_response.read().decode("utf-8"))
+        assert reload_payload["ok"] is True
+        assert reload_payload["bundle"]["render_geometry"]["roads"][0]["centerline"][1] == [
+            1.2,
+            0.4,
+            0.0,
+        ]
+    finally:
+        server.stop()

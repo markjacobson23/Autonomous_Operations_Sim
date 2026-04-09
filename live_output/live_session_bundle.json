@@ -838,7 +838,270 @@
         "road_id": "escape-ramp",
         "width_m": 1.0
       }
-    ]
+    ],
+    "world_model": {
+      "asset_layers": [],
+      "environment": {
+        "archetype_id": "legacy_mine_depot",
+        "display_name": "Legacy Mine Depot",
+        "family": "mine"
+      },
+      "layers": {
+        "boundaries": [],
+        "buildings": [
+          {
+            "feature_id": "service-yard",
+            "kind": "building",
+            "label": "Service Yard",
+            "layer": "buildings",
+            "polygon": [
+              [
+                5.8,
+                -3.2,
+                0.0
+              ],
+              [
+                8.1,
+                -3.2,
+                0.0
+              ],
+              [
+                8.1,
+                -1.4,
+                0.0
+              ],
+              [
+                5.8,
+                -1.4,
+                0.0
+              ]
+            ],
+            "reference_id": "service-yard"
+          }
+        ],
+        "intersections": [
+          {
+            "feature_id": "dispatch-hub",
+            "kind": "yard_junction",
+            "label": null,
+            "layer": "intersections",
+            "polygon": [],
+            "reference_id": "dispatch-hub"
+          },
+          {
+            "feature_id": "pit-apron",
+            "kind": "loading_apron",
+            "label": null,
+            "layer": "intersections",
+            "polygon": [],
+            "reference_id": "pit-apron"
+          },
+          {
+            "feature_id": "crusher-apron",
+            "kind": "yard_junction",
+            "label": null,
+            "layer": "intersections",
+            "polygon": [],
+            "reference_id": "crusher-apron"
+          },
+          {
+            "feature_id": "service-turn",
+            "kind": "service_turnout",
+            "label": null,
+            "layer": "intersections",
+            "polygon": [],
+            "reference_id": "service-turn"
+          }
+        ],
+        "no_go_areas": [
+          {
+            "feature_id": "blast-buffer",
+            "kind": "no_go_zone",
+            "label": "Blast Buffer",
+            "layer": "no_go_areas",
+            "polygon": [
+              [
+                8.7,
+                1.1,
+                0.0
+              ],
+              [
+                10.4,
+                1.1,
+                0.0
+              ],
+              [
+                10.4,
+                3.1,
+                0.0
+              ],
+              [
+                8.7,
+                3.1,
+                0.0
+              ]
+            ],
+            "reference_id": "blast-buffer"
+          }
+        ],
+        "roads": [
+          {
+            "feature_id": "dispatch-spine",
+            "kind": "haul_road",
+            "label": null,
+            "layer": "roads",
+            "polygon": [],
+            "reference_id": "dispatch-spine"
+          },
+          {
+            "feature_id": "pit-approach",
+            "kind": "service_road",
+            "label": null,
+            "layer": "roads",
+            "polygon": [],
+            "reference_id": "pit-approach"
+          },
+          {
+            "feature_id": "cut-ramp",
+            "kind": "ramp",
+            "label": null,
+            "layer": "roads",
+            "polygon": [],
+            "reference_id": "cut-ramp"
+          },
+          {
+            "feature_id": "crusher-run",
+            "kind": "haul_road",
+            "label": null,
+            "layer": "roads",
+            "polygon": [],
+            "reference_id": "crusher-run"
+          },
+          {
+            "feature_id": "fuel-branch",
+            "kind": "yard_lane",
+            "label": null,
+            "layer": "roads",
+            "polygon": [],
+            "reference_id": "fuel-branch"
+          },
+          {
+            "feature_id": "maintenance-link",
+            "kind": "service_road",
+            "label": null,
+            "layer": "roads",
+            "polygon": [],
+            "reference_id": "maintenance-link"
+          },
+          {
+            "feature_id": "south-bypass",
+            "kind": "bypass",
+            "label": null,
+            "layer": "roads",
+            "polygon": [],
+            "reference_id": "south-bypass"
+          },
+          {
+            "feature_id": "escape-ramp",
+            "kind": "ramp",
+            "label": null,
+            "layer": "roads",
+            "polygon": [],
+            "reference_id": "escape-ramp"
+          }
+        ],
+        "sidewalks": [],
+        "zones": [
+          {
+            "feature_id": "dispatch-yard",
+            "kind": "depot",
+            "label": "Dispatch Yard",
+            "layer": "zones",
+            "polygon": [
+              [
+                -0.9,
+                -0.9,
+                0.0
+              ],
+              [
+                1.1,
+                -0.9,
+                0.0
+              ],
+              [
+                1.1,
+                0.9,
+                0.0
+              ],
+              [
+                -0.9,
+                0.9,
+                0.0
+              ]
+            ],
+            "reference_id": "dispatch-yard"
+          },
+          {
+            "feature_id": "ore-cut",
+            "kind": "loading_bay",
+            "label": "Ore Cut",
+            "layer": "zones",
+            "polygon": [
+              [
+                5.0,
+                1.1,
+                0.0
+              ],
+              [
+                7.4,
+                1.1,
+                0.0
+              ],
+              [
+                7.4,
+                3.3,
+                0.0
+              ],
+              [
+                5.0,
+                3.3,
+                0.0
+              ]
+            ],
+            "reference_id": "ore-cut"
+          },
+          {
+            "feature_id": "crusher-pad",
+            "kind": "loading_bay",
+            "label": "Crusher Pad",
+            "layer": "zones",
+            "polygon": [
+              [
+                10.9,
+                -0.5,
+                0.0
+              ],
+              [
+                12.9,
+                -0.5,
+                0.0
+              ],
+              [
+                12.9,
+                1.6,
+                0.0
+              ],
+              [
+                10.9,
+                1.6,
+                0.0
+              ]
+            ],
+            "reference_id": "crusher-pad"
+          }
+        ]
+      }
+    }
   },
   "seed": 3801,
   "session_history": [],
