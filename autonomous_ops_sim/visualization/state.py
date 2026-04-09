@@ -17,6 +17,11 @@ from autonomous_ops_sim.simulation.control import (
     SimulationController,
 )
 from autonomous_ops_sim.simulation.engine import SimulationEngine
+from autonomous_ops_sim.simulation.live_session import (
+    LiveSimulationSession,
+    SessionAdvanceRecord,
+    session_advance_to_dict,
+)
 from autonomous_ops_sim.simulation.trace import TraceEvent, TraceEventType
 from autonomous_ops_sim.vehicles.vehicle import Position
 
@@ -72,6 +77,7 @@ class FrameTrigger:
     event_name: str
     trace_event: dict[str, Any] | None = None
     command: dict[str, Any] | None = None
+    session_step: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -103,6 +109,7 @@ class _TimelineRecord:
     sequence: int
     trace_event: TraceEvent | None = None
     command_record: CommandApplicationRecord | None = None
+    session_record: SessionAdvanceRecord | None = None
 
 
 def build_visualization_state(
@@ -110,10 +117,13 @@ def build_visualization_state(
     *,
     command_history: tuple[CommandApplicationRecord, ...]
     | list[CommandApplicationRecord] = (),
+    session_history: tuple[SessionAdvanceRecord, ...]
+    | list[SessionAdvanceRecord] = (),
 ) -> VisualizationState:
     """Build a stable visualization replay surface from an engine run."""
 
     history = tuple(command_history)
+    session_progress = tuple(session_history)
     map_surface = _build_map_surface(engine)
     initial_blocked_edge_ids = _infer_initial_blocked_edge_ids(engine, history)
     initial_vehicle_states = _infer_initial_vehicle_states(engine, history)
@@ -144,9 +154,21 @@ def build_visualization_state(
         )
     ]
 
-    timeline = _build_timeline(engine=engine, command_history=history)
+    timeline = _build_timeline(
+        engine=engine,
+        command_history=history,
+        session_history=session_progress,
+    )
     for record in timeline:
-        if record.command_record is not None:
+        if record.session_record is not None:
+            trigger = FrameTrigger(
+                source="session",
+                sequence=record.session_record.sequence,
+                timestamp_s=record.session_record.completed_at_s,
+                event_name="session_advance",
+                session_step=session_advance_to_dict(record.session_record),
+            )
+        elif record.command_record is not None:
             _apply_command_record(
                 record.command_record,
                 mutable_vehicle_states=mutable_vehicle_states,
@@ -205,6 +227,18 @@ def build_visualization_state_from_controller(
     )
 
 
+def build_visualization_state_from_live_session(
+    session: LiveSimulationSession,
+) -> VisualizationState:
+    """Build visualization state from an explicitly progressed live session."""
+
+    return build_visualization_state(
+        session.engine,
+        command_history=session.command_history,
+        session_history=session.progress_history,
+    )
+
+
 def visualization_state_to_dict(state: VisualizationState) -> dict[str, Any]:
     """Convert visualization state into a stable JSON-ready record."""
 
@@ -236,14 +270,7 @@ def visualization_state_to_dict(state: VisualizationState) -> dict[str, Any]:
             {
                 "frame_index": frame.frame_index,
                 "timestamp_s": frame.timestamp_s,
-                "trigger": {
-                    "source": frame.trigger.source,
-                    "sequence": frame.trigger.sequence,
-                    "timestamp_s": frame.trigger.timestamp_s,
-                    "event_name": frame.trigger.event_name,
-                    "trace_event": frame.trigger.trace_event,
-                    "command": frame.trigger.command,
-                },
+                "trigger": _frame_trigger_to_dict(frame.trigger),
                 "blocked_edge_ids": list(frame.blocked_edge_ids),
                 "vehicles": [
                     {
@@ -258,6 +285,20 @@ def visualization_state_to_dict(state: VisualizationState) -> dict[str, Any]:
             for frame in state.frames
         ],
     }
+
+
+def _frame_trigger_to_dict(trigger: FrameTrigger) -> dict[str, Any]:
+    payload = {
+        "source": trigger.source,
+        "sequence": trigger.sequence,
+        "timestamp_s": trigger.timestamp_s,
+        "event_name": trigger.event_name,
+        "trace_event": trigger.trace_event,
+        "command": trigger.command,
+    }
+    if trigger.session_step is not None:
+        payload["session_step"] = trigger.session_step
+    return payload
 
 
 def export_visualization_json(state: VisualizationState) -> str:
@@ -314,8 +355,9 @@ def _visualization_state_from_dict(data: dict[str, Any]) -> VisualizationState:
                     sequence=int(frame["trigger"]["sequence"]),
                     timestamp_s=float(frame["trigger"]["timestamp_s"]),
                     event_name=str(frame["trigger"]["event_name"]),
-                    trace_event=frame["trigger"]["trace_event"],
-                    command=frame["trigger"]["command"],
+                    trace_event=frame["trigger"].get("trace_event"),
+                    command=frame["trigger"].get("command"),
+                    session_step=frame["trigger"].get("session_step"),
                 ),
                 blocked_edge_ids=tuple(
                     int(edge_id) for edge_id in frame["blocked_edge_ids"]
@@ -475,12 +517,13 @@ def _build_timeline(
     *,
     engine: SimulationEngine,
     command_history: tuple[CommandApplicationRecord, ...],
+    session_history: tuple[SessionAdvanceRecord, ...],
 ) -> tuple[_TimelineRecord, ...]:
-    if not command_history:
+    if not command_history and not session_history:
         return tuple(
             _TimelineRecord(
                 timestamp_s=event.timestamp_s,
-                sort_group=1,
+                sort_group=2,
                 sequence=event.sequence,
                 trace_event=event,
             )
@@ -490,14 +533,33 @@ def _build_timeline(
     timeline: list[_TimelineRecord] = []
     trace_events = engine.trace.events
     trace_index = 0
+    session_index = 0
+
+    def append_pending_session_records(until_timestamp_s: float) -> None:
+        nonlocal session_index
+        while (
+            session_index < len(session_history)
+            and session_history[session_index].completed_at_s <= until_timestamp_s
+        ):
+            session_record = session_history[session_index]
+            timeline.append(
+                _TimelineRecord(
+                    timestamp_s=session_record.completed_at_s,
+                    sort_group=0,
+                    sequence=session_record.sequence,
+                    session_record=session_record,
+                )
+            )
+            session_index += 1
 
     for record in command_history:
+        append_pending_session_records(record.completed_at_s)
         command = record.command
         if isinstance(command, (BlockEdgeCommand, RepositionVehicleCommand)):
             timeline.append(
                 _TimelineRecord(
                     timestamp_s=record.completed_at_s,
-                    sort_group=0,
+                    sort_group=1,
                     sequence=record.sequence,
                     command_record=record,
                 )
@@ -511,7 +573,7 @@ def _build_timeline(
             timeline.append(
                 _TimelineRecord(
                     timestamp_s=event.timestamp_s,
-                    sort_group=1,
+                    sort_group=2,
                     sequence=event.sequence,
                     trace_event=event,
                 )
@@ -524,15 +586,21 @@ def _build_timeline(
                 and event.transition_reason == "route_complete"
             )
 
-    timeline.extend(
-        _TimelineRecord(
-            timestamp_s=event.timestamp_s,
-            sort_group=1,
-            sequence=event.sequence,
-            trace_event=event,
+    while trace_index < len(trace_events):
+        event = trace_events[trace_index]
+        append_pending_session_records(event.timestamp_s)
+        timeline.append(
+            _TimelineRecord(
+                timestamp_s=event.timestamp_s,
+                sort_group=2,
+                sequence=event.sequence,
+                trace_event=event,
+            )
         )
-        for event in trace_events[trace_index:]
-    )
+        trace_index += 1
+
+    append_pending_session_records(float("inf"))
+
     return tuple(timeline)
 
 

@@ -20,6 +20,14 @@ from autonomous_ops_sim.simulation.behavior import (
     VehicleOperationalState,
 )
 from autonomous_ops_sim.simulation.engine import SimulationEngine
+from autonomous_ops_sim.simulation.live_session import (
+    LiveSimulationSession,
+    SessionAdvanceRecord,
+    SessionStateError,
+    build_live_session_export,
+    export_live_session_json,
+    session_advance_to_dict,
+)
 from autonomous_ops_sim.simulation.metrics import (
     ExecutionMetricsSummary,
     TraceEventCount,
@@ -36,8 +44,11 @@ __all__ = [
     "CommandApplicationRecord",
     "CommandValidationError",
     "ExecutionMetricsSummary",
+    "LiveSimulationSession",
     "InvalidBehaviorTransitionError",
     "RepositionVehicleCommand",
+    "SessionAdvanceRecord",
+    "SessionStateError",
     "SimulationCommand",
     "SimulationController",
     "SimulationEngine",
@@ -49,9 +60,12 @@ __all__ = [
     "VehicleOperationalState",
     "WorldState",
     "build_controlled_engine_export",
+    "build_live_session_export",
     "command_application_to_dict",
     "command_to_dict",
     "export_controlled_engine_json",
+    "export_live_session_json",
+    "session_advance_to_dict",
     "summarize_engine_execution",
     "summarize_trace",
 ]
