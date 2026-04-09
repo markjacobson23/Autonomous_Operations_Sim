@@ -59,3 +59,11 @@ def test_serious_ui_package_json_defines_dev_and_build_scripts() -> None:
     assert package_json["scripts"]["dev"] == "vite"
     assert package_json["scripts"]["build"] == "tsc -b && vite build"
     assert package_json["dependencies"]["react"].startswith("^18.")
+
+
+def test_serious_ui_vite_config_uses_relative_base_for_nested_live_launch_path() -> None:
+    vite_config = (
+        REPO_ROOT / "frontend" / "serious_ui" / "vite.config.ts"
+    ).read_text(encoding="utf-8")
+
+    assert 'base: "./"' in vite_config
