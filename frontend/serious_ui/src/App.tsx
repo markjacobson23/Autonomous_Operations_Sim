@@ -1716,6 +1716,22 @@ function App(): JSX.Element {
     width: (viewport.width / bounds.width) * 100,
     height: (viewport.height / bounds.height) * 100,
   };
+  const minimapViewportCoverage = `${Math.max(1, Math.round((viewport.width / bounds.width) * 100))}% wide · ${Math.max(
+    1,
+    Math.round((viewport.height / bounds.height) * 100),
+  )}% tall`;
+  const minimapSelectedVehicleLabel =
+    selectedVehicle !== null
+      ? `Selected ${selectedVehicle.display_name ?? selectedVehicle.role_label ?? vehiclePresentationBadge(selectedVehicle)}`
+      : effectiveSelectedVehicleIds.length > 0
+        ? `Fleet ${effectiveSelectedVehicleIds.length} selected`
+        : "No selected vehicle";
+  const minimapBlockedContextLabel =
+    selectedTarget?.kind === "hazard"
+      ? `Blocked edge ${selectedTarget.edgeId}`
+      : blockedEdgeIds.length > 0
+        ? `${blockedEdgeIds.length} blocked edge${blockedEdgeIds.length === 1 ? "" : "s"}`
+        : "No blocked edges";
 
   return (
     <div className={`shell shell-tab-${activeTab} ${activeTab === "editor" ? "shell-editor-focused" : ""}`}>
@@ -2313,42 +2329,48 @@ function App(): JSX.Element {
                     ))}
                 </svg>
 
-                <div className="focus-card">
-                  <strong>Stop lines and yield controls are now live</strong>
-                  <p>
-                    Traffic snapshots now carry control-state overlays and
-                    inspection reasons, so dense corridors stay legible while
-                    still revealing where vehicles are waiting.
-                  </p>
-                </div>
-                <div className="scene-legend">
-                  <span className="legend-item">
-                    <span className="legend-swatch road" />
-                    Roads
-                  </span>
-                  <span className="legend-item">
-                    <span className="legend-swatch traffic" />
-                    Traffic heatmap
-                  </span>
-                  <span className="legend-item">
-                    <span className="legend-swatch vehicle" />
-                    Vehicles
-                  </span>
-                  <span className="legend-item">
-                    <span className="legend-swatch hazard" />
-                    Hazards
-                  </span>
-                  <span className="legend-item">
-                    <span className="legend-swatch handle" />
-                    Edit handles
-                  </span>
-                </div>
-                {hoverTarget ? (
-                  <div className="hover-card" aria-live="polite">
-                    <strong>{hoverTarget.label}</strong>
-                    <p>{hoverTarget.detail}</p>
+                <div className="scene-overlay-shell">
+                  <div className="scene-overlay-primary">
+                    <div className="scene-legend">
+                      <span className="legend-item">
+                        <span className="legend-swatch road" />
+                        Roads
+                      </span>
+                      <span className="legend-item">
+                        <span className="legend-swatch traffic" />
+                        Traffic heatmap
+                      </span>
+                      <span className="legend-item">
+                        <span className="legend-swatch vehicle" />
+                        Vehicles
+                      </span>
+                      <span className="legend-item">
+                        <span className="legend-swatch hazard" />
+                        Hazards
+                      </span>
+                      <span className="legend-item">
+                        <span className="legend-swatch handle" />
+                        Edit handles
+                      </span>
+                    </div>
+                    <div className="focus-card">
+                      <strong>Stop lines and yield controls are now live</strong>
+                      <p>
+                        Traffic snapshots now carry control-state overlays and
+                        inspection reasons, so dense corridors stay legible while
+                        still revealing where vehicles are waiting.
+                      </p>
+                    </div>
                   </div>
-                ) : null}
+                  {hoverTarget ? (
+                    <div className="scene-overlay-secondary">
+                      <div className="hover-card" aria-live="polite">
+                        <strong>{hoverTarget.label}</strong>
+                        <p>{hoverTarget.detail}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               <aside className="overview-panel">
@@ -2482,14 +2504,35 @@ function App(): JSX.Element {
                     </ul>
                   </div>
                 </div>
-                <div className="overview-card">
+                <div className="overview-card overview-card-minimap">
                   <p className="eyebrow">Overview</p>
                   <h3>Minimap Navigation</h3>
+                  <div className="minimap-card-head">
+                    <div className="minimap-card-copy">
+                      <span className="minimap-card-label">Scene camera</span>
+                      <p className="minimap-card-summary">{minimapViewportCoverage}</p>
+                    </div>
+                    <span className="minimap-orientation-pill">North-up</span>
+                  </div>
+                  <div className="minimap-context-strip" aria-label="Minimap context">
+                    <span className="selection-pill minimap-context-pill">{minimapSelectedVehicleLabel}</span>
+                    <span className="selection-pill minimap-context-pill">Viewport window</span>
+                    <span
+                      className={`selection-pill minimap-context-pill ${
+                        blockedEdgeIds.length > 0 || selectedTarget?.kind === "hazard"
+                          ? "minimap-context-pill-alert"
+                          : ""
+                      }`}
+                    >
+                      {minimapBlockedContextLabel}
+                    </span>
+                  </div>
                   <svg
                     ref={minimapRef}
                     className="minimap"
                     viewBox={`0 0 100 100`}
                     aria-label="Scene minimap"
+                    aria-describedby="minimap-caption"
                     onClick={handleMinimapClick}
                   >
                     <rect x={0} y={0} width={100} height={100} className="minimap-bg" />
@@ -2500,15 +2543,66 @@ function App(): JSX.Element {
                         className="minimap-road"
                       />
                     ))}
-                    {displayedVehicles.map((vehicle, index) => (
-                      <circle
-                        key={vehicle.vehicle_id ?? `minimap-vehicle-${index}`}
-                        cx={scaleX(vehicle.position?.[0] ?? 0, bounds)}
-                        cy={scaleY(vehicle.position?.[1] ?? 0, bounds)}
-                        r={1.7}
-                        className="minimap-vehicle"
-                      />
-                    ))}
+                    {layers.hazards &&
+                      blockedEdgeIds.map((edgeId) => {
+                        const edge = findEdgeById(bundle?.map_surface?.edges ?? [], edgeId);
+                        const start = edge
+                          ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.start_node_id)
+                          : null;
+                        const end = edge
+                          ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.end_node_id)
+                          : null;
+                        if (!start || !end) {
+                          return null;
+                        }
+                        return (
+                          <line
+                            key={`minimap-hazard-${edgeId}`}
+                            x1={scaleX(start[0], bounds)}
+                            y1={scaleY(start[1], bounds)}
+                            x2={scaleX(end[0], bounds)}
+                            y2={scaleY(end[1], bounds)}
+                            className={`minimap-hazard ${
+                              selectedTarget?.kind === "hazard" && selectedTarget.edgeId === edgeId
+                                ? "selected"
+                                : ""
+                            }`}
+                          />
+                        );
+                      })}
+                    {displayedVehicles.map((vehicle, index) => {
+                      const isPrimarySelected = vehicle.vehicle_id === selectedVehicleId;
+                      const isSelectedFleetVehicle = effectiveSelectedVehicleIds.includes(
+                        vehicle.vehicle_id ?? -1,
+                      );
+                      return (
+                        <g
+                          key={vehicle.vehicle_id ?? `minimap-vehicle-${index}`}
+                          className={`minimap-vehicle ${
+                            isPrimarySelected
+                              ? "selected"
+                              : isSelectedFleetVehicle
+                                ? "fleet-selected"
+                                : ""
+                          }`}
+                        >
+                          {isPrimarySelected ? (
+                            <circle
+                              cx={scaleX(vehicle.position?.[0] ?? 0, bounds)}
+                              cy={scaleY(vehicle.position?.[1] ?? 0, bounds)}
+                              r={3.1}
+                              className="minimap-vehicle-halo"
+                            />
+                          ) : null}
+                          <circle
+                            cx={scaleX(vehicle.position?.[0] ?? 0, bounds)}
+                            cy={scaleY(vehicle.position?.[1] ?? 0, bounds)}
+                            r={isPrimarySelected ? 2.05 : isSelectedFleetVehicle ? 1.75 : 1.25}
+                            className="minimap-vehicle-core"
+                          />
+                        </g>
+                      );
+                    })}
                     {routeDestinationMarkers.map((marker) => (
                       <g
                         key={`minimap-route-destination-${marker.destinationNodeId}`}
@@ -2533,10 +2627,23 @@ function App(): JSX.Element {
                       y={minimapRect.y}
                       width={minimapRect.width}
                       height={minimapRect.height}
+                      rx={1.1}
+                      ry={1.1}
+                      className="minimap-viewport minimap-viewport-shadow"
+                    />
+                    <rect
+                      x={minimapRect.x}
+                      y={minimapRect.y}
+                      width={minimapRect.width}
+                      height={minimapRect.height}
+                      rx={1.1}
+                      ry={1.1}
                       className="minimap-viewport"
                     />
                   </svg>
-                  <p>Click anywhere on the minimap to recenter the current viewport.</p>
+                  <p id="minimap-caption" className="minimap-caption">
+                    Click anywhere on the minimap to recenter the main scene. The window mirrors the current camera frame.
+                  </p>
                 </div>
 
                 <div className="overview-card">

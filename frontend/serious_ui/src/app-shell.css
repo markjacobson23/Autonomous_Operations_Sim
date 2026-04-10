@@ -1169,6 +1169,17 @@ h3 {
   margin-bottom: 14px;
 }
 
+.scene-toolbar {
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(66, 78, 88, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(248, 243, 236, 0.7)),
+    rgba(255, 255, 255, 0.54);
+  box-shadow: 0 12px 24px rgba(24, 33, 44, 0.06);
+  align-items: center;
+}
+
 .tool-group {
   display: flex;
   gap: 8px;
@@ -1186,10 +1197,26 @@ h3 {
   font-weight: 700;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
   min-width: 0;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
 }
 
 .scene-button:disabled {
   opacity: 0.45;
+}
+
+.scene-button:hover:not(:disabled),
+.scene-button:focus-visible:not(:disabled),
+.layer-chip:hover,
+.layer-chip:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(36, 83, 199, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 10px 18px rgba(24, 33, 44, 0.08);
 }
 
 .action-row {
@@ -1251,27 +1278,78 @@ h3 {
 
 .scene-routes {
   position: absolute;
-  left: 20px;
-  top: 20px;
+  left: 18px;
+  top: 18px;
   z-index: 1;
   display: flex;
-  gap: 8px;
+  gap: 7px;
   flex-wrap: wrap;
+  max-width: min(22rem, calc(100% - 36px));
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(66, 78, 88, 0.1);
+  background: rgba(255, 251, 245, 0.72);
+  box-shadow: 0 12px 24px rgba(24, 33, 44, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.route-chip {
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .route-chip-primary {
-  background: var(--accent-soft);
+  background: rgba(10, 118, 108, 0.1);
   color: var(--accent);
+  border-color: rgba(10, 118, 108, 0.16);
 }
 
 .route-chip-secondary {
-  background: var(--accent-2-soft);
+  background: rgba(36, 83, 199, 0.1);
   color: var(--accent-2);
+  border-color: rgba(36, 83, 199, 0.16);
 }
 
 .route-chip-alert {
-  background: var(--alert-soft);
+  background: rgba(178, 74, 59, 0.1);
   color: var(--alert);
+  border-color: rgba(178, 74, 59, 0.16);
+}
+
+.scene-overlay-shell {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 18px;
+  pointer-events: none;
+}
+
+.scene-overlay-shell > * {
+  pointer-events: none;
+}
+
+.scene-overlay-primary {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: end;
+  justify-self: start;
+  display: grid;
+  gap: 10px;
+  width: min(100%, 400px);
+}
+
+.scene-overlay-secondary {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  justify-self: end;
+  width: min(100%, 290px);
 }
 
 .focus-card,
@@ -1287,47 +1365,56 @@ h3 {
 }
 
 .focus-card {
-  position: absolute;
-  left: 28px;
-  bottom: 28px;
+  position: relative;
   z-index: 1;
-  max-width: 340px;
-  padding: 18px;
+  max-width: 380px;
+  padding: 18px 18px 18px 17px;
+  border-color: rgba(10, 118, 108, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(246, 240, 232, 0.95)),
+    linear-gradient(135deg, rgba(10, 118, 108, 0.08), rgba(36, 83, 199, 0.04));
+  box-shadow: 0 20px 48px rgba(24, 33, 44, 0.16);
 }
 
 .hover-card {
-  position: absolute;
-  top: 24px;
-  right: 24px;
+  position: relative;
   z-index: 1;
-  max-width: 250px;
-  padding: 14px 16px;
+  max-width: 290px;
+  padding: 14px 15px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 252, 248, 0.98), rgba(247, 241, 235, 0.96));
-  box-shadow: 0 14px 34px rgba(28, 36, 48, 0.18);
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 248, 0.94), rgba(246, 240, 233, 0.9)),
+    rgba(255, 255, 255, 0.76);
+  box-shadow: 0 14px 30px rgba(28, 36, 48, 0.14);
+  backdrop-filter: blur(12px);
 }
 
 .scene-legend {
-  position: absolute;
-  left: 28px;
-  bottom: 168px;
+  position: relative;
   z-index: 1;
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
+  max-width: 100%;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(66, 78, 88, 0.1);
+  background: rgba(255, 251, 245, 0.76);
+  box-shadow: 0 12px 24px rgba(24, 33, 44, 0.08);
+  backdrop-filter: blur(10px);
 }
 
 .legend-item {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 7px;
+  padding: 7px 10px;
   border-radius: 999px;
-  background: rgba(255, 251, 245, 0.9);
-  border: 1px solid rgba(66, 78, 88, 0.12);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(66, 78, 88, 0.1);
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
@@ -1378,6 +1465,78 @@ h3 {
 .inspection-card,
 .empty-state {
   padding: 16px;
+}
+
+.overview-card-minimap {
+  display: grid;
+  gap: 10px;
+  border-color: rgba(36, 83, 199, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 243, 236, 0.92)),
+    linear-gradient(135deg, rgba(36, 83, 199, 0.05), rgba(10, 118, 108, 0.04));
+  box-shadow: var(--shadow-strong);
+}
+
+.minimap-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.minimap-card-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.minimap-card-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.minimap-card-summary {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.minimap-orientation-pill {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(36, 83, 199, 0.1);
+  border: 1px solid rgba(36, 83, 199, 0.18);
+  color: var(--accent-2);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.minimap-context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.minimap-context-pill {
+  background: rgba(0, 108, 103, 0.08);
+  color: var(--accent);
+  border: 1px solid rgba(0, 108, 103, 0.12);
+}
+
+.minimap-context-pill-alert {
+  background: rgba(178, 74, 59, 0.1);
+  color: var(--alert);
+  border-color: rgba(178, 74, 59, 0.18);
 }
 
 .mini-list,
@@ -2142,9 +2301,32 @@ h3 {
   }
 
   .focus-card {
-    right: 18px;
-    left: 18px;
     max-width: none;
+  }
+
+  .scene-overlay-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    padding: 12px;
+  }
+
+  .scene-overlay-primary,
+  .scene-overlay-secondary {
+    grid-column: 1;
+    justify-self: stretch;
+    width: auto;
+  }
+
+  .scene-overlay-primary {
+    grid-row: 2;
+  }
+
+  .scene-overlay-secondary {
+    grid-row: 1;
+  }
+
+  .scene-legend {
+    padding: 9px 10px;
   }
 
   .review-metric-grid {
@@ -2187,7 +2369,7 @@ h3 {
 
 .scene-road {
   fill: none;
-  stroke: rgba(56, 62, 68, 0.88);
+  stroke: rgba(56, 62, 68, 0.82);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-miterlimit: 1.4;
@@ -2210,48 +2392,48 @@ h3 {
 }
 
 .scene-road-heatmap-free {
-  stroke: rgba(95, 109, 121, 0.08);
+  stroke: rgba(95, 109, 121, 0.05);
 }
 
 .scene-road-heatmap-active {
-  stroke: rgba(36, 83, 199, 0.16);
+  stroke: rgba(36, 83, 199, 0.12);
 }
 
 .scene-road-heatmap-congested {
-  stroke: rgba(187, 101, 30, 0.28);
+  stroke: rgba(187, 101, 30, 0.22);
 }
 
 .scene-road-heatmap-queued {
-  stroke: rgba(178, 74, 59, 0.36);
+  stroke: rgba(178, 74, 59, 0.28);
 }
 
 .scene-lane {
   fill: none;
-  stroke: rgba(255, 252, 247, 0.92);
-  stroke-width: 0.12;
+  stroke: rgba(255, 252, 247, 0.82);
+  stroke-width: 0.11;
   stroke-dasharray: 0.6 0.45;
   pointer-events: stroke;
 }
 
 .scene-lane-reverse {
-  stroke: rgba(245, 232, 208, 0.92);
+  stroke: rgba(245, 232, 208, 0.84);
 }
 
 .scene-turn-connector {
   fill: none;
-  stroke: rgba(36, 83, 199, 0.6);
-  stroke-width: 0.14;
+  stroke: rgba(36, 83, 199, 0.48);
+  stroke-width: 0.13;
   stroke-dasharray: 0.45 0.3;
 }
 
 .scene-stop-line {
-  stroke: rgba(178, 74, 59, 0.9);
-  stroke-width: 0.18;
+  stroke: rgba(178, 74, 59, 0.78);
+  stroke-width: 0.16;
 }
 
 .scene-merge-zone {
-  fill: rgba(36, 83, 199, 0.08);
-  stroke: rgba(36, 83, 199, 0.22);
+  fill: rgba(36, 83, 199, 0.06);
+  stroke: rgba(36, 83, 199, 0.18);
   stroke-width: 0.08;
 }
 
@@ -2272,22 +2454,22 @@ h3 {
 
 .scene-route-preview {
   fill: none;
-  stroke: rgba(0, 108, 103, 0.78);
-  stroke-width: 0.28;
-  stroke-dasharray: 0.92 0.44;
+  stroke: rgba(0, 108, 103, 0.66);
+  stroke-width: 0.24;
+  stroke-dasharray: 0.96 0.5;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-miterlimit: 1.4;
   paint-order: stroke fill;
   vector-effect: non-scaling-stroke;
   shape-rendering: geometricPrecision;
-  filter: drop-shadow(0 0 0.14px rgba(10, 118, 108, 0.36));
+  filter: drop-shadow(0 0 0.12px rgba(10, 118, 108, 0.3));
 }
 
 .scene-route-preview.selected {
   stroke: rgba(201, 106, 24, 0.98);
-  stroke-width: 0.36;
-  stroke-dasharray: 0.82 0.34;
+  stroke-width: 0.34;
+  stroke-dasharray: 0.84 0.34;
 }
 
 .scene-destination {
@@ -2296,22 +2478,22 @@ h3 {
 }
 
 .scene-destination-threshold {
-  fill: rgba(0, 108, 103, 0.08);
-  stroke: rgba(0, 108, 103, 0.32);
-  stroke-dasharray: 0.24 0.18;
+  fill: rgba(0, 108, 103, 0.06);
+  stroke: rgba(0, 108, 103, 0.26);
+  stroke-dasharray: 0.22 0.18;
   stroke-width: 0.06;
 }
 
 .scene-destination-core {
-  fill: rgba(255, 251, 246, 0.95);
-  stroke: rgba(0, 108, 103, 0.88);
+  fill: rgba(255, 251, 246, 0.92);
+  stroke: rgba(0, 108, 103, 0.82);
   stroke-width: 0.08;
 }
 
 .scene-route-endpoint.selected .scene-destination-threshold {
   fill: rgba(201, 106, 24, 0.12);
-  stroke: rgba(201, 106, 24, 0.58);
-  stroke-dasharray: 0.18 0.12;
+  stroke: rgba(201, 106, 24, 0.5);
+  stroke-dasharray: 0.16 0.12;
 }
 
 .scene-route-endpoint.selected .scene-destination-core {
@@ -2320,8 +2502,8 @@ h3 {
 }
 
 .scene-reservation {
-  stroke: rgba(29, 78, 216, 0.38);
-  stroke-width: 0.16;
+  stroke: rgba(29, 78, 216, 0.3);
+  stroke-width: 0.14;
   stroke-dasharray: 0.6 0.38;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -2336,20 +2518,20 @@ h3 {
 }
 
 .scene-queue-overlay.preview {
-  stroke: rgba(201, 106, 24, 0.84);
-  stroke-dasharray: 0.5 0.3;
+  stroke: rgba(201, 106, 24, 0.74);
+  stroke-dasharray: 0.48 0.3;
 }
 
 .scene-hazard {
-  stroke: rgba(182, 75, 58, 0.82);
-  stroke-width: 0.42;
+  stroke: rgba(182, 75, 58, 0.72);
+  stroke-width: 0.38;
   stroke-linecap: round;
   stroke-linejoin: round;
   paint-order: stroke fill;
   vector-effect: non-scaling-stroke;
   shape-rendering: geometricPrecision;
   cursor: pointer;
-  filter: drop-shadow(0 0 0.18px rgba(178, 74, 59, 0.4));
+  filter: drop-shadow(0 0 0.14px rgba(178, 74, 59, 0.34));
 }
 
 .scene-vehicle {
@@ -3038,26 +3220,67 @@ h3 {
 
 .minimap {
   width: 100%;
-  height: 180px;
-  margin-top: 12px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(246, 240, 231, 0.72));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  height: 160px;
+  margin-top: 2px;
+  border-radius: 20px;
+  border: 1px solid rgba(36, 83, 199, 0.18);
+  background:
+    radial-gradient(circle at top left, rgba(10, 118, 108, 0.08), transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(36, 83, 199, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(246, 240, 231, 0.86));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 16px 28px rgba(24, 33, 44, 0.09);
 }
 
 .minimap-bg {
-  fill: rgba(255, 255, 255, 0.7);
+  fill: rgba(255, 255, 255, 0.56);
 }
 
 .minimap-road {
   fill: none;
-  stroke: rgba(52, 64, 74, 0.6);
-  stroke-width: 1.4;
+  stroke: rgba(52, 64, 74, 0.44);
+  stroke-width: 1.15;
+}
+
+.minimap-hazard {
+  fill: none;
+  stroke: rgba(178, 74, 59, 0.58);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-dasharray: 2.4 1.4;
+  opacity: 0.68;
+  pointer-events: none;
+}
+
+.minimap-hazard.selected {
+  stroke: rgba(178, 74, 59, 0.96);
+  stroke-width: 2.2;
+  opacity: 0.96;
 }
 
 .minimap-vehicle {
-  fill: rgba(0, 108, 103, 0.85);
+  pointer-events: none;
+}
+
+.minimap-vehicle-core {
+  fill: rgba(0, 108, 103, 0.78);
+  stroke: rgba(255, 251, 246, 0.88);
+  stroke-width: 0.55;
+}
+
+.minimap-vehicle.fleet-selected .minimap-vehicle-core {
+  fill: rgba(36, 83, 199, 0.7);
+}
+
+.minimap-vehicle.selected .minimap-vehicle-core {
+  fill: rgba(187, 101, 30, 0.9);
+}
+
+.minimap-vehicle-halo {
+  fill: rgba(255, 247, 235, 0.92);
+  stroke: rgba(187, 101, 30, 0.92);
+  stroke-width: 0.72;
 }
 
 .minimap-destination {
@@ -3065,20 +3288,20 @@ h3 {
 }
 
 .minimap-destination-threshold {
-  fill: rgba(0, 108, 103, 0.12);
+  fill: rgba(0, 108, 103, 0.09);
   stroke: rgba(0, 108, 103, 0.42);
-  stroke-width: 0.7;
+  stroke-width: 0.72;
 }
 
 .minimap-destination-core {
-  fill: rgba(255, 251, 246, 0.96);
-  stroke: rgba(0, 108, 103, 0.9);
-  stroke-width: 0.65;
+  fill: rgba(255, 251, 246, 0.94);
+  stroke: rgba(0, 108, 103, 0.88);
+  stroke-width: 0.68;
 }
 
 .minimap-destination.selected .minimap-destination-threshold {
   fill: rgba(201, 106, 24, 0.18);
-  stroke: rgba(201, 106, 24, 0.68);
+  stroke: rgba(201, 106, 24, 0.6);
 }
 
 .minimap-destination.selected .minimap-destination-core {
@@ -3086,8 +3309,23 @@ h3 {
   stroke: rgba(201, 106, 24, 0.95);
 }
 
+.minimap-viewport-shadow {
+  fill: rgba(255, 255, 255, 0.1);
+  stroke: rgba(255, 255, 255, 0.72);
+  stroke-width: 2.2;
+  opacity: 0.92;
+}
+
 .minimap-viewport {
-  fill: rgba(29, 78, 216, 0.06);
-  stroke: rgba(29, 78, 216, 0.7);
-  stroke-width: 1.4;
+  fill: rgba(29, 78, 216, 0.08);
+  stroke: rgba(29, 78, 216, 0.92);
+  stroke-width: 1.35;
+  stroke-dasharray: 3.2 2.2;
+}
+
+.minimap-caption {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
 }

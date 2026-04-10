@@ -110,7 +110,18 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "vehicle-label-text" in app_source
     assert "traffic-summary-chip" in app_source
     assert "scene-legend" in app_source
+    assert "scene-overlay-shell" in app_source
+    assert "scene-overlay-primary" in app_source
+    assert "scene-overlay-secondary" in app_source
     assert "scene-button-primary" in app_source
+    assert "overview-card-minimap" in app_source
+    assert "minimap-card-head" in app_source
+    assert "minimap-context-strip" in app_source
+    assert "minimap-orientation-pill" in app_source
+    assert "minimap-caption" in app_source
+    assert "minimap-hazard" in app_source
+    assert "minimap-vehicle-halo" in app_source
+    assert "minimap-viewport-shadow" in app_source
     assert "route-planning-grid" in app_source
     assert "route-preview-summary" in app_source
     assert "selectVehicle" in app_source
@@ -151,7 +162,19 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".editor-draft-item" in css_source
     assert ".scene-toolbar" in css_source
     assert ".layer-toolbar" in css_source
+    assert ".scene-overlay-shell" in css_source
+    assert ".scene-overlay-primary" in css_source
+    assert ".scene-overlay-secondary" in css_source
     assert ".minimap" in css_source
+    assert ".overview-card-minimap" in css_source
+    assert ".minimap-card-head" in css_source
+    assert ".minimap-context-strip" in css_source
+    assert ".minimap-orientation-pill" in css_source
+    assert ".minimap-caption" in css_source
+    assert ".minimap-hazard" in css_source
+    assert ".minimap-vehicle-core" in css_source
+    assert ".minimap-vehicle-halo" in css_source
+    assert ".minimap-viewport-shadow" in css_source
     assert ".hover-card" in css_source
     assert ".shell-accent" in css_source
     assert ".scene-rim" in css_source
