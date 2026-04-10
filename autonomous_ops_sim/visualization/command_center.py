@@ -164,7 +164,32 @@ def preview_route_command(
 ) -> RoutePreviewSurface:
     """Build a deterministic route preview without mutating the live session."""
 
-    vehicle = session.engine.get_vehicle(vehicle_id)
+    try:
+        vehicle = session.engine.get_vehicle(vehicle_id)
+    except KeyError:
+        return RoutePreviewSurface(
+            vehicle_id=vehicle_id,
+            destination_node_id=destination_node_id,
+            start_node_id=-1,
+            is_actionable=False,
+            reason="unknown_vehicle",
+            node_ids=(),
+            edge_ids=(),
+            total_distance=None,
+        )
+
+    if not session.engine.map.graph.has_node(destination_node_id):
+        return RoutePreviewSurface(
+            vehicle_id=vehicle_id,
+            destination_node_id=destination_node_id,
+            start_node_id=vehicle.current_node_id,
+            is_actionable=False,
+            reason="unknown_destination",
+            node_ids=(),
+            edge_ids=(),
+            total_distance=None,
+        )
+
     try:
         total_distance, node_ids = session.engine.router.route(
             session.engine.map.graph,
@@ -484,7 +509,10 @@ def _normalize_selected_vehicle_ids(
     for vehicle_id in selected_vehicle_ids:
         if vehicle_id in seen:
             continue
-        vehicle = session.engine.get_vehicle(vehicle_id)
+        try:
+            vehicle = session.engine.get_vehicle(vehicle_id)
+        except KeyError:
+            continue
         if not getattr(vehicle, "is_active", True):
             continue
         seen.add(vehicle_id)
@@ -565,7 +593,7 @@ def _preview_for_vehicle(
     vehicle_id: int,
     route_previews: tuple[RoutePreviewSurface, ...],
 ) -> RoutePreviewSurface | None:
-    for preview in route_previews:
+    for preview in reversed(route_previews):
         if preview.vehicle_id == vehicle_id:
             return preview
     return None

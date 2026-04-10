@@ -488,20 +488,26 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
     def _handle_live_command(self, payload: dict[str, object]) -> None:
         try:
             commands = _simulation_commands_from_payload(payload)
+            selected_vehicle_ids, route_preview_requests = _selection_requests_from_payload(
+                payload
+            )
         except (KeyError, TypeError, ValueError) as exc:
             self._write_json_response(
                 400,
                 {
                     "ok": False,
                     "message": str(exc),
-                    "validation_messages": [],
+                    "validation_messages": [
+                        {
+                            "severity": "error",
+                            "code": "invalid_request",
+                            "message": str(exc),
+                        }
+                    ],
                 },
             )
             return
 
-        selected_vehicle_ids, route_preview_requests = _selection_requests_from_payload(
-            payload
-        )
         command_results: list[dict[str, object]] = []
         bundle: dict[str, object] | None = None
         for command in commands:
@@ -528,10 +534,14 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_live_route_preview(self, payload: dict[str, object]) -> None:
-        selected_vehicle_ids, route_preview_requests = _selection_requests_from_payload(
-            payload
-        )
         try:
+            selected_vehicle_ids, route_preview_requests = _selection_requests_from_payload(
+                payload
+            )
+            if route_preview_requests and not selected_vehicle_ids:
+                selected_vehicle_ids = tuple(
+                    request.vehicle_id for request in route_preview_requests
+                )
             if not route_preview_requests:
                 vehicle_ids = _payload_int_list(payload, "vehicle_ids")
                 destination_node_id = _payload_int(payload, "destination_node_id")
@@ -553,7 +563,13 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
                 {
                     "ok": False,
                     "message": str(exc),
-                    "validation_messages": [],
+                    "validation_messages": [
+                        {
+                            "severity": "error",
+                            "code": "invalid_request",
+                            "message": str(exc),
+                        }
+                    ],
                 },
             )
             return
@@ -562,28 +578,46 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
             selected_vehicle_ids=selected_vehicle_ids,
             route_preview_requests=route_preview_requests,
         )
-        route_previews: list[object] = []
         command_center = bundle.get("command_center")
-        if isinstance(command_center, dict):
-            maybe_route_previews = command_center.get("route_previews", [])
-            if isinstance(maybe_route_previews, list):
-                route_previews = maybe_route_previews
+        if not isinstance(command_center, dict):
+            self._write_json_response(
+                500,
+                {
+                    "ok": False,
+                    "message": "Live bundle did not include command_center preview state.",
+                    "validation_messages": [],
+                },
+            )
+            return
+        maybe_route_previews = command_center.get("route_previews", [])
+        if not isinstance(maybe_route_previews, list) or len(maybe_route_previews) != len(
+            route_preview_requests
+        ):
+            self._write_json_response(
+                500,
+                {
+                    "ok": False,
+                    "message": "Live bundle did not serialize route previews for every request.",
+                    "validation_messages": [],
+                },
+            )
+            return
         self._write_json_response(
             200,
             {
                 "ok": True,
                 "bundle": bundle,
-                "route_previews": route_previews,
+                "route_previews": maybe_route_previews,
                 "working_scenario_path": str(self._artifacts.working_scenario_path),
             },
         )
 
     def _handle_live_session_control(self, payload: dict[str, object]) -> None:
         action = str(payload.get("action", "")).strip().lower()
-        selected_vehicle_ids, route_preview_requests = _selection_requests_from_payload(
-            payload
-        )
         try:
+            selected_vehicle_ids, route_preview_requests = _selection_requests_from_payload(
+                payload
+            )
             if action == "step":
                 with self._runtime.lock:
                     if self._runtime.play_state == "playing":
@@ -640,7 +674,13 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
                 {
                     "ok": False,
                     "message": str(exc),
-                    "validation_messages": [],
+                    "validation_messages": [
+                        {
+                            "severity": "error",
+                            "code": "invalid_request",
+                            "message": str(exc),
+                        }
+                    ],
                 },
             )
             return
@@ -650,7 +690,13 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
             {
                 "ok": False,
                 "message": f"Unknown session control action: {action}",
-                "validation_messages": [],
+                "validation_messages": [
+                    {
+                        "severity": "error",
+                        "code": "invalid_request",
+                        "message": f"Unknown session control action: {action}",
+                    }
+                ],
             },
         )
 
@@ -848,24 +894,33 @@ def _selection_requests_from_payload(
     else:
         selected_vehicle_ids = ()
 
+    route_preview_requests = _route_preview_requests_from_payload(payload)
+    return selected_vehicle_ids, route_preview_requests
+
+
+def _route_preview_requests_from_payload(
+    payload: dict[str, object],
+) -> tuple[RoutePreviewRequest, ...]:
+    if "route_preview_requests" not in payload:
+        return ()
+
     route_preview_requests_payload = payload.get("route_preview_requests", ())
     if not isinstance(route_preview_requests_payload, list):
-        return selected_vehicle_ids, ()
+        raise ValueError("route_preview_requests must be a list of objects")
 
-    route_preview_requests = tuple(
-        RoutePreviewRequest(
-            vehicle_id=int(vehicle_id),
-            destination_node_id=int(destination_node_id),
+    route_preview_requests: list[RoutePreviewRequest] = []
+    for index, request in enumerate(route_preview_requests_payload):
+        if not isinstance(request, dict):
+            raise ValueError(
+                f"route_preview_requests[{index}] must be an object"
+            )
+        route_preview_requests.append(
+            RoutePreviewRequest(
+                vehicle_id=_payload_int(request, "vehicle_id"),
+                destination_node_id=_payload_int(request, "destination_node_id"),
+            )
         )
-        for request in route_preview_requests_payload
-        if isinstance(request, dict)
-        and isinstance((vehicle_id := request.get("vehicle_id")), (int, float))
-        and isinstance(
-            (destination_node_id := request.get("destination_node_id")),
-            (int, float),
-        )
-    )
-    return selected_vehicle_ids, route_preview_requests
+    return tuple(route_preview_requests)
 
 
 def _payload_int(payload: dict[str, object], key: str) -> int:

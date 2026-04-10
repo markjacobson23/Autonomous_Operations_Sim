@@ -13,6 +13,7 @@ from autonomous_ops_sim.simulation import (
     UnblockEdgeCommand,
     WorldState,
 )
+from autonomous_ops_sim.simulation.behavior import VehicleOperationalState
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
 from autonomous_ops_sim.visualization import build_render_geometry_surface
 from autonomous_ops_sim.visualization import (
@@ -189,6 +190,52 @@ def test_preview_route_command_builds_non_mutating_route_preview() -> None:
     assert preview.edge_ids == (1, 2)
     assert preview.total_distance == 2.0
     assert session.command_history == ()
+
+
+def test_preview_route_command_marks_non_idle_vehicle_as_non_actionable() -> None:
+    session = LiveSimulationSession(build_command_center_engine())
+    session.engine.get_vehicle(77).behavior.transition_to(
+        VehicleOperationalState.MOVING,
+        reason="in_transit",
+    )
+
+    preview = preview_route_command(
+        session,
+        vehicle_id=77,
+        destination_node_id=3,
+    )
+
+    assert preview.is_actionable is False
+    assert preview.reason == "vehicle_not_idle"
+    assert preview.node_ids == (1, 2, 3)
+    assert preview.edge_ids == (1, 2)
+    assert preview.total_distance == 2.0
+
+
+def test_preview_route_command_handles_unknown_vehicle_and_destination_explicitly() -> None:
+    session = LiveSimulationSession(build_command_center_engine())
+
+    unknown_vehicle_preview = preview_route_command(
+        session,
+        vehicle_id=999,
+        destination_node_id=3,
+    )
+    assert unknown_vehicle_preview.is_actionable is False
+    assert unknown_vehicle_preview.reason == "unknown_vehicle"
+    assert unknown_vehicle_preview.node_ids == ()
+    assert unknown_vehicle_preview.edge_ids == ()
+    assert unknown_vehicle_preview.total_distance is None
+
+    unknown_destination_preview = preview_route_command(
+        session,
+        vehicle_id=77,
+        destination_node_id=999,
+    )
+    assert unknown_destination_preview.is_actionable is False
+    assert unknown_destination_preview.reason == "unknown_destination"
+    assert unknown_destination_preview.node_ids == ()
+    assert unknown_destination_preview.edge_ids == ()
+    assert unknown_destination_preview.total_distance is None
 
 
 def test_command_center_surface_tracks_selection_edge_openings_and_preview_requests() -> None:

@@ -292,6 +292,8 @@ def build_live_session_bundle(
 ) -> LiveSessionBundle:
     """Build the versioned live-session API surface."""
 
+    normalized_selected_vehicle_ids = tuple(selected_vehicle_ids)
+    normalized_route_preview_requests = tuple(route_preview_requests)
     metrics_summary = summary or summarize_engine_execution(session.engine)
     replay_state = build_visualization_state_from_live_session(session)
     render_geometry = build_render_geometry_surface(session.engine.map)
@@ -329,8 +331,8 @@ def build_live_session_bundle(
         ),
         command_center=build_live_command_center_surface(
             session,
-            selected_vehicle_ids=selected_vehicle_ids,
-            route_preview_requests=route_preview_requests,
+            selected_vehicle_ids=normalized_selected_vehicle_ids,
+            route_preview_requests=normalized_route_preview_requests,
         ),
         vehicle_presentations=vehicle_presentations,
     )
@@ -345,6 +347,8 @@ def build_live_sync_bundle(
 ) -> LiveSyncBundle:
     """Build the versioned live sync bundle for transport-agnostic viewers."""
 
+    normalized_selected_vehicle_ids = tuple(selected_vehicle_ids)
+    normalized_route_preview_requests = tuple(route_preview_requests)
     surface = build_live_sync_surface(session)
     replay_state = build_visualization_state_from_live_session(session)
     render_geometry = build_render_geometry_surface(session.engine.map)
@@ -387,8 +391,8 @@ def build_live_sync_bundle(
         ),
         command_center=build_live_command_center_surface(
             session,
-            selected_vehicle_ids=selected_vehicle_ids,
-            route_preview_requests=route_preview_requests,
+            selected_vehicle_ids=normalized_selected_vehicle_ids,
+            route_preview_requests=normalized_route_preview_requests,
         ),
         vehicle_presentations=vehicle_presentations,
     )

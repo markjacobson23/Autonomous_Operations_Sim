@@ -8,6 +8,7 @@ from autonomous_ops_sim.live_app import (
     export_live_app_artifacts,
     launch_live_app,
 )
+from autonomous_ops_sim.simulation.behavior import VehicleOperationalState
 
 
 def _read_live_bundle(base_url: str) -> dict[str, object]:
@@ -465,8 +466,12 @@ def test_live_app_frontend_server_supports_route_preview_endpoint(tmp_path) -> N
                 url=f"{base_url}/api/live/preview",
                 data=json.dumps(
                     {
-                        "vehicle_id": vehicle_id,
-                        "destination_node_id": destination_node_id,
+                        "route_preview_requests": [
+                            {
+                                "vehicle_id": vehicle_id,
+                                "destination_node_id": destination_node_id,
+                            }
+                        ],
                     }
                 ).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
@@ -475,15 +480,266 @@ def test_live_app_frontend_server_supports_route_preview_endpoint(tmp_path) -> N
         )
         preview_payload = json.loads(preview_response.read().decode("utf-8"))
         assert preview_payload["ok"] is True
-        assert preview_payload["bundle"]["command_center"]["route_previews"][0][
-            "vehicle_id"
-        ] == vehicle_id
-        assert preview_payload["bundle"]["command_center"]["route_previews"][0][
-            "destination_node_id"
-        ] == destination_node_id
+        assert preview_payload["route_previews"][0]["vehicle_id"] == vehicle_id
+        assert preview_payload["route_previews"][0]["destination_node_id"] == destination_node_id
+        assert preview_payload["route_previews"][0]["is_actionable"] is True
+        assert preview_payload["bundle"]["command_center"]["route_previews"] == preview_payload["route_previews"]
+        assert preview_payload["bundle"]["command_center"]["selected_vehicle_ids"] == [vehicle_id]
         assert preview_payload["bundle"]["command_center"]["vehicle_inspections"][0][
             "route_ahead_node_ids"
-        ]
+        ] == preview_payload["route_previews"][0]["node_ids"]
+        assert preview_payload["bundle"]["command_center"]["vehicle_inspections"][0][
+            "route_ahead_edge_ids"
+        ] == preview_payload["route_previews"][0]["edge_ids"]
+        assert preview_payload["bundle"]["command_center"]["vehicle_inspections"][0][
+            "eta_s"
+        ] is not None
         assert preview_payload["bundle"]["session_control"]["route_preview_endpoint"] == "/api/live/preview"
+    finally:
+        server.stop()
+
+
+def test_live_app_frontend_server_rejects_invalid_route_preview_payload(tmp_path) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        try:
+            request.urlopen(
+                request.Request(
+                    url=f"{base_url}/api/live/preview",
+                    data=json.dumps(
+                        {
+                            "route_preview_requests": [
+                                {"vehicle_id": 77},
+                            ]
+                        }
+                    ).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+            )
+            raise AssertionError("invalid preview payload should be rejected")
+        except error.HTTPError as exc:
+            assert exc.code == 400
+            payload = json.loads(exc.read().decode("utf-8"))
+            assert payload["ok"] is False
+            assert payload["validation_messages"][0]["code"] == "invalid_request"
+            assert "destination_node_id" in payload["message"]
+    finally:
+        server.stop()
+
+
+def test_live_app_frontend_server_handles_unknown_vehicle_route_preview(tmp_path) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        preview_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/preview",
+                data=json.dumps(
+                    {
+                        "route_preview_requests": [
+                            {
+                                "vehicle_id": 999_999,
+                                "destination_node_id": 1,
+                            }
+                        ],
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        preview_payload = json.loads(preview_response.read().decode("utf-8"))
+        preview = preview_payload["route_previews"][0]
+        assert preview["is_actionable"] is False
+        assert preview["reason"] == "unknown_vehicle"
+        assert preview["node_ids"] == []
+        assert preview["edge_ids"] == []
+        assert preview["total_distance"] is None
+    finally:
+        server.stop()
+
+
+def test_live_app_frontend_server_handles_unknown_destination_route_preview(tmp_path) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
+    vehicle_id = bundle["command_center"]["vehicles"][0]["vehicle_id"]
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        preview_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/preview",
+                data=json.dumps(
+                    {
+                        "route_preview_requests": [
+                            {
+                                "vehicle_id": vehicle_id,
+                                "destination_node_id": 999_999,
+                            }
+                        ],
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        preview_payload = json.loads(preview_response.read().decode("utf-8"))
+        preview = preview_payload["route_previews"][0]
+        assert preview["vehicle_id"] == vehicle_id
+        assert preview["is_actionable"] is False
+        assert preview["reason"] == "unknown_destination"
+        assert preview["node_ids"] == []
+        assert preview["edge_ids"] == []
+        assert preview["total_distance"] is None
+    finally:
+        server.stop()
+
+
+def test_live_app_frontend_server_handles_blocked_route_preview_as_no_route(tmp_path) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
+    vehicle_id = bundle["command_center"]["vehicles"][0]["vehicle_id"]
+    destination_node_id = bundle["map_surface"]["edges"][0]["end_node_id"]
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        for edge in bundle["map_surface"]["edges"]:
+            request.urlopen(
+                request.Request(
+                    url=f"{base_url}/api/live/command",
+                    data=json.dumps(
+                        {
+                            "command_type": "block_edge",
+                            "edge_id": edge["edge_id"],
+                        }
+                    ).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+            )
+
+        preview_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/preview",
+                data=json.dumps(
+                    {
+                        "route_preview_requests": [
+                            {
+                                "vehicle_id": vehicle_id,
+                                "destination_node_id": destination_node_id,
+                            }
+                        ],
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        preview_payload = json.loads(preview_response.read().decode("utf-8"))
+        preview = preview_payload["route_previews"][0]
+        assert preview["is_actionable"] is False
+        assert preview["reason"] == "no_route"
+        assert preview["node_ids"] == []
+        assert preview["edge_ids"] == []
+        assert preview["total_distance"] is None
+    finally:
+        server.stop()
+
+
+def test_live_app_frontend_server_handles_non_idle_vehicle_route_preview(tmp_path) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
+    vehicle_id = bundle["command_center"]["vehicles"][0]["vehicle_id"]
+    destination_node_id = bundle["map_surface"]["edges"][0]["end_node_id"]
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        server._runtime.session.engine.get_vehicle(vehicle_id).behavior.transition_to(
+            VehicleOperationalState.MOVING,
+            reason="test_setup",
+        )
+        preview_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/preview",
+                data=json.dumps(
+                    {
+                        "route_preview_requests": [
+                            {
+                                "vehicle_id": vehicle_id,
+                                "destination_node_id": destination_node_id,
+                            }
+                        ],
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        preview_payload = json.loads(preview_response.read().decode("utf-8"))
+        preview = preview_payload["route_previews"][0]
+        assert preview["vehicle_id"] == vehicle_id
+        assert preview["is_actionable"] is False
+        assert preview["reason"] == "vehicle_not_idle"
+        assert preview["node_ids"] == preview_payload["bundle"]["command_center"]["vehicle_inspections"][0][
+            "route_ahead_node_ids"
+        ]
+        assert preview["edge_ids"] == preview_payload["bundle"]["command_center"]["vehicle_inspections"][0][
+            "route_ahead_edge_ids"
+        ]
+        assert preview_payload["bundle"]["command_center"]["vehicle_inspections"][0]["eta_s"] is not None
     finally:
         server.stop()
