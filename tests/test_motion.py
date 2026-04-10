@@ -15,6 +15,7 @@ from autonomous_ops_sim.simulation import (
 )
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
 from autonomous_ops_sim.visualization import (
+    build_render_geometry_surface,
     build_vehicle_motion_segments,
     build_visualization_state_from_controller,
     sample_motion,
@@ -133,3 +134,57 @@ def test_motion_sampling_clamps_to_authoritative_endpoints_outside_segments() ->
     assert final.timestamp_s == state.final_time_s
     assert final.vehicles[0].position == (2.0, 0.0, 0.0)
     assert final.vehicles[0].is_interpolated is False
+
+
+def test_motion_segments_follow_curved_render_geometry_when_available() -> None:
+    graph = Graph()
+    node_1 = Node(1, (0.0, 0.0, 0.0))
+    node_2 = Node(2, (2.0, 0.0, 0.0))
+    graph.add_node(node_1)
+    graph.add_node(node_2)
+    graph.add_edge(Edge(1, node_1, node_2, 2.0, 10.0))
+    simulation_map = Map(
+        graph,
+        coord_to_id={
+            (0.0, 0.0, 0.0): 1,
+            (2.0, 0.0, 0.0): 2,
+        },
+        render_geometry={
+            "roads": [
+                {
+                    "id": "curved-road",
+                    "edge_ids": [1],
+                    "centerline": [[0.0, 0.0, 0.0], [1.0, 1.0, 0.0], [2.0, 0.0, 0.0]],
+                    "directionality": "one_way",
+                    "lane_count": 1,
+                    "width_m": 1.0,
+                }
+            ]
+        },
+    )
+    engine = SimulationEngine(
+        simulation_map=simulation_map,
+        world_state=WorldState(graph),
+        router=Router(),
+        seed=181,
+        vehicles=(
+            Vehicle(
+                id=88,
+                current_node_id=1,
+                position=(0.0, 0.0, 0.0),
+                velocity=0.0,
+                payload=0.0,
+                max_payload=10.0,
+                max_speed=5.0,
+            ),
+        ),
+    )
+    controller = SimulationController(engine)
+    controller.apply(AssignVehicleDestinationCommand(vehicle_id=88, destination_node_id=2))
+    state = build_visualization_state_from_controller(controller)
+    render_geometry = build_render_geometry_surface(engine.map)
+    segments = build_vehicle_motion_segments(state, render_geometry=render_geometry)
+    sample = sample_motion(state, timestamp_s=0.2, segments=segments)
+
+    assert len(segments[0].path_points) == 3
+    assert sample.vehicles[0].position[1] > 0.0

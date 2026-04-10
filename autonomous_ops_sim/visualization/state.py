@@ -431,7 +431,8 @@ def _infer_initial_vehicle_states(
     ):
         initial_states.setdefault(
             vehicle_id,
-            VehicleSurfaceState(
+            _build_vehicle_surface_state(
+                engine=engine,
                 vehicle_id=vehicle_id,
                 node_id=node_id,
                 position=engine.map.get_position(node_id),
@@ -442,7 +443,8 @@ def _infer_initial_vehicle_states(
     for vehicle in engine.vehicles:
         initial_states.setdefault(
             vehicle.id,
-            VehicleSurfaceState(
+            _build_vehicle_surface_state(
+                engine=engine,
                 vehicle_id=vehicle.id,
                 node_id=vehicle.current_node_id,
                 position=vehicle.get_position(),
@@ -624,7 +626,8 @@ def _apply_command_record(
         return
 
     assert isinstance(command, RepositionVehicleCommand)
-    mutable_vehicle_states[command.vehicle_id] = VehicleSurfaceState(
+    mutable_vehicle_states[command.vehicle_id] = _build_vehicle_surface_state(
+        engine=engine,
         vehicle_id=command.vehicle_id,
         node_id=command.node_id,
         position=engine.map.get_position(command.node_id),
@@ -646,7 +649,8 @@ def _apply_trace_event(
                 "visualization replay cannot infer an initial node for "
                 f"vehicle_id {event.vehicle_id}"
             )
-        state = VehicleSurfaceState(
+        state = _build_vehicle_surface_state(
+            engine=engine,
             vehicle_id=event.vehicle_id,
             node_id=node_id,
             position=engine.map.get_position(node_id),
@@ -670,7 +674,8 @@ def _apply_trace_event(
         node_id = event.node_id
         position = engine.map.get_position(node_id)
 
-    mutable_vehicle_states[event.vehicle_id] = VehicleSurfaceState(
+    mutable_vehicle_states[event.vehicle_id] = _build_vehicle_surface_state(
+        engine=engine,
         vehicle_id=event.vehicle_id,
         node_id=node_id,
         position=position,
@@ -686,3 +691,19 @@ def _sorted_vehicle_states(
 
 def _position_from_iterable(value: list[float] | tuple[float, ...]) -> Position:
     return (float(value[0]), float(value[1]), float(value[2]))
+
+
+def _build_vehicle_surface_state(
+    *,
+    engine: SimulationEngine,
+    vehicle_id: int,
+    node_id: int,
+    position: Position,
+    operational_state: str,
+) -> VehicleSurfaceState:
+    return VehicleSurfaceState(
+        vehicle_id=vehicle_id,
+        node_id=node_id,
+        position=position,
+        operational_state=operational_state,
+    )

@@ -178,6 +178,27 @@ type VehicleSnapshotPayload = {
   operational_state?: string;
 };
 
+type MotionSegmentPayload = {
+  vehicle_id?: number;
+  segment_index?: number;
+  edge_id?: number;
+  start_node_id?: number;
+  end_node_id?: number;
+  start_time_s?: number;
+  end_time_s?: number;
+  duration_s?: number;
+  distance?: number;
+  start_position?: Position3;
+  end_position?: Position3;
+  path_points?: Position3[];
+  heading_rad?: number;
+  nominal_speed?: number;
+  peak_speed?: number;
+  acceleration_mps2?: number;
+  deceleration_mps2?: number;
+  profile_kind?: string;
+};
+
 type TrafficBaselinePayload = {
   control_points?: Array<{ edge_id?: number; state?: string }>;
   queue_records?: Array<{ edge_id?: number; vehicle_ids?: number[] }>;
@@ -204,6 +225,7 @@ type BundlePayload = {
   command_center?: CommandCenterPayload;
   map_surface?: MapSurfacePayload;
   render_geometry?: RenderGeometryPayload;
+  motion_segments?: MotionSegmentPayload[];
   traffic_baseline?: TrafficBaselinePayload;
   authoring?: AuthoringPayload;
   snapshot?: {
@@ -354,6 +376,7 @@ function App(): JSX.Element {
     width: 40,
     height: 24,
   });
+  const [motionClockS, setMotionClockS] = useState(0);
 
   useEffect(() => {
     const bundlePath = new URLSearchParams(window.location.search).get("bundle");
@@ -412,6 +435,32 @@ function App(): JSX.Element {
   }, []);
 
   useEffect(() => {
+    const motionEndTimeS = maxMotionTime(bootstrap.bundle);
+    if (motionEndTimeS <= 0.0) {
+      setMotionClockS(0);
+      return;
+    }
+
+    let frameId = 0;
+    let lastTimestampMs: number | null = null;
+    const tick = (timestampMs: number) => {
+      if (lastTimestampMs === null) {
+        lastTimestampMs = timestampMs;
+      }
+      const deltaS = (timestampMs - lastTimestampMs) / 1000;
+      lastTimestampMs = timestampMs;
+      setMotionClockS((current) => {
+        const next = current + deltaS;
+        return next > motionEndTimeS ? next % motionEndTimeS : next;
+      });
+      frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [bootstrap.bundle]);
+
+  useEffect(() => {
     const authoring = bootstrap.bundle?.authoring;
     if (!authoring?.validate_endpoint || draftTransaction.operations.length === 0) {
       setValidationMessages([]);
@@ -459,6 +508,7 @@ function App(): JSX.Element {
   }, [bootstrap.bundle, draftTransaction]);
 
   const bundle = applyTransactionToBundle(bootstrap.bundle, draftTransaction);
+  const displayedVehicles = sampleDisplayedVehicles(bundle, motionClockS);
   const bounds = computeSceneBounds(bundle);
   const routePreviews = bootstrap.commandCenter.route_previews ?? [];
   const inspections = bootstrap.commandCenter.vehicle_inspections ?? [];
@@ -471,6 +521,10 @@ function App(): JSX.Element {
   const selectedVehicleId =
     selectedTarget?.kind === "vehicle" ? selectedTarget.vehicleId : defaultVehicleId;
   const selectedVehicle = findVehicleById(bundle, selectedVehicleId);
+  const displayedSelectedVehicle =
+    selectedVehicleId !== null
+      ? displayedVehicles.find((vehicle) => vehicle.vehicle_id === selectedVehicleId) ?? null
+      : null;
   const selectedInspection = selectedVehicleId
     ? inspections.find((inspection) => inspection.vehicle_id === selectedVehicleId) ?? null
     : null;
@@ -534,10 +588,10 @@ function App(): JSX.Element {
   }
 
   function focusSelectedVehicle(): void {
-    if (!selectedVehicle?.position) {
+    if (!displayedSelectedVehicle?.position) {
       return;
     }
-    const [x, y] = selectedVehicle.position;
+    const [x, y] = displayedSelectedVehicle.position;
     const nextWidth = Math.max(bounds.width * 0.32, 8);
     const nextHeight = Math.max(bounds.height * 0.32, 6);
     setViewport({
@@ -809,13 +863,12 @@ function App(): JSX.Element {
       <div className="shell-accent shell-accent-right" aria-hidden="true" />
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 52 Lane Geometry and Kinematics Baseline</p>
+          <p className="eyebrow">Step 53 Curve-Following and Turn Arcs</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
-            The serious frontend now layers explicit lanes, turn connectors,
-            stop lines, and merge zones onto the authored road network while
-            the motion surface samples vehicles through a shared kinematics
-            profile instead of plain viewer-only interpolation.
+            The serious frontend now plays vehicles along curved path geometry
+            with heading-aware directional marks, so turns read naturally
+            through roads, connectors, and shaped intersections.
           </p>
         </div>
         <div className="masthead-meta">
@@ -1244,7 +1297,7 @@ function App(): JSX.Element {
                     ))}
 
                   {layers.vehicles &&
-                    (bundle?.snapshot?.vehicles ?? []).map((vehicle, vehicleIndex) => {
+                    displayedVehicles.map((vehicle, vehicleIndex) => {
                       const position = vehicle.position ?? [0, 0, 0];
                       const isSelected = vehicle.vehicle_id === selectedVehicleId;
                       return (
@@ -1259,8 +1312,14 @@ function App(): JSX.Element {
                             })
                           }
                         >
-                          <circle cx={position[0]} cy={position[1]} r={0.55} />
-                          <text x={position[0]} y={position[1] - 0.85}>
+                          <g
+                            transform={`translate(${position[0]} ${position[1]}) rotate(${radiansToDegrees(
+                              vehicle.heading_rad ?? 0,
+                            )})`}
+                          >
+                            {renderVehicleMarker()}
+                          </g>
+                          <text x={position[0]} y={position[1] - 0.84}>
                             V{vehicle.vehicle_id ?? vehicleIndex}
                           </text>
                         </g>
@@ -1269,12 +1328,11 @@ function App(): JSX.Element {
                 </svg>
 
                 <div className="focus-card">
-                  <strong>Lane semantics and kinematics are now live in the scene</strong>
+                  <strong>Curved motion and heading-aware playback are now live</strong>
                   <p>
-                    Lane centerlines, connectors, stop lines, and merge zones now
-                    sit on top of the authored geometry, while motion sampling uses
-                    a deterministic kinematic profile that keeps headings and speeds
-                    aligned with the simulator-side assumptions.
+                    Motion playback now follows authored path geometry instead of
+                    only straight edge interpolation, and vehicle heading updates
+                    continuously through turns and connectors.
                   </p>
                 </div>
                 <div className="scene-legend">
@@ -1322,7 +1380,7 @@ function App(): JSX.Element {
                         className="minimap-road"
                       />
                     ))}
-                    {(bundle?.snapshot?.vehicles ?? []).map((vehicle, index) => (
+                    {displayedVehicles.map((vehicle, index) => (
                       <circle
                         key={vehicle.vehicle_id ?? `minimap-vehicle-${index}`}
                         cx={scaleX(vehicle.position?.[0] ?? 0, bounds)}
@@ -1599,7 +1657,9 @@ function App(): JSX.Element {
               {selectedInspection ? (
                 <article className="inspection-card">
                   <div className="inspection-header">
-                    <strong>Vehicle {formatMaybeNumber(selectedInspection.vehicle_id ?? null)}</strong>
+                    <strong>
+                      Vehicle {formatMaybeNumber(selectedInspection.vehicle_id ?? null)}
+                    </strong>
                     <span>{selectedInspection.operational_state ?? "unknown_state"}</span>
                   </div>
                   <ul className="mini-list">
@@ -1607,6 +1667,7 @@ function App(): JSX.Element {
                     <li>ETA: {formatSeconds(selectedInspection.eta_s ?? null)}</li>
                     <li>Job: {selectedInspection.current_job_id ?? "none"}</li>
                     <li>Wait: {selectedInspection.wait_reason ?? "none"}</li>
+                    <li>Heading: {formatHeadingDegrees(displayedSelectedVehicle?.heading_rad ?? null)}</li>
                   </ul>
                   <div className="diagnostic-row">
                     {(selectedInspection.diagnostics ?? []).slice(0, 3).map((diagnostic, diagIndex) => (
@@ -1637,6 +1698,9 @@ function App(): JSX.Element {
                       <li>ETA: {formatSeconds(inspection.eta_s ?? null)}</li>
                       <li>Job: {inspection.current_job_id ?? "none"}</li>
                       <li>Wait: {inspection.wait_reason ?? "none"}</li>
+                      <li>
+                        Heading: {formatHeadingDegrees(findDisplayedVehicleById(displayedVehicles, inspection.vehicle_id ?? null)?.heading_rad ?? null)}
+                      </li>
                     </ul>
                   </article>
                 ))
@@ -1976,6 +2040,215 @@ function findNodePosition(nodes: NodePayload[], nodeId: number | undefined): Pos
     return null;
   }
   return nodes.find((node) => node.node_id === nodeId)?.position ?? null;
+}
+
+function sampleDisplayedVehicles(
+  bundle: BundlePayload | null,
+  motionClockS: number,
+): Array<VehicleSnapshotPayload & { heading_rad?: number; speed?: number }> {
+  const baseVehicles = (bundle?.snapshot?.vehicles ?? []).map((vehicle) => ({
+    ...vehicle,
+    heading_rad: 0,
+    speed: 0,
+  }));
+  if (!bundle?.motion_segments?.length) {
+    return baseVehicles;
+  }
+
+  const vehiclesById = new Map<number, VehicleSnapshotPayload & { heading_rad?: number; speed?: number }>();
+  for (const vehicle of baseVehicles) {
+    if (vehicle.vehicle_id !== undefined) {
+      vehiclesById.set(vehicle.vehicle_id, vehicle);
+    }
+  }
+
+  const motionSegments = [...bundle.motion_segments].sort(
+    (left, right) =>
+      (left.start_time_s ?? 0) - (right.start_time_s ?? 0) ||
+      (left.segment_index ?? 0) - (right.segment_index ?? 0),
+  );
+
+  for (const segment of motionSegments) {
+    const vehicleId = segment.vehicle_id;
+    if (
+      vehicleId === undefined ||
+      segment.start_time_s === undefined ||
+      segment.end_time_s === undefined
+    ) {
+      continue;
+    }
+    const existing = vehiclesById.get(vehicleId);
+    if (!existing) {
+      vehiclesById.set(vehicleId, {
+        vehicle_id: vehicleId,
+        node_id: segment.start_node_id,
+        position: segment.start_position,
+        operational_state: "moving",
+        heading_rad: segment.heading_rad ?? 0,
+        speed: 0,
+      });
+    } else if (existing.position === undefined && segment.start_position) {
+      existing.position = segment.start_position;
+    }
+    if (motionClockS < segment.start_time_s) {
+      continue;
+    }
+    if (motionClockS > segment.end_time_s) {
+      const settled = vehiclesById.get(vehicleId);
+      if (settled) {
+        settled.position = segment.end_position ?? settled.position;
+        settled.node_id = segment.end_node_id ?? settled.node_id;
+        settled.heading_rad = segment.heading_rad ?? settled.heading_rad;
+        settled.speed = 0;
+      }
+      continue;
+    }
+    const sampled = sampleMotionSegmentPayload(segment, motionClockS);
+    const active = vehiclesById.get(vehicleId);
+    if (active) {
+      active.position = sampled.position;
+      active.node_id = segment.start_node_id ?? active.node_id;
+      active.operational_state = "moving";
+      active.heading_rad = sampled.headingRad;
+      active.speed = sampled.speed;
+    }
+  }
+
+  return [...vehiclesById.values()].sort(
+    (left, right) => (left.vehicle_id ?? 0) - (right.vehicle_id ?? 0),
+  );
+}
+
+function sampleMotionSegmentPayload(
+  segment: MotionSegmentPayload,
+  timestampS: number,
+): { position: Position3; headingRad: number; speed: number } {
+  const startTimeS = segment.start_time_s ?? 0;
+  const endTimeS = segment.end_time_s ?? startTimeS;
+  const durationS = Math.max((segment.duration_s ?? endTimeS - startTimeS), 0.0001);
+  const boundedTimestampS = Math.min(Math.max(timestampS, startTimeS), endTimeS);
+  const progress = Math.min(
+    1,
+    Math.max(0, (boundedTimestampS - startTimeS) / durationS),
+  );
+  const pathPoints = (segment.path_points?.length ?? 0) >= 2
+    ? (segment.path_points as Position3[])
+    : ([segment.start_position ?? [0, 0, 0], segment.end_position ?? [0, 0, 0]] as Position3[]);
+  const pathLength = polylineLength(pathPoints);
+  const distanceAlongPath = pathLength * progress;
+  return {
+    position: samplePathPosition(pathPoints, distanceAlongPath),
+    headingRad: headingAlongPath(pathPoints, distanceAlongPath),
+    speed: sampleSegmentSpeed(segment, progress),
+  };
+}
+
+function sampleSegmentSpeed(segment: MotionSegmentPayload, progress: number): number {
+  const peakSpeed = segment.peak_speed ?? segment.nominal_speed ?? 0;
+  if ((segment.profile_kind ?? "").startsWith("triangle")) {
+    return progress <= 0.5 ? peakSpeed * (progress / 0.5) : peakSpeed * ((1 - progress) / 0.5);
+  }
+  return peakSpeed;
+}
+
+function polylineLength(points: Position3[]): number {
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    total += pointDistance(points[index - 1], points[index]);
+  }
+  return total;
+}
+
+function samplePathPosition(points: Position3[], distanceAlongPath: number): Position3 {
+  if (points.length === 0) {
+    return [0, 0, 0];
+  }
+  if (points.length === 1) {
+    return points[0];
+  }
+  let remaining = Math.min(Math.max(distanceAlongPath, 0), polylineLength(points));
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const segmentLength = pointDistance(start, end);
+    if (segmentLength <= 0) {
+      continue;
+    }
+    if (remaining <= segmentLength) {
+      const progress = remaining / segmentLength;
+      return [
+        start[0] + (end[0] - start[0]) * progress,
+        start[1] + (end[1] - start[1]) * progress,
+        start[2] + (end[2] - start[2]) * progress,
+      ];
+    }
+    remaining -= segmentLength;
+  }
+  return points[points.length - 1];
+}
+
+function headingAlongPath(points: Position3[], distanceAlongPath: number): number {
+  if (points.length < 2) {
+    return 0;
+  }
+  let remaining = Math.min(Math.max(distanceAlongPath, 0), polylineLength(points));
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const segmentLength = pointDistance(start, end);
+    if (segmentLength <= 0) {
+      continue;
+    }
+    if (remaining <= segmentLength) {
+      return Math.atan2(end[1] - start[1], end[0] - start[0]);
+    }
+    remaining -= segmentLength;
+  }
+  const start = points[points.length - 2];
+  const end = points[points.length - 1];
+  return Math.atan2(end[1] - start[1], end[0] - start[0]);
+}
+
+function pointDistance(start: Position3, end: Position3): number {
+  return Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
+}
+
+function maxMotionTime(bundle: BundlePayload | null): number {
+  return Math.max(
+    0,
+    ...((bundle?.motion_segments ?? []).map((segment) => segment.end_time_s ?? 0)),
+  );
+}
+
+function radiansToDegrees(value: number): number {
+  return (value * 180) / Math.PI;
+}
+
+function renderVehicleMarker(): JSX.Element {
+  return (
+    <>
+      <circle r={0.34} className="vehicle-body" />
+      <path d="M 0.08 -0.16 L 0.58 0 L 0.08 0.16 Z" className="vehicle-heading" />
+    </>
+  );
+}
+
+function findDisplayedVehicleById(
+  vehicles: Array<VehicleSnapshotPayload & { heading_rad?: number; speed?: number }>,
+  vehicleId: number | null,
+): (VehicleSnapshotPayload & { heading_rad?: number; speed?: number }) | null {
+  if (vehicleId === null) {
+    return null;
+  }
+  return vehicles.find((vehicle) => vehicle.vehicle_id === vehicleId) ?? null;
+}
+
+function formatHeadingDegrees(value: number | null): string {
+  if (value === null || Number.isNaN(value)) {
+    return "unknown";
+  }
+  const normalized = ((radiansToDegrees(value) % 360) + 360) % 360;
+  return `${Math.round(normalized)} deg`;
 }
 
 function describeSelectedTarget(

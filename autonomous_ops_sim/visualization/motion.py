@@ -11,6 +11,11 @@ from autonomous_ops_sim.simulation.kinematics import (
     sample_profile_speed,
 )
 from autonomous_ops_sim.vehicles.vehicle import Position
+from autonomous_ops_sim.visualization.geometry import (
+    LaneGeometrySurface,
+    RenderGeometrySurface,
+    RoadGeometrySurface,
+)
 from autonomous_ops_sim.visualization.state import (
     MapSurface,
     VisualizationState,
@@ -32,6 +37,7 @@ class VehicleMotionSegment:
     distance: float
     start_position: Position
     end_position: Position
+    path_points: tuple[Position, ...]
     heading_rad: float
     nominal_speed: float
     peak_speed: float
@@ -69,6 +75,8 @@ class MotionSample:
 
 def build_vehicle_motion_segments(
     state: VisualizationState,
+    *,
+    render_geometry: RenderGeometrySurface | None = None,
 ) -> tuple[VehicleMotionSegment, ...]:
     """Derive edge motion segments from authoritative replay frames."""
 
@@ -103,9 +111,15 @@ def build_vehicle_motion_segments(
         start_position = _node_position(state.map_surface, start_node_id)
         end_position = _node_position(state.map_surface, end_node_id)
         duration_s = max(0.0, arrival_frame.timestamp_s - frame.timestamp_s)
-        heading_rad = _heading_rad(start_position, end_position)
         edge = edge_lookup.get(edge_id)
         distance = edge.distance if edge is not None else _distance(start_position, end_position)
+        path_points = _resolve_segment_path_points(
+            render_geometry=render_geometry,
+            edge_id=edge_id,
+            start_position=start_position,
+            end_position=end_position,
+        )
+        heading_rad = _heading_along_path(path_points, distance_along_path=0.0)
         nominal_speed = distance / duration_s if duration_s > 0.0 else 0.0
         profile = _segment_profile(
             distance=distance,
@@ -127,6 +141,7 @@ def build_vehicle_motion_segments(
                 distance=distance,
                 start_position=start_position,
                 end_position=end_position,
+                path_points=path_points,
                 heading_rad=heading_rad,
                 nominal_speed=nominal_speed,
                 peak_speed=profile.peak_speed_mps,
@@ -188,13 +203,21 @@ def sample_motion(
             max(0.0, traversed_distance / segment.distance if segment.distance > 0.0 else 1.0),
         )
         speed = sample_profile_speed(profile, elapsed_s)
-        position = _lerp_position(segment.start_position, segment.end_position, progress)
+        path_length = _polyline_length(segment.path_points)
+        distance_along_path = (
+            path_length * progress if path_length > 0.0 else segment.distance * progress
+        )
+        position = _sample_path_position(segment.path_points, distance_along_path)
+        heading_rad = _heading_along_path(
+            segment.path_points,
+            distance_along_path=distance_along_path,
+        )
         vehicles[segment.vehicle_id] = InterpolatedVehicleState(
             vehicle_id=segment.vehicle_id,
             node_id=segment.start_node_id,
             position=position,
             operational_state="moving",
-            heading_rad=segment.heading_rad,
+            heading_rad=heading_rad,
             speed=speed,
             active_edge_id=segment.edge_id,
             start_node_id=segment.start_node_id,
@@ -226,6 +249,7 @@ def motion_segment_to_dict(segment: VehicleMotionSegment) -> dict[str, Any]:
         "distance": segment.distance,
         "start_position": list(segment.start_position),
         "end_position": list(segment.end_position),
+        "path_points": [list(point) for point in segment.path_points],
         "heading_rad": segment.heading_rad,
         "nominal_speed": segment.nominal_speed,
         "peak_speed": segment.peak_speed,
@@ -324,12 +348,104 @@ def _heading_rad(start: Position, end: Position) -> float:
     return math.atan2(dy, dx)
 
 
-def _lerp_position(start: Position, end: Position, progress: float) -> Position:
-    return (
-        start[0] + (end[0] - start[0]) * progress,
-        start[1] + (end[1] - start[1]) * progress,
-        start[2] + (end[2] - start[2]) * progress,
+def _resolve_segment_path_points(
+    *,
+    render_geometry: RenderGeometrySurface | None,
+    edge_id: int,
+    start_position: Position,
+    end_position: Position,
+) -> tuple[Position, ...]:
+    if render_geometry is None:
+        return (start_position, end_position)
+
+    road = _road_for_edge(render_geometry.roads, edge_id)
+    if road is None:
+        return (start_position, end_position)
+
+    lane = _lane_for_road_segment(render_geometry.lanes, road, start_position, end_position)
+    candidate_points = lane.centerline if lane is not None else road.centerline
+    if _distance(candidate_points[0], start_position) + _distance(
+        candidate_points[-1], end_position
+    ) <= _distance(candidate_points[0], end_position) + _distance(
+        candidate_points[-1], start_position
+    ):
+        return candidate_points
+    return tuple(reversed(candidate_points))
+
+
+def _road_for_edge(
+    roads: tuple[RoadGeometrySurface, ...],
+    edge_id: int,
+) -> RoadGeometrySurface | None:
+    for road in roads:
+        if edge_id in road.edge_ids:
+            return road
+    return None
+
+
+def _lane_for_road_segment(
+    lanes: tuple[LaneGeometrySurface, ...],
+    road: RoadGeometrySurface,
+    start_position: Position,
+    end_position: Position,
+) -> LaneGeometrySurface | None:
+    candidates = [lane for lane in lanes if lane.road_id == road.road_id]
+    if not candidates:
+        return None
+    return min(
+        candidates,
+        key=lambda lane: min(
+            _distance(lane.centerline[0], start_position)
+            + _distance(lane.centerline[-1], end_position),
+            _distance(lane.centerline[0], end_position)
+            + _distance(lane.centerline[-1], start_position),
+        ),
     )
+
+
+def _polyline_length(points: tuple[Position, ...]) -> float:
+    return sum(_distance(start, end) for start, end in zip(points, points[1:]))
+
+
+def _sample_path_position(
+    points: tuple[Position, ...],
+    distance_along_path: float,
+) -> Position:
+    if len(points) < 2:
+        return points[0]
+    remaining = min(max(distance_along_path, 0.0), _polyline_length(points))
+    for start, end in zip(points, points[1:]):
+        segment_length = _distance(start, end)
+        if segment_length <= 0.0:
+            continue
+        if remaining <= segment_length:
+            progress = remaining / segment_length
+            return (
+                start[0] + (end[0] - start[0]) * progress,
+                start[1] + (end[1] - start[1]) * progress,
+                start[2] + (end[2] - start[2]) * progress,
+            )
+        remaining -= segment_length
+    return points[-1]
+
+
+def _heading_along_path(
+    points: tuple[Position, ...],
+    *,
+    distance_along_path: float,
+) -> float:
+    if len(points) < 2:
+        return 0.0
+    bounded_distance = min(max(distance_along_path, 0.0), _polyline_length(points))
+    remaining = bounded_distance
+    for start, end in zip(points, points[1:]):
+        segment_length = _distance(start, end)
+        if segment_length <= 0.0:
+            continue
+        if remaining <= segment_length:
+            return _heading_rad(start, end)
+        remaining -= segment_length
+    return _heading_rad(points[-2], points[-1])
 
 
 def _segment_profile(

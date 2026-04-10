@@ -72,9 +72,9 @@ from autonomous_ops_sim.visualization.state import (
 
 
 SIMULATION_API_VERSION = 1
-REPLAY_BUNDLE_SCHEMA_VERSION = 4
-LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 7
-LIVE_SYNC_BUNDLE_SCHEMA_VERSION = 7
+REPLAY_BUNDLE_SCHEMA_VERSION = 5
+LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 8
+LIVE_SYNC_BUNDLE_SCHEMA_VERSION = 8
 
 
 @dataclass(frozen=True)
@@ -202,8 +202,11 @@ def build_replay_bundle(
         command_history=command_history,
         session_history=session_history,
     )
-    motion_segments = build_vehicle_motion_segments(replay_state)
     render_geometry = build_render_geometry_surface(engine.map)
+    motion_segments = build_vehicle_motion_segments(
+        replay_state,
+        render_geometry=render_geometry,
+    )
     command_results = _build_replay_command_results(
         command_history=tuple(command_history),
         frames=replay_state.frames,
@@ -276,8 +279,11 @@ def build_live_session_bundle(
 
     metrics_summary = summary or summarize_engine_execution(session.engine)
     replay_state = build_visualization_state_from_live_session(session)
-    motion_segments = build_vehicle_motion_segments(replay_state)
     render_geometry = build_render_geometry_surface(session.engine.map)
+    motion_segments = build_vehicle_motion_segments(
+        replay_state,
+        render_geometry=render_geometry,
+    )
     return LiveSessionBundle(
         metadata=SimulationApiMetadata(
             api_version=SIMULATION_API_VERSION,
@@ -323,8 +329,11 @@ def build_live_sync_bundle(
 
     surface = build_live_sync_surface(session)
     replay_state = build_visualization_state_from_live_session(session)
-    motion_segments = build_vehicle_motion_segments(replay_state)
     render_geometry = build_render_geometry_surface(session.engine.map)
+    motion_segments = build_vehicle_motion_segments(
+        replay_state,
+        render_geometry=render_geometry,
+    )
     return LiveSyncBundle(
         metadata=SimulationApiMetadata(
             api_version=SIMULATION_API_VERSION,

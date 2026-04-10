@@ -718,25 +718,35 @@ h3 {
   filter: drop-shadow(0 0 0.18px rgba(178, 74, 59, 0.4));
 }
 
-.scene-vehicle circle {
-  fill: rgba(0, 108, 103, 0.95);
-  stroke: white;
-  stroke-width: 0.14;
+.scene-vehicle {
   cursor: pointer;
   filter: drop-shadow(0 0.14px 0.12px rgba(24, 33, 44, 0.18));
 }
 
+.vehicle-body {
+  fill: rgba(95, 109, 121, 0.96);
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.08;
+}
+
+.vehicle-heading {
+  fill: rgba(0, 108, 103, 0.96);
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 0.06;
+}
+
 .scene-vehicle text {
   fill: var(--ink);
-  font-size: 0.8px;
+  font-size: 0.58px;
   font-weight: 700;
   text-anchor: middle;
 }
 
-.scene-vehicle.selected circle {
+.scene-vehicle.selected .vehicle-body,
+.scene-vehicle.selected .vehicle-heading {
   fill: rgba(201, 106, 24, 0.96);
   stroke: rgba(255, 255, 255, 0.95);
-  stroke-width: 0.18;
+  stroke-width: 0.1;
 }
 
 .scene-road.selected {
