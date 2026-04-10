@@ -57,6 +57,8 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "workspace-tabs" in app_source
     assert "workspace-tab-active" in app_source
     assert "scene-road-heatmap" in app_source
+    assert "scene-route-endpoint" in app_source
+    assert "scene-destination-threshold" in app_source
     assert "traffic-summary-chip" in app_source
     assert "scene-legend" in app_source
     assert "scene-button-primary" in app_source
@@ -115,7 +117,10 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".scene-road.selected" in css_source
     assert ".scene-reservation.selected" in css_source
     assert ".scene-route-preview.selected" in css_source
+    assert ".scene-route-endpoint" in css_source
+    assert ".scene-destination" in css_source
     assert ".scene-queue-overlay.preview" in css_source
+    assert ".minimap-destination" in css_source
     assert ".selection-strip" in css_source
     assert ".selection-pill" in css_source
     assert ".scene-hazard.selected" in css_source

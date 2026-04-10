@@ -844,6 +844,7 @@ h3 {
   fill: rgba(97, 112, 125, 0.11);
   stroke: rgba(97, 112, 125, 0.2);
   stroke-width: 0.08;
+  stroke-linejoin: round;
 }
 
 .scene-area-depot,
@@ -857,9 +858,10 @@ h3 {
 }
 
 .scene-area.selected {
-  fill: rgba(36, 83, 199, 0.18);
-  stroke: rgba(36, 83, 199, 0.55);
-  stroke-width: 0.12;
+  fill: rgba(36, 83, 199, 0.15);
+  stroke: rgba(36, 83, 199, 0.62);
+  stroke-width: 0.11;
+  filter: drop-shadow(0 0 0.14px rgba(36, 83, 199, 0.18));
 }
 
 .scene-road {
@@ -943,6 +945,8 @@ h3 {
   stroke: rgba(0, 108, 103, 0.84);
   stroke-width: 0.24;
   stroke-dasharray: 0.76 0.54;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   filter: drop-shadow(0 0 0.14px rgba(10, 118, 108, 0.36));
 }
 
@@ -950,6 +954,35 @@ h3 {
   stroke: rgba(201, 106, 24, 0.98);
   stroke-width: 0.34;
   stroke-dasharray: 0.62 0.42;
+}
+
+.scene-destination {
+  pointer-events: none;
+  filter: drop-shadow(0 0 0.12px rgba(24, 33, 44, 0.08));
+}
+
+.scene-destination-threshold {
+  fill: rgba(0, 108, 103, 0.08);
+  stroke: rgba(0, 108, 103, 0.32);
+  stroke-dasharray: 0.24 0.18;
+  stroke-width: 0.06;
+}
+
+.scene-destination-core {
+  fill: rgba(255, 251, 246, 0.95);
+  stroke: rgba(0, 108, 103, 0.88);
+  stroke-width: 0.08;
+}
+
+.scene-route-endpoint.selected .scene-destination-threshold {
+  fill: rgba(201, 106, 24, 0.12);
+  stroke: rgba(201, 106, 24, 0.58);
+  stroke-dasharray: 0.18 0.12;
+}
+
+.scene-route-endpoint.selected .scene-destination-core {
+  fill: rgba(255, 247, 235, 0.98);
+  stroke: rgba(201, 106, 24, 0.96);
 }
 
 .scene-reservation {
@@ -1222,6 +1255,32 @@ h3 {
 
 .minimap-vehicle {
   fill: rgba(0, 108, 103, 0.85);
+}
+
+.minimap-destination {
+  pointer-events: none;
+}
+
+.minimap-destination-threshold {
+  fill: rgba(0, 108, 103, 0.12);
+  stroke: rgba(0, 108, 103, 0.42);
+  stroke-width: 0.7;
+}
+
+.minimap-destination-core {
+  fill: rgba(255, 251, 246, 0.96);
+  stroke: rgba(0, 108, 103, 0.9);
+  stroke-width: 0.65;
+}
+
+.minimap-destination.selected .minimap-destination-threshold {
+  fill: rgba(201, 106, 24, 0.18);
+  stroke: rgba(201, 106, 24, 0.68);
+}
+
+.minimap-destination.selected .minimap-destination-core {
+  fill: rgba(255, 247, 235, 0.98);
+  stroke: rgba(201, 106, 24, 0.95);
 }
 
 .minimap-viewport {

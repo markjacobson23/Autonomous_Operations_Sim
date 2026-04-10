@@ -354,6 +354,13 @@ type SelectedTarget =
   | { kind: "queue"; roadId: string }
   | { kind: "hazard"; edgeId: number };
 
+type RouteDestinationMarker = {
+  destinationNodeId: number;
+  position: Position3;
+  selected: boolean;
+  previewVehicleId?: number;
+};
+
 type HoverTarget = {
   label: string;
   detail: string;
@@ -727,6 +734,29 @@ function App(): JSX.Element {
     routePreviews.find((preview) => preview.vehicle_id === primaryVehicleId) ??
     routePreviews[0] ??
     null;
+  const routeDestinationMarkers = [...routePreviews.reduce((markers, preview) => {
+    const destinationNodeId = preview.destination_node_id;
+    if (destinationNodeId === undefined) {
+      return markers;
+    }
+    const position = findNodePosition(bundle?.map_surface?.nodes ?? [], destinationNodeId);
+    if (!position) {
+      return markers;
+    }
+    const selected = selectedRoutePreview?.vehicle_id !== undefined
+      ? selectedRoutePreview.vehicle_id === preview.vehicle_id
+      : false;
+    const existingMarker = markers.get(destinationNodeId);
+    if (!existingMarker || (!existingMarker.selected && selected)) {
+      markers.set(destinationNodeId, {
+        destinationNodeId,
+        position,
+        selected,
+        previewVehicleId: preview.vehicle_id,
+      });
+    }
+    return markers;
+  }, new Map<number, RouteDestinationMarker>()).values()];
   const selectedRoutePreviewRoadIds = new Set(
     (bundle?.render_geometry?.roads ?? [])
       .filter((road) =>
@@ -1958,6 +1988,26 @@ function App(): JSX.Element {
                       );
                     })}
 
+                  {layers.routes &&
+                    routeDestinationMarkers.map((marker) => (
+                      <g
+                        key={`route-destination-${marker.destinationNodeId}`}
+                        className={`scene-destination scene-route-endpoint ${
+                          marker.selected ? "selected" : ""
+                        }`}
+                        transform={`translate(${marker.position[0]} ${marker.position[1]})`}
+                      >
+                        <circle
+                          r={marker.selected ? 1.08 : 0.86}
+                          className="scene-destination-threshold"
+                        />
+                        <circle
+                          r={marker.selected ? 0.38 : 0.3}
+                          className="scene-destination-core"
+                        />
+                      </g>
+                    ))}
+
                   {editorEnabled &&
                     (bundle?.map_surface?.nodes ?? []).map((node, index) => {
                       if (node.node_id === undefined || !node.position) {
@@ -2253,6 +2303,25 @@ function App(): JSX.Element {
                         r={1.7}
                         className="minimap-vehicle"
                       />
+                    ))}
+                    {routeDestinationMarkers.map((marker) => (
+                      <g
+                        key={`minimap-route-destination-${marker.destinationNodeId}`}
+                        className={`minimap-destination ${marker.selected ? "selected" : ""}`}
+                      >
+                        <circle
+                          cx={scaleX(marker.position[0], bounds)}
+                          cy={scaleY(marker.position[1], bounds)}
+                          r={marker.selected ? 2.0 : 1.55}
+                          className="minimap-destination-threshold"
+                        />
+                        <circle
+                          cx={scaleX(marker.position[0], bounds)}
+                          cy={scaleY(marker.position[1], bounds)}
+                          r={marker.selected ? 0.85 : 0.62}
+                          className="minimap-destination-core"
+                        />
+                      </g>
                     ))}
                     <rect
                       x={minimapRect.x}
