@@ -9,7 +9,7 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
         REPO_ROOT / "frontend" / "serious_ui" / "src" / "App.tsx"
     ).read_text(encoding="utf-8")
 
-    assert "Step 56 Queue Formation and Congestion Baseline" in app_source
+    assert "Step 57 Stop Lines, Yielding, and Traffic-Control Logic" in app_source
     assert "Command-Center Region" in app_source
     assert "Inspector Region" in app_source
     assert "Alerts Region" in app_source
@@ -19,7 +19,7 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "Autonomous Ops Command Deck" in app_source
     assert "Fit Scene" in app_source
     assert "Focus Selected" in app_source
-    assert "Queue buildup and congestion heatmaps are now live" in app_source
+    assert "Stop lines and yield controls are now live" in app_source
     assert "Save Scenario" in app_source
     assert "Reload Scenario" in app_source
     assert "turn_connectors" in app_source
@@ -34,6 +34,8 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "sampleTrafficSnapshot" in app_source
     assert "trafficCongestionIntensity" in app_source
     assert "trafficCongestionLevel" in app_source
+    assert "traffic_control_state" in app_source
+    assert "protected_conflict_zone_ids" in app_source
     assert "scene-road-heatmap" in app_source
     assert "traffic-summary-chip" in app_source
     assert "scene-legend" in app_source

@@ -81,8 +81,10 @@ def test_traffic_baseline_derives_control_points_and_conflict_queue_records() ->
         (control.node_id, control.control_type, control.controlled_road_ids)
         for control in baseline.control_points
     ] == [
-        (2, "yield", ("road-1-2", "road-2-3")),
+        (2, "signalized", ("road-1-2", "road-2-3")),
     ]
+    assert baseline.control_points[0].signal_ready is True
+    assert baseline.control_points[0].stop_line_ids != ()
     assert [
         (
             record.vehicle_id,
@@ -126,12 +128,15 @@ def test_traffic_snapshot_reports_active_and_queued_road_states() -> None:
     assert queued_road_states["road-2-3"].queued_vehicle_ids == (202,)
     assert queued_road_states["road-2-3"].occupancy_count == 1
     assert queued_road_states["road-2-3"].congestion_level == "queued"
+    assert queued_road_states["road-2-3"].control_state == "signalized"
+    assert queued_road_states["road-2-3"].stop_line_ids != ()
     assert queued_road_states["road-2-3"].congestion_intensity > queued_road_states[
         "road-1-2"
     ].congestion_intensity
     assert active_road_states["road-2-3"].active_vehicle_ids == (202,)
     assert active_road_states["road-2-3"].queued_vehicle_ids == ()
     assert active_road_states["road-2-3"].congestion_level == "active"
+    assert active_road_states["road-2-3"].control_state == "signalized"
     assert active_road_states["road-2-3"].congestion_intensity < queued_road_states[
         "road-2-3"
     ].congestion_intensity

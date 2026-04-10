@@ -13,12 +13,14 @@ from autonomous_ops_sim.simulation import (
     WorldState,
 )
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
+from autonomous_ops_sim.visualization import build_render_geometry_surface
 from autonomous_ops_sim.visualization import (
     RoutePreviewRequest,
     build_vehicle_inspection_surface,
     build_live_command_center_surface,
     preview_route_command,
 )
+import autonomous_ops_sim.visualization.command_center as command_center_module
 
 
 def build_command_center_engine() -> SimulationEngine:
@@ -149,6 +151,41 @@ def test_vehicle_inspection_surface_exposes_payload_route_history_and_diagnostic
         "route_preview",
         "ready_state",
     ]
+
+
+def test_vehicle_inspection_surface_maps_conflict_wait_to_control_state(
+    monkeypatch,
+) -> None:
+    session = LiveSimulationSession(build_command_center_engine())
+    vehicle = session.engine.get_vehicle(77)
+    vehicle.current_node_id = 2
+    vehicle.position = session.engine.map.get_position(2)
+    preview = preview_route_command(session, vehicle_id=77, destination_node_id=3)
+
+    monkeypatch.setattr(
+        command_center_module,
+        "_active_execution_context",
+        lambda _session, vehicle_id: {
+            "current_job_id": None,
+            "current_task_index": None,
+            "current_task_type": None,
+            "assigned_resource_id": None,
+            "wait_reason": "conflict_wait",
+        },
+    )
+
+    inspection = build_vehicle_inspection_surface(
+        session,
+        vehicle_id=77,
+        render_geometry=build_render_geometry_surface(session.engine.map),
+        route_preview=preview,
+    )
+
+    assert inspection.wait_reason == "stop_line"
+    assert inspection.traffic_control_state == "stop_line"
+    assert inspection.traffic_control_detail is not None
+    assert "stop line" in inspection.traffic_control_detail
+    assert any(diagnostic.code == "wait_reason" for diagnostic in inspection.diagnostics)
 
 
 def test_ai_assist_surface_provides_explanations_and_actionable_suggestions() -> None:

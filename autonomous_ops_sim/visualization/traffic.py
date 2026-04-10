@@ -19,6 +19,9 @@ class TrafficControlPoint:
     node_id: int
     control_type: str
     controlled_road_ids: tuple[str, ...]
+    stop_line_ids: tuple[str, ...]
+    protected_conflict_zone_ids: tuple[str, ...]
+    signal_ready: bool
 
 
 @dataclass(frozen=True)
@@ -52,6 +55,9 @@ class TrafficRoadState:
     min_spacing_m: float | None
     congestion_intensity: float
     congestion_level: str
+    control_state: str
+    stop_line_ids: tuple[str, ...]
+    protected_conflict_zone_ids: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -89,6 +95,7 @@ def sample_traffic_snapshot(
 ) -> TrafficSnapshot:
     """Sample congestion and queue state at one explicit timestamp."""
 
+    control_by_road_id = _control_points_by_road_id(baseline.control_points)
     road_states: list[TrafficRoadState] = []
     for road in render_geometry.roads:
         active_segments = [
@@ -117,6 +124,10 @@ def sample_traffic_snapshot(
             queue_count=len(queued_vehicle_ids),
             min_spacing_m=min_spacing_m,
         )
+        control_state, stop_line_ids, protected_conflict_zone_ids = _road_control_state(
+            road_id=road.road_id,
+            control_points=control_by_road_id,
+        )
         congestion_intensity = _congestion_intensity(
             occupancy_count=len(active_vehicle_ids),
             queue_count=len(queued_vehicle_ids),
@@ -131,6 +142,9 @@ def sample_traffic_snapshot(
                 min_spacing_m=min_spacing_m,
                 congestion_intensity=congestion_intensity,
                 congestion_level=congestion_level,
+                control_state=control_state,
+                stop_line_ids=stop_line_ids,
+                protected_conflict_zone_ids=protected_conflict_zone_ids,
             )
         )
 
@@ -183,6 +197,11 @@ def traffic_snapshot_to_dict(snapshot: TrafficSnapshot) -> dict[str, Any]:
                 "min_spacing_m": road_state.min_spacing_m,
                 "congestion_intensity": road_state.congestion_intensity,
                 "congestion_level": road_state.congestion_level,
+                "control_state": road_state.control_state,
+                "stop_line_ids": list(road_state.stop_line_ids),
+                "protected_conflict_zone_ids": list(
+                    road_state.protected_conflict_zone_ids
+                ),
             }
             for road_state in snapshot.road_states
         ],
@@ -211,9 +230,34 @@ def _build_control_points(
                 )
             )
         )
+        stop_line_ids = tuple(
+            sorted(
+                stop_line.stop_line_id
+                for stop_line in render_geometry.stop_lines
+                if stop_line.lane_id in {
+                    lane.lane_id
+                    for lane in render_geometry.lanes
+                    if lane.road_id in connected_road_ids
+                }
+            )
+        )
+        protected_conflict_zone_ids = tuple(
+            sorted(
+                merge_zone.merge_zone_id
+                for merge_zone in render_geometry.merge_zones
+                if any(
+                    lane_id in merge_zone.lane_ids
+                    for lane_id in (
+                        lane.lane_id
+                        for lane in render_geometry.lanes
+                        if lane.road_id in connected_road_ids
+                    )
+                )
+            )
+        )
         if len(connected_road_ids) < 2:
             continue
-        if len(connected_road_ids) >= 4:
+        if len(connected_road_ids) >= 4 or stop_line_ids:
             control_type = "signalized"
         elif len(connected_road_ids) >= 2:
             control_type = "yield"
@@ -225,9 +269,66 @@ def _build_control_points(
                 node_id=intersection.node_id,
                 control_type=control_type,
                 controlled_road_ids=connected_road_ids,
+                stop_line_ids=stop_line_ids,
+                protected_conflict_zone_ids=protected_conflict_zone_ids,
+                signal_ready=bool(stop_line_ids or protected_conflict_zone_ids),
             )
         )
     return tuple(controls)
+
+
+def _control_points_by_road_id(
+    control_points: tuple[TrafficControlPoint, ...],
+) -> dict[str, tuple[TrafficControlPoint, ...]]:
+    by_road_id: dict[str, list[TrafficControlPoint]] = {}
+    for control in control_points:
+        for road_id in control.controlled_road_ids:
+            by_road_id.setdefault(road_id, []).append(control)
+    return {
+        road_id: tuple(
+            sorted(
+                controls,
+                key=lambda control: (
+                    _control_priority(control.control_type),
+                    control.control_id,
+                ),
+                reverse=True,
+            )
+        )
+        for road_id, controls in by_road_id.items()
+    }
+
+
+def _road_control_state(
+    *,
+    road_id: str,
+    control_points: dict[str, tuple[TrafficControlPoint, ...]],
+) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
+    controls = control_points.get(road_id, ())
+    if not controls:
+        return "free_flow", (), ()
+    primary = controls[0]
+    stop_line_ids = tuple(
+        sorted({stop_line_id for control in controls for stop_line_id in control.stop_line_ids})
+    )
+    protected_conflict_zone_ids = tuple(
+        sorted(
+            {
+                zone_id
+                for control in controls
+                for zone_id in control.protected_conflict_zone_ids
+            }
+        )
+    )
+    return primary.control_type, stop_line_ids, protected_conflict_zone_ids
+
+
+def _control_priority(control_type: str) -> int:
+    return {
+        "signalized": 3,
+        "yield": 2,
+        "uncontrolled": 1,
+    }.get(control_type, 0)
 
 
 def _build_queue_records(

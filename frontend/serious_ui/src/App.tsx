@@ -212,7 +212,7 @@ type MotionSegmentPayload = {
 };
 
 type TrafficBaselinePayload = {
-  control_points?: Array<{ edge_id?: number; state?: string }>;
+  control_points?: TrafficControlPointPayload[];
   queue_records?: Array<{
     vehicle_id?: number;
     node_id?: number;
@@ -223,6 +223,16 @@ type TrafficBaselinePayload = {
   }>;
 };
 
+type TrafficControlPointPayload = {
+  control_id?: string;
+  node_id?: number;
+  control_type?: string;
+  controlled_road_ids?: string[];
+  stop_line_ids?: string[];
+  protected_conflict_zone_ids?: string[];
+  signal_ready?: boolean;
+};
+
 type TrafficRoadStatePayload = {
   road_id?: string;
   active_vehicle_ids?: number[];
@@ -231,6 +241,9 @@ type TrafficRoadStatePayload = {
   min_spacing_m?: number | null;
   congestion_intensity?: number;
   congestion_level?: string;
+  control_state?: string;
+  stop_line_ids?: string[];
+  protected_conflict_zone_ids?: string[];
 };
 
 type TrafficSnapshotPayload = {
@@ -925,12 +938,12 @@ function App(): JSX.Element {
       <div className="shell-accent shell-accent-right" aria-hidden="true" />
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 56 Queue Formation and Congestion Baseline</p>
+          <p className="eyebrow">Step 57 Stop Lines, Yielding, and Traffic-Control Logic</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
-            Queue growth and congestion are now visible in the serious UI, so
-            roads show buildup, release, and intensity instead of flattening
-            traffic into a single static line.
+            Stop lines, yield controls, and protected conflict areas are now
+            visible in the serious UI, so controlled junctions show why vehicles
+            are pausing instead of flattening traffic into a single static line.
           </p>
         </div>
         <div className="masthead-meta">
@@ -1183,7 +1196,9 @@ function App(): JSX.Element {
                               detail: controlPoint
                                 ? `${controlPoint.control_type} · ${
                                     controlPoint.controlled_road_ids?.length ?? 0
-                                  } road(s)`
+                                  } road(s) · ${
+                                    controlPoint.stop_line_ids?.length ?? 0
+                                  } stop line(s)`
                                 : intersection.intersection_type ?? "intersection",
                             })
                           }
@@ -1443,11 +1458,11 @@ function App(): JSX.Element {
                 </svg>
 
                 <div className="focus-card">
-                  <strong>Queue buildup and congestion heatmaps are now live</strong>
+                  <strong>Stop lines and yield controls are now live</strong>
                   <p>
-                    Traffic snapshots now drive animated road heatmaps and queue
-                    overlays, so dense corridors stay legible while still
-                    revealing where vehicles are waiting.
+                    Traffic snapshots now carry control-state overlays and
+                    inspection reasons, so dense corridors stay legible while
+                    still revealing where vehicles are waiting.
                   </p>
                 </div>
                 <div className="scene-legend">
@@ -1736,6 +1751,14 @@ function App(): JSX.Element {
                       {selectedRoadTraffic?.active_vehicle_ids?.length ?? 0}
                     </li>
                     <li>Min spacing: {formatMeters(selectedRoadTraffic?.min_spacing_m ?? null)}</li>
+                    <li>Control: {selectedRoadTraffic?.control_state ?? "free_flow"}</li>
+                    <li>
+                      Stop lines: {selectedRoadTraffic?.stop_line_ids?.join(", ") || "none"}
+                    </li>
+                    <li>
+                      Protected areas:{" "}
+                      {selectedRoadTraffic?.protected_conflict_zone_ids?.join(", ") || "none"}
+                    </li>
                   </ul>
                 </article>
               ) : null}
@@ -1757,7 +1780,7 @@ function App(): JSX.Element {
               {selectedTarget?.kind === "queue" && selectedQueueRecord ? (
                 <article className="inspection-card">
                   <div className="inspection-header">
-                    <strong>Queue Edge {selectedQueueRecord.edge_id ?? "?"}</strong>
+                    <strong>Queue {selectedQueueRecord.road_id ?? "road"}</strong>
                     <span>reservation queue</span>
                   </div>
                   <ul className="mini-list">
@@ -1767,6 +1790,7 @@ function App(): JSX.Element {
                     <li>Intensity: {Math.round((selectedQueueTraffic?.congestion_intensity ?? 0) * 100)}%</li>
                     <li>Queue window: {formatSeconds(selectedQueueRecord.queue_start_s ?? null)} to {formatSeconds(selectedQueueRecord.queue_end_s ?? null)}</li>
                     <li>Reason: {selectedQueueRecord.reason ?? "queued"}</li>
+                    <li>Control: {selectedQueueTraffic?.control_state ?? "yield"}</li>
                   </ul>
                 </article>
               ) : null}
@@ -1807,6 +1831,8 @@ function App(): JSX.Element {
                     <li>Type: {displayedSelectedVehicle?.vehicle_type ?? "GENERIC"}</li>
                     <li>Spacing: {formatMeters(displayedSelectedVehicle?.spacing_envelope_m ?? null)}</li>
                     <li>Heading: {formatHeadingDegrees(displayedSelectedVehicle?.heading_rad ?? null)}</li>
+                    <li>Control: {selectedInspection.traffic_control_state ?? "none"}</li>
+                    <li>{selectedInspection.traffic_control_detail ?? "No control detail"}</li>
                   </ul>
                   <div className="diagnostic-row">
                     {(selectedInspection.diagnostics ?? []).slice(0, 3).map((diagnostic, diagIndex) => (

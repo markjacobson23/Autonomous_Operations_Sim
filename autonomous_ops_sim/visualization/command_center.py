@@ -6,6 +6,10 @@ from typing import Any
 from autonomous_ops_sim.io.exports import trace_event_to_dict
 from autonomous_ops_sim.simulation.kinematics import estimate_edge_travel_time_s
 from autonomous_ops_sim.simulation import LiveSimulationSession, command_to_dict
+from autonomous_ops_sim.visualization.geometry import (
+    RenderGeometrySurface,
+    build_render_geometry_surface,
+)
 
 
 @dataclass(frozen=True)
@@ -66,6 +70,8 @@ class VehicleInspectionSurface:
     current_task_type: str | None
     assigned_resource_id: str | None
     wait_reason: str | None
+    traffic_control_state: str | None
+    traffic_control_detail: str | None
     eta_s: float | None
     route_ahead_node_ids: tuple[int, ...]
     route_ahead_edge_ids: tuple[int, ...]
@@ -188,6 +194,7 @@ def build_live_command_center_surface(
 ) -> CommandCenterSurface:
     """Build the command-center state for one authoritative live session."""
 
+    render_geometry = build_render_geometry_surface(session.engine.map)
     normalized_selection = _normalize_selected_vehicle_ids(
         session,
         selected_vehicle_ids,
@@ -204,6 +211,7 @@ def build_live_command_center_surface(
         build_vehicle_inspection_surface(
             session,
             vehicle_id=vehicle_id,
+            render_geometry=render_geometry,
             route_preview=_preview_for_vehicle(
                 vehicle_id=vehicle_id,
                 route_previews=route_previews,
@@ -254,12 +262,18 @@ def build_vehicle_inspection_surface(
     session: LiveSimulationSession,
     *,
     vehicle_id: int,
+    render_geometry: RenderGeometrySurface | None = None,
     route_preview: RoutePreviewSurface | None = None,
 ) -> VehicleInspectionSurface:
     """Build one richer inspection record from authoritative session state."""
 
     vehicle = session.engine.get_vehicle(vehicle_id)
     context = _active_execution_context(session, vehicle_id=vehicle_id)
+    traffic_control_state, traffic_control_detail, wait_reason = _traffic_control_wait_state(
+        current_node_id=vehicle.current_node_id,
+        wait_reason=context["wait_reason"],
+        render_geometry=render_geometry,
+    )
     targeted_commands = tuple(
         command_to_dict(record.command)
         for record in session.command_history
@@ -287,7 +301,9 @@ def build_vehicle_inspection_surface(
         current_task_index=context["current_task_index"],
         current_task_type=context["current_task_type"],
         assigned_resource_id=context["assigned_resource_id"],
-        wait_reason=context["wait_reason"],
+        wait_reason=wait_reason,
+        traffic_control_state=traffic_control_state,
+        traffic_control_detail=traffic_control_detail,
         eta_s=_estimate_eta_s(
             session,
             route_preview=route_preview,
@@ -300,7 +316,7 @@ def build_vehicle_inspection_surface(
             vehicle_id=vehicle_id,
             vehicle=vehicle,
             route_preview=route_preview,
-            wait_reason=context["wait_reason"],
+            wait_reason=wait_reason,
             current_job_id=context["current_job_id"],
         ),
     )
@@ -341,6 +357,8 @@ def vehicle_inspection_surface_to_dict(
         "current_task_type": inspection.current_task_type,
         "assigned_resource_id": inspection.assigned_resource_id,
         "wait_reason": inspection.wait_reason,
+        "traffic_control_state": inspection.traffic_control_state,
+        "traffic_control_detail": inspection.traffic_control_detail,
         "eta_s": inspection.eta_s,
         "route_ahead_node_ids": list(inspection.route_ahead_node_ids),
         "route_ahead_edge_ids": list(inspection.route_ahead_edge_ids),
@@ -602,6 +620,107 @@ def _build_vehicle_diagnostics(
             )
         )
     return tuple(diagnostics)
+
+
+def _traffic_control_wait_state(
+    *,
+    current_node_id: int,
+    wait_reason: str | None,
+    render_geometry: RenderGeometrySurface | None,
+) -> tuple[str | None, str | None, str | None]:
+    if wait_reason is None:
+        return None, None, None
+    if render_geometry is None:
+        return None, None, wait_reason
+
+    node_intersection = next(
+        (
+            intersection
+            for intersection in render_geometry.intersections
+            if intersection.node_id == current_node_id
+        ),
+        None,
+    )
+    if node_intersection is None:
+        return None, None, wait_reason
+
+    intersection_id = node_intersection.intersection_id
+    road_ids = _controlled_road_ids_for_node(render_geometry, current_node_id)
+    road_id_set = set(road_ids)
+    stop_line_ids = tuple(
+        sorted(
+            stop_line.stop_line_id
+            for stop_line in render_geometry.stop_lines
+            if stop_line.lane_id in _lane_ids_for_road_ids(render_geometry, road_id_set)
+        )
+    )
+    merge_zone_ids = tuple(
+        sorted(
+            merge_zone.merge_zone_id
+            for merge_zone in render_geometry.merge_zones
+            if any(
+                lane_id in merge_zone.lane_ids
+                for lane_id in _lane_ids_for_road_ids(render_geometry, road_id_set)
+            )
+        )
+    )
+    if stop_line_ids:
+        return "stop_line", f"{intersection_id} stop line", "stop_line"
+    if merge_zone_ids:
+        return "protected_conflict", f"{intersection_id} protected conflict area", "protected_conflict"
+    if len(road_ids) >= 4:
+        return "signalized", f"{intersection_id} signalized control", "signal_red"
+    if len(road_ids) >= 2:
+        return "yield", f"{intersection_id} yield control", "yield"
+    return None, None, wait_reason
+
+
+def _controlled_road_ids_for_node(
+    render_geometry: RenderGeometrySurface,
+    current_node_id: int,
+) -> tuple[str, ...]:
+    node_intersection = next(
+        (
+            intersection
+            for intersection in render_geometry.intersections
+            if intersection.node_id == current_node_id
+        ),
+        None,
+    )
+    if node_intersection is None:
+        return ()
+    controlled_road_ids: list[str] = []
+    for road in render_geometry.roads:
+        if not road.centerline:
+            continue
+        start = road.centerline[0]
+        end = road.centerline[-1]
+        if node_intersection.polygon and not (
+            _point_in_bounds(start, node_intersection.polygon)
+            or _point_in_bounds(end, node_intersection.polygon)
+        ):
+            continue
+        controlled_road_ids.append(road.road_id)
+    return tuple(sorted(set(controlled_road_ids)))
+
+
+def _lane_ids_for_road_ids(
+    render_geometry: RenderGeometrySurface,
+    road_ids: set[str],
+) -> set[str]:
+    lane_ids: set[str] = set()
+    for lane in render_geometry.lanes:
+        if lane.road_id in road_ids:
+            lane_ids.add(lane.lane_id)
+    return lane_ids
+
+
+def _point_in_bounds(point: tuple[float, float, float], polygon: tuple[tuple[float, float, float], ...]) -> bool:
+    min_x = min(p[0] for p in polygon)
+    max_x = max(p[0] for p in polygon)
+    min_y = min(p[1] for p in polygon)
+    max_y = max(p[1] for p in polygon)
+    return min_x <= point[0] <= max_x and min_y <= point[1] <= max_y
 
 
 def build_ai_assist_surface(
