@@ -6,7 +6,10 @@ from autonomous_ops_sim.authoring import (
     geometry_edit_transaction_from_dict,
     validate_geometry_edit_transaction,
 )
-from autonomous_ops_sim.io.scenario_loader import load_scenario
+from autonomous_ops_sim.io.scenario_loader import (
+    load_scenario,
+    validate_scenario_payload,
+)
 
 
 def build_authoring_scenario() -> dict[str, object]:
@@ -195,6 +198,10 @@ def test_geometry_edit_validation_rejects_duplicate_node_position() -> None:
     assert len(messages) == 1
     assert messages[0].severity == "error"
     assert "positions must be unique" in messages[0].message
+
+
+def test_validate_scenario_payload_accepts_a_valid_authoring_scenario() -> None:
+    validate_scenario_payload(build_authoring_scenario())
 
 
 def test_saved_authoring_scenario_round_trips_through_loader(tmp_path) -> None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 
-from autonomous_ops_sim.io.scenario_loader import _parse_scenario
+from autonomous_ops_sim.io.scenario_loader import validate_scenario_payload
 
 
 Position = tuple[float, float, float]
@@ -104,7 +104,7 @@ def validate_geometry_edit_transaction(
 
     try:
         candidate = apply_geometry_edit_transaction(scenario_data, transaction)
-        _parse_scenario(candidate)
+        validate_scenario_payload(candidate)
     except (ValueError, TypeError, KeyError, OverflowError) as exc:
         return (
             GeometryValidationMessage(

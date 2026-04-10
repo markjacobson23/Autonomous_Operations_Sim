@@ -91,13 +91,11 @@ class LiveSimulationSession:
 
         started_at_s = self.engine.simulated_time_s
         self.engine.run(until_s)
-        record = SessionAdvanceRecord(
-            sequence=len(self._progress_history),
+        completed_at_s = self.engine.simulated_time_s
+        return self._append_progress_record(
             started_at_s=started_at_s,
-            completed_at_s=self.engine.simulated_time_s,
+            completed_at_s=completed_at_s,
         )
-        self._progress_history.append(record)
-        return record
 
     def advance_by(self, delta_s: float) -> SessionAdvanceRecord:
         """Advance the active session by one explicit simulated duration."""
@@ -131,6 +129,31 @@ class LiveSimulationSession:
     def _require_active(self) -> None:
         if not self.is_active:
             raise SessionStateError("live session is not active")
+
+    def _append_progress_record(
+        self,
+        *,
+        started_at_s: float,
+        completed_at_s: float,
+    ) -> SessionAdvanceRecord:
+        """Record one explicit time advance while preserving monotonic order."""
+
+        if not math.isfinite(started_at_s):
+            raise ValueError("started_at_s must be finite")
+        if not math.isfinite(completed_at_s):
+            raise ValueError("completed_at_s must be finite")
+        if completed_at_s < started_at_s:
+            raise RuntimeError("live session progression cannot move backward")
+        if self._progress_history and started_at_s < self._progress_history[-1].completed_at_s:
+            raise RuntimeError("live session progression history is out of order")
+
+        record = SessionAdvanceRecord(
+            sequence=len(self._progress_history),
+            started_at_s=started_at_s,
+            completed_at_s=completed_at_s,
+        )
+        self._progress_history.append(record)
+        return record
 
 
 def build_live_session_export(

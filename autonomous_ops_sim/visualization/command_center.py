@@ -30,6 +30,7 @@ class RoutePreviewSurface:
     start_node_id: int
     is_actionable: bool
     reason: str | None
+    reason_code: str | None
     node_ids: tuple[int, ...]
     edge_ids: tuple[int, ...]
     total_distance: float | None
@@ -48,7 +49,7 @@ class CommandCenterVehicleSurface:
 
 @dataclass(frozen=True)
 class VehicleDiagnosticSurface:
-    """Stable diagnostic hook surfaced to the operator for one vehicle."""
+    """Deterministic diagnostic hook surfaced to the operator for one vehicle."""
 
     code: str
     severity: str
@@ -57,7 +58,7 @@ class VehicleDiagnosticSurface:
 
 @dataclass(frozen=True)
 class _DeadlockRisk:
-    """Internal deadlock-risk summary reused across diagnostics and AI surfaces."""
+    """Internal deadlock-risk summary reused across diagnostics and review surfaces."""
 
     code: str
     severity: str
@@ -94,20 +95,22 @@ class VehicleInspectionSurface:
 
 @dataclass(frozen=True)
 class AIAssistExplanation:
-    """Deterministic AI-style explanation over authoritative vehicle state."""
+    """Deterministic operator-support explanation over authoritative vehicle state."""
 
     vehicle_id: int
+    reason_code: str
     summary: str
     rationale_codes: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class AIAssistSuggestion:
-    """Operator-facing suggested next step derived from runtime truth."""
+    """Deterministic heuristic suggestion derived from runtime truth."""
 
     suggestion_id: str
     kind: str
     priority: str
+    reason_code: str
     summary: str
     proposed_command: dict[str, Any] | None = None
     target_vehicle_id: int | None = None
@@ -116,17 +119,18 @@ class AIAssistSuggestion:
 
 @dataclass(frozen=True)
 class AIAssistAnomaly:
-    """Derived anomaly explanation over authoritative state."""
+    """Deterministic derived anomaly over authoritative state."""
 
     anomaly_id: str
     severity: str
+    reason_code: str
     summary: str
     vehicle_id: int | None = None
 
 
 @dataclass(frozen=True)
 class AIAssistSurface:
-    """Low-risk AI-assist read-model layered above command-center truth."""
+    """Deterministic operator-support read-model layered above command-center truth."""
 
     explanations: tuple[AIAssistExplanation, ...]
     suggestions: tuple[AIAssistSuggestion, ...]
@@ -173,6 +177,7 @@ def preview_route_command(
             start_node_id=-1,
             is_actionable=False,
             reason="unknown_vehicle",
+            reason_code=_normalize_reason_code("unknown_vehicle"),
             node_ids=(),
             edge_ids=(),
             total_distance=None,
@@ -185,6 +190,7 @@ def preview_route_command(
             start_node_id=vehicle.current_node_id,
             is_actionable=False,
             reason="unknown_destination",
+            reason_code=_normalize_reason_code("unknown_destination"),
             node_ids=(),
             edge_ids=(),
             total_distance=None,
@@ -204,6 +210,7 @@ def preview_route_command(
             start_node_id=vehicle.current_node_id,
             is_actionable=False,
             reason="no_route",
+            reason_code=_normalize_reason_code("no_route"),
             node_ids=(),
             edge_ids=(),
             total_distance=None,
@@ -216,6 +223,7 @@ def preview_route_command(
         start_node_id=vehicle.current_node_id,
         is_actionable=is_idle,
         reason=None if is_idle else "vehicle_not_idle",
+        reason_code=None if is_idle else _normalize_reason_code("vehicle_not_idle"),
         node_ids=tuple(node_ids),
         edge_ids=_edge_ids_for_node_path(session, tuple(node_ids)),
         total_distance=total_distance,
@@ -383,6 +391,7 @@ def route_preview_surface_to_dict(
         "start_node_id": preview.start_node_id,
         "is_actionable": preview.is_actionable,
         "reason": preview.reason,
+        "reason_code": preview.reason_code,
         "node_ids": list(preview.node_ids),
         "edge_ids": list(preview.edge_ids),
         "total_distance": preview.total_distance,
@@ -426,12 +435,13 @@ def vehicle_inspection_surface_to_dict(
 
 
 def ai_assist_surface_to_dict(surface: AIAssistSurface) -> dict[str, Any]:
-    """Convert AI-assist state into a stable JSON-ready record."""
+    """Convert deterministic operator-support state into a stable JSON-ready record."""
 
     return {
         "explanations": [
             {
                 "vehicle_id": explanation.vehicle_id,
+                "reason_code": explanation.reason_code,
                 "summary": explanation.summary,
                 "rationale_codes": list(explanation.rationale_codes),
             }
@@ -442,6 +452,7 @@ def ai_assist_surface_to_dict(surface: AIAssistSurface) -> dict[str, Any]:
                 "suggestion_id": suggestion.suggestion_id,
                 "kind": suggestion.kind,
                 "priority": suggestion.priority,
+                "reason_code": suggestion.reason_code,
                 "summary": suggestion.summary,
                 "proposed_command": suggestion.proposed_command,
                 "target_vehicle_id": suggestion.target_vehicle_id,
@@ -453,6 +464,7 @@ def ai_assist_surface_to_dict(surface: AIAssistSurface) -> dict[str, Any]:
             {
                 "anomaly_id": anomaly.anomaly_id,
                 "severity": anomaly.severity,
+                "reason_code": anomaly.reason_code,
                 "summary": anomaly.summary,
                 "vehicle_id": anomaly.vehicle_id,
             }
@@ -638,7 +650,7 @@ def _build_vehicle_diagnostics(
     diagnostics.append(
         VehicleDiagnosticSurface(
             code="payload_state",
-            severity="info",
+            severity=_normalize_diagnostic_severity("info"),
             message=(
                 "Vehicle payload is empty."
                 if payload == 0.0
@@ -650,7 +662,9 @@ def _build_vehicle_diagnostics(
         diagnostics.append(
             VehicleDiagnosticSurface(
                 code="route_preview",
-                severity="info" if route_preview.is_actionable else "warning",
+                severity=_normalize_diagnostic_severity(
+                    "info" if route_preview.is_actionable else "warning",
+                ),
                 message=(
                     "Route preview is actionable."
                     if route_preview.is_actionable
@@ -662,7 +676,7 @@ def _build_vehicle_diagnostics(
         diagnostics.append(
             VehicleDiagnosticSurface(
                 code="wait_reason",
-                severity="warning",
+                severity=_normalize_diagnostic_severity("warning"),
                 message=f"Vehicle is waiting because of {wait_reason}.",
             )
         )
@@ -670,7 +684,7 @@ def _build_vehicle_diagnostics(
         diagnostics.append(
             VehicleDiagnosticSurface(
                 code="ready_state",
-                severity="info",
+                severity=_normalize_diagnostic_severity("info"),
                 message=f"Vehicle {vehicle_id} is idle and ready for reassignment.",
             )
         )
@@ -785,7 +799,7 @@ def build_ai_assist_surface(
     vehicle_inspections: tuple[VehicleInspectionSurface, ...],
     route_previews: tuple[RoutePreviewSurface, ...],
 ) -> AIAssistSurface:
-    """Build deterministic AI-style operator assistance from command-center truth."""
+    """Build deterministic operator-support diagnostics and suggestions."""
 
     explanations = tuple(
         _build_ai_explanation(inspection) for inspection in vehicle_inspections
@@ -830,6 +844,7 @@ def _build_ai_explanation(
     if inspection.wait_reason is not None:
         return AIAssistExplanation(
             vehicle_id=inspection.vehicle_id,
+            reason_code="wait_state",
             summary=(
                 f"Vehicle {inspection.vehicle_id} is paused at node "
                 f"{inspection.current_node_id} because of {inspection.wait_reason}."
@@ -839,6 +854,7 @@ def _build_ai_explanation(
     if inspection.current_task_type is not None:
         return AIAssistExplanation(
             vehicle_id=inspection.vehicle_id,
+            reason_code="active_task",
             summary=(
                 f"Vehicle {inspection.vehicle_id} is working on "
                 f"{inspection.current_task_type} task {inspection.current_task_index} "
@@ -849,6 +865,7 @@ def _build_ai_explanation(
     if inspection.route_ahead_node_ids:
         return AIAssistExplanation(
             vehicle_id=inspection.vehicle_id,
+            reason_code="route_ready",
             summary=(
                 f"Vehicle {inspection.vehicle_id} is positioned to travel "
                 f"{' -> '.join(str(node_id) for node_id in inspection.route_ahead_node_ids)}."
@@ -857,6 +874,7 @@ def _build_ai_explanation(
         )
     return AIAssistExplanation(
         vehicle_id=inspection.vehicle_id,
+        reason_code="idle_ready",
         summary=(
             f"Vehicle {inspection.vehicle_id} is idle at node "
             f"{inspection.current_node_id} and available for reassignment."
@@ -873,7 +891,8 @@ def _build_ai_anomalies(
         anomalies.append(
             AIAssistAnomaly(
                 anomaly_id=f"vehicle-{inspection.vehicle_id}-wait",
-                severity="warning",
+                severity=_normalize_diagnostic_severity("warning"),
+                reason_code="wait_state",
                 summary=(
                     f"Vehicle {inspection.vehicle_id} is stalled by "
                     f"{inspection.wait_reason}."
@@ -885,7 +904,8 @@ def _build_ai_anomalies(
         anomalies.append(
             AIAssistAnomaly(
                 anomaly_id=f"vehicle-{inspection.vehicle_id}-failed",
-                severity="critical",
+                severity=_normalize_diagnostic_severity("critical"),
+                reason_code="vehicle_failed",
                 summary=f"Vehicle {inspection.vehicle_id} is in failed state.",
                 vehicle_id=inspection.vehicle_id,
             )
@@ -905,7 +925,8 @@ def _build_ai_suggestions(
             AIAssistSuggestion(
                 suggestion_id=f"assign-{inspection.vehicle_id}-{route_preview.destination_node_id}",
                 kind="retask_vehicle",
-                priority="high",
+                priority=_normalize_suggestion_priority("high"),
+                reason_code="assign_destination",
                 summary=(
                     f"Assign vehicle {inspection.vehicle_id} to destination "
                     f"{route_preview.destination_node_id} using the previewed route."
@@ -926,7 +947,8 @@ def _build_ai_suggestions(
                 AIAssistSuggestion(
                     suggestion_id=f"unblock-{blocked_edge_id}",
                     kind="reopen_edge",
-                    priority="medium",
+                    priority=_normalize_suggestion_priority("medium"),
+                    reason_code="reopen_blocked_edge",
                     summary=(
                         f"Consider reopening blocked edge {blocked_edge_id} to restore "
                         f"routing options for vehicle {inspection.vehicle_id}."
@@ -948,7 +970,8 @@ def _build_ai_suggestions(
             AIAssistSuggestion(
                 suggestion_id=f"preview-{inspection.vehicle_id}",
                 kind="preview_destination",
-                priority="medium",
+                priority=_normalize_suggestion_priority("medium"),
+                reason_code="preview_destination",
                 summary=(
                     f"Preview a destination for idle vehicle {inspection.vehicle_id} "
                     "before committing a retask command."
@@ -1016,7 +1039,8 @@ def _build_deadlock_anomalies(
         anomalies.extend(
             AIAssistAnomaly(
                 anomaly_id=f"vehicle-{vehicle.id}-{risk.code}",
-                severity=risk.severity,
+                severity=_normalize_diagnostic_severity(risk.severity),
+                reason_code=risk.code,
                 summary=risk.summary,
                 vehicle_id=vehicle.id,
             )
@@ -1054,7 +1078,10 @@ def _build_deadlock_suggestions(
             AIAssistSuggestion(
                 suggestion_id=f"{risk.code}-{vehicle.id}",
                 kind="avoid_deadlock",
-                priority="high" if risk.severity == "critical" else "medium",
+                priority=_normalize_suggestion_priority(
+                    "high" if risk.severity == "critical" else "medium",
+                ),
+                reason_code=risk.code,
                 summary=risk.mitigation,
                 target_vehicle_id=vehicle.id,
             )
@@ -1277,6 +1304,27 @@ def _point_distance_to_segment(
         start[2] + clamped * (end[2] - start[2]),
     )
     return _distance_xy(point, closest_point)
+
+
+def _normalize_reason_code(reason: str | None) -> str | None:
+    if reason is None:
+        return None
+    normalized = reason.strip().lower().replace(" ", "_").replace("-", "_")
+    return normalized or None
+
+
+def _normalize_diagnostic_severity(severity: str, *, fallback: str = "info") -> str:
+    normalized = _normalize_reason_code(severity) or fallback
+    if normalized in {"info", "warning", "critical"}:
+        return normalized
+    return fallback
+
+
+def _normalize_suggestion_priority(priority: str, *, fallback: str = "medium") -> str:
+    normalized = _normalize_reason_code(priority) or fallback
+    if normalized in {"high", "medium", "low"}:
+        return normalized
+    return fallback
 
 
 __all__ = [

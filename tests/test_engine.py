@@ -70,6 +70,9 @@ def test_engine_run_rejects_invalid_time_targets():
     with pytest.raises(ValueError, match="until_s must be finite"):
         engine.run(float("inf"))
 
+    with pytest.raises(ValueError, match="until_s must be finite"):
+        engine.run(float("nan"))
+
     with pytest.raises(
         ValueError,
         match="until_s must be greater than or equal to current simulated time",

@@ -38,6 +38,7 @@ export type AIAssistPayload = {
 
 export type ExplanationPayload = {
   vehicle_id?: number;
+  reason_code?: string;
   summary?: string;
 };
 
@@ -45,6 +46,7 @@ export type SuggestionPayload = {
   suggestion_id?: string;
   kind?: string;
   priority?: string;
+  reason_code?: string;
   summary?: string;
   target_vehicle_id?: number | null;
   target_edge_id?: number | null;
@@ -53,6 +55,7 @@ export type SuggestionPayload = {
 export type AnomalyPayload = {
   anomaly_id?: string;
   severity?: string;
+  reason_code?: string;
   summary?: string;
   vehicle_id?: number | null;
 };
@@ -81,6 +84,7 @@ export type RoutePreviewPayload = {
   start_node_id?: number;
   is_actionable?: boolean;
   reason?: string | null;
+  reason_code?: string | null;
   total_distance?: number | null;
   node_ids?: number[];
   edge_ids?: number[];

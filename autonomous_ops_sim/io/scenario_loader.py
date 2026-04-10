@@ -31,6 +31,12 @@ def load_scenario(path: str | Path) -> Scenario:
     return _parse_scenario(data, source_path=clean_path)
 
 
+def validate_scenario_payload(data: dict[str, object]) -> None:
+    """Validate a raw scenario payload using the standard loader rules."""
+
+    _parse_scenario(data)
+
+
 def _read_json(path: Path) -> dict[str, object]:
     """reads a JSON file and returns the raw data."""
 

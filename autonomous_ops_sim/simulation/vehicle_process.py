@@ -102,8 +102,13 @@ class VehicleProcess:
                     end_node_id=end_node_id,
                 )
 
-                engine.run(
-                    engine.simulated_time_s + _edge_travel_time_s(edge, self.max_speed)
+                travel_time_s = _edge_travel_time_s(edge, self.max_speed)
+                if not math.isfinite(travel_time_s) or travel_time_s < 0.0:
+                    raise ValueError("edge travel time must be finite and non-negative")
+
+                _advance_engine_time_to(
+                    engine,
+                    engine.simulated_time_s + travel_time_s,
                 )
                 self.vehicle.move_to_node(
                     node_id=end_node_id,
@@ -279,6 +284,8 @@ class VehicleProcess:
         engine: "SimulationEngine",
     ) -> None:
         service_start_time_s = engine.simulated_time_s
+        if not math.isfinite(service_duration_s) or service_duration_s < 0.0:
+            raise ValueError("service_duration_s must be finite and non-negative")
         if resource_id is not None:
             self._transition_behavior(
                 engine=engine,
@@ -289,6 +296,14 @@ class VehicleProcess:
                 requested_at_s=engine.simulated_time_s,
                 duration_s=service_duration_s,
             )
+            if not math.isfinite(reservation.start_time_s):
+                raise ValueError("resource reservation start time must be finite")
+            if reservation.start_time_s < service_start_time_s:
+                raise RuntimeError(
+                    "resource reservation cannot start before the current service time"
+                )
+            if reservation.wait_duration_s < 0.0:
+                raise RuntimeError("resource reservation wait duration cannot be negative")
             if reservation.wait_duration_s > 0.0:
                 engine.trace.emit(
                     timestamp_s=engine.simulated_time_s,
@@ -301,7 +316,7 @@ class VehicleProcess:
                     resource_id=resource_id,
                     duration_s=reservation.wait_duration_s,
                 )
-                engine.run(reservation.start_time_s)
+                _advance_engine_time_to(engine, reservation.start_time_s)
                 engine.trace.emit(
                     timestamp_s=engine.simulated_time_s,
                     vehicle_id=self.vehicle_id,
@@ -331,7 +346,7 @@ class VehicleProcess:
             resource_id=resource_id,
             duration_s=service_duration_s,
         )
-        engine.run(service_start_time_s + service_duration_s)
+        _advance_engine_time_to(engine, service_start_time_s + service_duration_s)
         engine.trace.emit(
             timestamp_s=engine.simulated_time_s,
             vehicle_id=self.vehicle_id,
@@ -411,9 +426,27 @@ class VehicleProcess:
 def _edge_travel_time_s(edge: Edge, max_speed: float) -> float:
     """Return traversal time using both the vehicle and edge constraints."""
 
+    if not math.isfinite(edge.distance) or edge.distance < 0.0:
+        raise ValueError(f"Edge-{edge.id} distance must be finite and non-negative.")
+    if not math.isfinite(edge.speed_limit) or edge.speed_limit <= 0.0:
+        raise ValueError(f"Edge-{edge.id} speed limit must be finite and positive.")
+
     effective_speed = min(max_speed, edge.speed_limit)
     if effective_speed <= 0.0:
         raise ValueError(
             f"Edge-{edge.id} cannot be traversed with effective_speed={effective_speed}."
         )
     return edge.distance / effective_speed
+
+
+def _advance_engine_time_to(engine: "SimulationEngine", target_time_s: float) -> None:
+    """Advance the authoritative engine clock with explicit monotonic checks."""
+
+    if not math.isfinite(target_time_s):
+        raise ValueError("target_time_s must be finite")
+    if target_time_s < 0.0:
+        raise ValueError("target_time_s must be non-negative")
+    if target_time_s < engine.simulated_time_s:
+        raise RuntimeError("engine time cannot move backward during execution")
+
+    engine.run(target_time_s)

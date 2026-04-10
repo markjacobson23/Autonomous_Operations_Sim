@@ -21,6 +21,11 @@ STEP_21_GOLDEN_PATH = (
 )
 
 
+def assert_trace_timestamps_are_monotonic(trace_events) -> None:
+    timestamps = [event.timestamp_s for event in trace_events]
+    assert timestamps == sorted(timestamps)
+
+
 def test_scenario_execution_runs_end_to_end_through_existing_engine_surfaces():
     scenario = load_scenario(SCENARIO_PATH)
 
@@ -35,6 +40,9 @@ def test_scenario_execution_runs_end_to_end_through_existing_engine_surfaces():
     assert result.summary.route_count == 2
     assert result.summary.vehicle_ids == (7,)
     assert result.summary.trace_event_count > 0
+    assert result.engine.simulated_time_s == result.summary.final_time_s == 6.0
+    assert_trace_timestamps_are_monotonic(result.engine.trace.events)
+    assert result.engine.trace.events[-1].timestamp_s == result.summary.final_time_s
     assert runtime_vehicle.id == 7
     assert runtime_vehicle.current_node_id == 6
     assert runtime_vehicle.payload == 0.0
@@ -95,6 +103,8 @@ def test_step_13_scenario_execution_uses_resources_and_dispatcher():
     assert result.summary.total_route_distance == 4.0
     assert result.summary.total_service_time_s == 3.0
     assert result.summary.total_resource_wait_time_s == 1.0
+    assert result.engine.simulated_time_s == result.summary.final_time_s == 8.0
+    assert_trace_timestamps_are_monotonic(result.engine.trace.events)
     assert result.engine.world_state.blocked_edge_ids == {2}
     assert export_record["summary"]["completed_job_count"] == 1
     assert export_record["summary"]["total_resource_wait_time_s"] == 1.0
@@ -153,6 +163,8 @@ def test_step_16_scenario_execution_runs_repeated_dispatch_workload():
     assert result.summary.total_route_distance == 3.0
     assert result.summary.total_service_time_s == 3.0
     assert result.summary.total_resource_wait_time_s == 1.0
+    assert result.engine.simulated_time_s == result.summary.final_time_s == 7.0
+    assert_trace_timestamps_are_monotonic(result.engine.trace.events)
     assert runtime_vehicle.position == (0.0, 1.0, 0.0)
     assert runtime_vehicle.payload == 0.0
     assert runtime_vehicle.operational_state == "idle"
@@ -203,6 +215,8 @@ def test_step_21_graph_map_scenario_executes_over_non_grid_topology():
     assert result.summary.route_count == 2
     assert result.summary.total_route_distance == 10.0
     assert result.summary.total_service_time_s == 2.0
+    assert result.engine.simulated_time_s == result.summary.final_time_s == 6.0
+    assert_trace_timestamps_are_monotonic(result.engine.trace.events)
     assert runtime_vehicle.current_node_id == 40
     assert runtime_vehicle.position == (9.0, 0.0, 0.0)
     assert runtime_vehicle.payload == 0.0

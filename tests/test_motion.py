@@ -103,6 +103,10 @@ def test_motion_segments_follow_edge_traversal_order_deterministically() -> None
         (0.4, 0.7),
         (0.7, 0.8999999999999999),
     ]
+    assert all(segment.start_time_s <= segment.end_time_s for segment in segments)
+    assert [segment.start_time_s for segment in segments] == sorted(
+        segment.start_time_s for segment in segments
+    )
     assert [segment.profile_kind for segment in segments] == [
         "triangle_authoritative",
         "triangle_authoritative",

@@ -186,6 +186,7 @@ def test_preview_route_command_builds_non_mutating_route_preview() -> None:
     assert preview.destination_node_id == 3
     assert preview.is_actionable is True
     assert preview.reason is None
+    assert preview.reason_code is None
     assert preview.node_ids == (1, 2, 3)
     assert preview.edge_ids == (1, 2)
     assert preview.total_distance == 2.0
@@ -207,6 +208,7 @@ def test_preview_route_command_marks_non_idle_vehicle_as_non_actionable() -> Non
 
     assert preview.is_actionable is False
     assert preview.reason == "vehicle_not_idle"
+    assert preview.reason_code == "vehicle_not_idle"
     assert preview.node_ids == (1, 2, 3)
     assert preview.edge_ids == (1, 2)
     assert preview.total_distance == 2.0
@@ -222,6 +224,7 @@ def test_preview_route_command_handles_unknown_vehicle_and_destination_explicitl
     )
     assert unknown_vehicle_preview.is_actionable is False
     assert unknown_vehicle_preview.reason == "unknown_vehicle"
+    assert unknown_vehicle_preview.reason_code == "unknown_vehicle"
     assert unknown_vehicle_preview.node_ids == ()
     assert unknown_vehicle_preview.edge_ids == ()
     assert unknown_vehicle_preview.total_distance is None
@@ -233,6 +236,7 @@ def test_preview_route_command_handles_unknown_vehicle_and_destination_explicitl
     )
     assert unknown_destination_preview.is_actionable is False
     assert unknown_destination_preview.reason == "unknown_destination"
+    assert unknown_destination_preview.reason_code == "unknown_destination"
     assert unknown_destination_preview.node_ids == ()
     assert unknown_destination_preview.edge_ids == ()
     assert unknown_destination_preview.total_distance is None
@@ -251,6 +255,7 @@ def test_command_center_surface_tracks_selection_edge_openings_and_preview_reque
     assert surface.selected_vehicle_ids == (77,)
     assert [vehicle.vehicle_id for vehicle in surface.vehicles] == [77]
     assert surface.vehicles[0].can_assign_destination is True
+    assert surface.route_previews[0].reason_code is None
     assert [(edge.edge_id, edge.is_blocked, edge.available_action) for edge in surface.edges] == [
         (1, False, "block_edge"),
         (2, True, "unblock_edge"),
@@ -261,6 +266,7 @@ def test_command_center_surface_tracks_selection_edge_openings_and_preview_reque
     assert surface.recent_commands == ({"command_type": "block_edge", "edge_id": 2},)
     assert surface.route_previews[0].is_actionable is True
     assert surface.route_previews[0].reason is None
+    assert surface.route_previews[0].reason_code is None
 
     session.apply(UnblockEdgeCommand(edge_id=2))
     updated_surface = build_live_command_center_surface(session)
@@ -269,6 +275,13 @@ def test_command_center_surface_tracks_selection_edge_openings_and_preview_reque
     assert updated_surface.ai_assist.explanations == ()
     assert updated_surface.ai_assist.suggestions == ()
     assert updated_surface.ai_assist.anomalies == ()
+    assert command_center_module.command_center_surface_to_dict(updated_surface)[
+        "ai_assist"
+    ] == {
+        "explanations": [],
+        "suggestions": [],
+        "anomalies": [],
+    }
 
 
 def test_vehicle_inspection_surface_exposes_payload_route_history_and_diagnostics() -> None:
@@ -351,8 +364,14 @@ def test_ai_assist_surface_provides_explanations_and_actionable_suggestions() ->
     assert [explanation.summary for explanation in surface.ai_assist.explanations] == [
         "Vehicle 77 is positioned to travel 1 -> 2 -> 3."
     ]
+    assert [explanation.reason_code for explanation in surface.ai_assist.explanations] == [
+        "route_ready"
+    ]
     assert [suggestion.kind for suggestion in surface.ai_assist.suggestions] == [
         "retask_vehicle"
+    ]
+    assert [suggestion.reason_code for suggestion in surface.ai_assist.suggestions] == [
+        "assign_destination"
     ]
     assert surface.ai_assist.suggestions[0].proposed_command == {
         "command_type": "assign_vehicle_destination",
@@ -374,8 +393,12 @@ def test_ai_assist_surface_explains_blocked_route_anomaly_and_reopen_suggestion(
     )
 
     assert surface.route_previews[0].reason == "no_route"
+    assert surface.route_previews[0].reason_code == "no_route"
     assert [suggestion.kind for suggestion in surface.ai_assist.suggestions] == [
         "reopen_edge"
+    ]
+    assert [suggestion.reason_code for suggestion in surface.ai_assist.suggestions] == [
+        "reopen_blocked_edge"
     ]
     assert surface.ai_assist.suggestions[0].proposed_command == {
         "command_type": "unblock_edge",
@@ -418,10 +441,15 @@ def test_command_center_surface_flags_intersection_deadlock_risk() -> None:
         for diagnostic in surface.vehicle_inspections[0].diagnostics
     )
     assert any(
+        anomaly.reason_code == "deadlock_risk_intersection"
+        for anomaly in surface.ai_assist.anomalies
+    )
+    assert any(
         anomaly.vehicle_id == 78 and "intersection" in (anomaly.summary or "")
         for anomaly in surface.ai_assist.anomalies
     )
     assert any(suggestion.kind == "avoid_deadlock" for suggestion in surface.ai_assist.suggestions)
+    assert any(suggestion.reason_code == "deadlock_risk_intersection" for suggestion in surface.ai_assist.suggestions)
 
 
 def test_command_center_surface_flags_narrow_corridor_spillback_risk() -> None:
@@ -458,7 +486,12 @@ def test_command_center_surface_flags_narrow_corridor_spillback_risk() -> None:
         for diagnostic in surface.vehicle_inspections[0].diagnostics
     )
     assert any(
+        anomaly.reason_code == "deadlock_risk_corridor"
+        for anomaly in surface.ai_assist.anomalies
+    )
+    assert any(
         anomaly.vehicle_id == 78 and "spill" in (anomaly.summary or "").lower()
         for anomaly in surface.ai_assist.anomalies
     )
     assert any(suggestion.kind == "avoid_deadlock" for suggestion in surface.ai_assist.suggestions)
+    assert any(suggestion.reason_code == "deadlock_risk_corridor" for suggestion in surface.ai_assist.suggestions)

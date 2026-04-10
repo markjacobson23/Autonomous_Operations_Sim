@@ -147,20 +147,18 @@ class SimulationController:
         self._validate_assign_vehicle_destination(command)
 
     def _validate_block_edge(self, command: BlockEdgeCommand) -> None:
-        try:
-            already_blocked = self.engine.world_state.is_edge_blocked(command.edge_id)
-        except KeyError as exc:
-            raise CommandValidationError(f"Unknown edge_id: {command.edge_id}") from exc
+        if not self.engine.has_edge(command.edge_id):
+            raise CommandValidationError(f"Unknown edge_id: {command.edge_id}")
+        already_blocked = self.engine.world_state.has_blocked_edge(command.edge_id)
         if already_blocked:
             raise CommandValidationError(
                 f"edge_id {command.edge_id} is already blocked"
             )
 
     def _validate_unblock_edge(self, command: UnblockEdgeCommand) -> None:
-        try:
-            is_blocked = self.engine.world_state.is_edge_blocked(command.edge_id)
-        except KeyError as exc:
-            raise CommandValidationError(f"Unknown edge_id: {command.edge_id}") from exc
+        if not self.engine.has_edge(command.edge_id):
+            raise CommandValidationError(f"Unknown edge_id: {command.edge_id}")
+        is_blocked = self.engine.world_state.has_blocked_edge(command.edge_id)
         if not is_blocked:
             raise CommandValidationError(
                 f"edge_id {command.edge_id} is not currently blocked"
@@ -169,12 +167,8 @@ class SimulationController:
     def _validate_reposition_vehicle(self, command: RepositionVehicleCommand) -> None:
         vehicle = self._require_vehicle(command.vehicle_id)
         self._require_idle_vehicle(vehicle_id=vehicle.id)
-        try:
-            self.engine.map.get_position(command.node_id)
-        except KeyError as exc:
-            raise CommandValidationError(
-                f"Unknown node_id: {command.node_id}"
-            ) from exc
+        if not self.engine.has_node(command.node_id):
+            raise CommandValidationError(f"Unknown node_id: {command.node_id}")
 
     def _validate_assign_vehicle_destination(
         self,
@@ -182,12 +176,10 @@ class SimulationController:
     ) -> None:
         vehicle = self._require_vehicle(command.vehicle_id)
         self._require_idle_vehicle(vehicle_id=vehicle.id)
-        try:
-            self.engine.map.get_position(command.destination_node_id)
-        except KeyError as exc:
+        if not self.engine.has_node(command.destination_node_id):
             raise CommandValidationError(
                 f"Unknown destination_node_id: {command.destination_node_id}"
-            ) from exc
+            )
         try:
             self.engine.router.route(
                 self.engine.map.graph,
@@ -202,14 +194,12 @@ class SimulationController:
             ) from exc
 
     def _validate_spawn_vehicle(self, command: SpawnVehicleCommand) -> None:
-        if command.vehicle_id in self.engine._vehicles:
+        if self.engine.has_vehicle(command.vehicle_id):
             raise CommandValidationError(
                 f"vehicle_id {command.vehicle_id} is already registered"
             )
-        try:
-            self.engine.map.get_position(command.node_id)
-        except KeyError as exc:
-            raise CommandValidationError(f"Unknown node_id: {command.node_id}") from exc
+        if not self.engine.has_node(command.node_id):
+            raise CommandValidationError(f"Unknown node_id: {command.node_id}")
 
     def _validate_remove_vehicle(self, command: RemoveVehicleCommand) -> None:
         vehicle = self._require_vehicle(command.vehicle_id)
@@ -265,10 +255,9 @@ class SimulationController:
         self,
         command: DeclareTemporaryHazardCommand,
     ) -> None:
-        try:
-            is_blocked = self.engine.world_state.is_edge_blocked(command.edge_id)
-        except KeyError as exc:
-            raise CommandValidationError(f"Unknown edge_id: {command.edge_id}") from exc
+        if not self.engine.has_edge(command.edge_id):
+            raise CommandValidationError(f"Unknown edge_id: {command.edge_id}")
+        is_blocked = self.engine.world_state.has_blocked_edge(command.edge_id)
         if is_blocked:
             raise CommandValidationError(
                 f"edge_id {command.edge_id} is already blocked"
@@ -278,10 +267,9 @@ class SimulationController:
         self,
         command: ClearTemporaryHazardCommand,
     ) -> None:
-        try:
-            is_blocked = self.engine.world_state.is_edge_blocked(command.edge_id)
-        except KeyError as exc:
-            raise CommandValidationError(f"Unknown edge_id: {command.edge_id}") from exc
+        if not self.engine.has_edge(command.edge_id):
+            raise CommandValidationError(f"Unknown edge_id: {command.edge_id}")
+        is_blocked = self.engine.world_state.has_blocked_edge(command.edge_id)
         if not is_blocked or command.edge_id not in self._temporary_hazards:
             raise CommandValidationError(
                 f"edge_id {command.edge_id} does not have an active temporary hazard"

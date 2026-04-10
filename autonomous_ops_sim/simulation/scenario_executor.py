@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import math
 
 from autonomous_ops_sim.io.exports import export_engine_json
 from autonomous_ops_sim.maps.graph_map import make_graph_map
@@ -83,6 +84,10 @@ def execute_scenario(scenario: Scenario) -> ScenarioExecutionResult:
             "Scenario execution exceeded configured duration_s: "
             f"{engine.simulated_time_s} > {scenario.duration_s}"
         )
+    if not math.isfinite(engine.simulated_time_s):
+        raise RuntimeError("Scenario execution produced a non-finite simulated time.")
+    if engine.simulated_time_s < 0.0:
+        raise RuntimeError("Scenario execution produced a negative simulated time.")
 
     summary = summarize_engine_execution(engine)
     return ScenarioExecutionResult(

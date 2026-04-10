@@ -5,7 +5,10 @@ from autonomous_ops_sim.io.exports import (
     metrics_summary_to_dict,
     trace_event_to_dict,
 )
-from autonomous_ops_sim.io.scenario_loader import load_scenario
+from autonomous_ops_sim.io.scenario_loader import (
+    load_scenario,
+    validate_scenario_payload,
+)
 from autonomous_ops_sim.io.scenario_pack_runner import (
     SCENARIO_PACK_EXPORT_SCHEMA_VERSION,
     aggregate_summary_to_dict,
@@ -30,4 +33,5 @@ __all__ = [
     "metrics_summary_to_dict",
     "run_scenario_pack",
     "trace_event_to_dict",
+    "validate_scenario_payload",
 ]

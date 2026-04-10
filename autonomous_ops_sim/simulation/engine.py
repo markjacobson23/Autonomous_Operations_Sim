@@ -156,16 +156,13 @@ class SimulationEngine:
         return self._simulated_time_s
 
     def run(self, until_s: float) -> float:
-        """Advance the engine's simulated time to the requested point."""
+        """Advance the deterministic simulator clock to an explicit target time.
 
-        if not math.isfinite(until_s):
-            raise ValueError("until_s must be finite")
-        if until_s < 0.0:
-            raise ValueError("until_s must be non-negative")
-        if until_s < self._simulated_time_s:
-            raise ValueError(
-                "until_s must be greater than or equal to current simulated time"
-            )
+        This engine does not run a continuous physics loop. Higher-level execution
+        paths advance simulated time explicitly while emitting deterministic events.
+        """
+
+        self._validate_simulated_time_target(until_s)
 
         self._simulated_time_s = until_s
         return self._simulated_time_s
@@ -262,6 +259,21 @@ class SimulationEngine:
             return self._resources[resource_id]
         except KeyError as exc:
             raise KeyError(f"Unknown resource_id: {resource_id}") from exc
+
+    def has_vehicle(self, vehicle_id: int) -> bool:
+        """Return whether a runtime vehicle is registered for this run."""
+
+        return vehicle_id in self._vehicles
+
+    def has_node(self, node_id: int) -> bool:
+        """Return whether the engine map contains the given node."""
+
+        return self._map.graph.has_node(node_id)
+
+    def has_edge(self, edge_id: int) -> bool:
+        """Return whether the engine map contains the given edge."""
+
+        return self._map.graph.has_edge(edge_id)
 
     def get_vehicle(self, vehicle_id: int) -> Vehicle:
         """Return a configured runtime vehicle by ID."""
@@ -748,3 +760,15 @@ class SimulationEngine:
             travel_time_s += edge.distance / min(max_speed, edge.speed_limit)
 
         return travel_time_s
+
+    def _validate_simulated_time_target(self, until_s: float) -> None:
+        """Reject invalid simulator clock targets before mutation."""
+
+        if not math.isfinite(until_s):
+            raise ValueError("until_s must be finite")
+        if until_s < 0.0:
+            raise ValueError("until_s must be non-negative")
+        if until_s < self._simulated_time_s:
+            raise ValueError(
+                "until_s must be greater than or equal to current simulated time"
+            )

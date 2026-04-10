@@ -85,11 +85,19 @@ def test_live_session_progression_is_deterministic() -> None:
     session_b = run_live_session()
 
     assert session_a.progress_history == session_b.progress_history
-    assert [record.completed_at_s for record in session_a.progress_history] == [
-        1.0,
-        1.9,
-        3.0,
+    assert [
+        (record.started_at_s, record.completed_at_s)
+        for record in session_a.progress_history
+    ] == [
+        (0.0, 1.0),
+        (1.4, 1.9),
+        (2.4, 3.0),
     ]
+    assert [record.sequence for record in session_a.progress_history] == [0, 1, 2]
+    assert all(
+        record.started_at_s <= record.completed_at_s
+        for record in session_a.progress_history
+    )
     assert session_a.engine.simulated_time_s == 3.0
     assert session_b.engine.simulated_time_s == 3.0
 
@@ -190,3 +198,20 @@ def test_closed_live_session_rejects_future_progression_and_commands() -> None:
 
     with pytest.raises(SessionStateError, match="live session is not active"):
         session.apply(BlockEdgeCommand(edge_id=1))
+
+
+def test_live_session_rejects_backward_progression_targets() -> None:
+    session = LiveSimulationSession(build_live_session_engine())
+
+    session.advance_to(1.0)
+
+    with pytest.raises(
+        ValueError,
+        match="until_s must be greater than or equal to current simulated time",
+    ):
+        session.advance_to(0.5)
+
+    assert [
+        (record.started_at_s, record.completed_at_s)
+        for record in session.progress_history
+    ] == [(0.0, 1.0)]

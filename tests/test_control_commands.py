@@ -101,6 +101,17 @@ def test_command_application_is_deterministic_for_same_initial_state() -> None:
     assert vehicle_b.get_position() == (2.0, 0.0, 0.0)
 
 
+def test_engine_public_lookup_methods_expose_runtime_state() -> None:
+    engine, _ = build_controlled_engine()
+
+    assert engine.has_vehicle(77) is True
+    assert engine.has_node(1) is True
+    assert engine.has_edge(2) is True
+    assert engine.has_vehicle(999) is False
+    assert engine.has_node(999) is False
+    assert engine.has_edge(999) is False
+
+
 @pytest.mark.parametrize(
     ("command", "message"),
     (
