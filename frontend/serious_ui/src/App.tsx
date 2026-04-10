@@ -2195,9 +2195,28 @@ function App(): JSX.Element {
                       const isSelected = effectiveSelectedVehicleIds.includes(
                         vehicle.vehicle_id ?? -1,
                       );
+                      const vehicleSpeed = vehicle.speed ?? 0;
+                      const isMoving = vehicleSpeed > 0.05 || vehicle.operational_state === "moving";
+                      const isRouteTracked = selectedRoutePreview?.vehicle_id === vehicle.vehicle_id;
+                      const routeContextLabel = isRouteTracked
+                        ? `Route to node ${formatMaybeNumber(
+                            selectedRoutePreview?.destination_node_id ?? null,
+                          )}`
+                        : vehicle.lane_selection_reason ?? null;
+                      const motionContextLabel =
+                        isSelected && (isMoving || routeContextLabel !== null)
+                          ? `${formatHeadingDegrees(vehicle.heading_rad ?? null)} · ${formatSpeedPerSecond(
+                              vehicleSpeed,
+                            )}${
+                              routeContextLabel !== null ? ` · ${routeContextLabel}` : ""
+                            }`
+                          : null;
                       const vehicleLabel = `${vehiclePresentationBadge(vehicle)} ${vehicle.vehicle_id ?? vehicleIndex}`;
                       const labelWidth = Math.max(1.12, vehicleLabel.length * 0.22 + 0.34);
-                      const labelY = position[1] - Math.max((vehicle.body_length_m ?? 1.12) * 0.66, 1);
+                      const labelY = position[1] - Math.max((vehicle.body_length_m ?? 1.12) * 0.72, 1.08);
+                      const labelHeight = motionContextLabel ? 0.8 : 0.46;
+                      const labelTextY = motionContextLabel ? labelY - 0.12 : labelY;
+                      const labelSecondaryY = labelY + 0.27;
                       const selectionEnvelopeLength = Math.max(
                         vehicle.spacing_envelope_m ?? spacingEnvelopeFromVehicle(vehicle),
                         0.9,
@@ -2206,7 +2225,14 @@ function App(): JSX.Element {
                       return (
                         <g
                           key={vehicle.vehicle_id ?? `vehicle-${vehicleIndex}`}
-                          className={isSelected ? "scene-vehicle selected" : "scene-vehicle"}
+                          className={[
+                            "scene-vehicle",
+                            isSelected ? "selected" : "",
+                            isMoving ? "moving" : "settled",
+                            isRouteTracked ? "route-following" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
                           onClick={(event) =>
                             selectVehicle(vehicle.vehicle_id, {
                               additive: event.shiftKey || event.metaKey || event.ctrlKey,
@@ -2220,39 +2246,57 @@ function App(): JSX.Element {
                               } · ${formatMeters(vehicle.spacing_envelope_m ?? null)} envelope`,
                             })
                           }
-                        >
-                          {isSelected ? (
-                            <rect
-                              x={position[0] - selectionEnvelopeLength * 0.56}
-                              y={position[1] - selectionEnvelopeWidth * 0.5}
+                          >
+                            {isSelected ? (
+                              <rect
+                                x={position[0] - selectionEnvelopeLength * 0.56}
+                                y={position[1] - selectionEnvelopeWidth * 0.5}
                               width={selectionEnvelopeLength * 1.12}
                               height={selectionEnvelopeWidth}
                               rx={0.28}
-                              className="vehicle-selection-ring"
-                            />
-                          ) : null}
-                          <g transform={`translate(${position[0]} ${position[1]}) rotate(${radiansToDegrees(
-                            vehicle.heading_rad ?? 0,
-                          )})`}>
-                            {renderVehicleEnvelope(vehicle)}
-                            {renderVehicleGlyph(vehicle)}
+                                className="vehicle-selection-ring"
+                              />
+                            ) : null}
+                            <g transform={`translate(${position[0]} ${position[1]}) rotate(${radiansToDegrees(
+                              vehicle.heading_rad ?? 0,
+                            )})`}>
+                              {isMoving ? (
+                                <line
+                                  x1={-Math.max((vehicle.body_length_m ?? 1.12) * 0.42, 0.42)}
+                                  y1={0}
+                                  x2={Math.max((vehicle.body_length_m ?? 1.12) * 0.24, 0.26)}
+                                  y2={0}
+                                  className="vehicle-motion-trail"
+                                />
+                              ) : null}
+                              {renderVehicleEnvelope(vehicle)}
+                              {renderVehicleGlyph(vehicle)}
+                            </g>
+                            <g className="vehicle-label">
+                              <rect
+                                x={position[0] - labelWidth * 0.5}
+                                y={labelY - 0.24}
+                                width={labelWidth}
+                                height={labelHeight}
+                                rx={0.16}
+                                className="vehicle-label-bg"
+                              />
+                              <text x={position[0]} y={labelTextY} className="vehicle-label-text">
+                                {vehicleLabel}
+                              </text>
+                              {motionContextLabel !== null ? (
+                                <text
+                                  x={position[0]}
+                                  y={labelSecondaryY}
+                                  className="vehicle-label-secondary"
+                                >
+                                  {motionContextLabel}
+                                </text>
+                              ) : null}
+                            </g>
                           </g>
-                          <g className="vehicle-label">
-                            <rect
-                              x={position[0] - labelWidth * 0.5}
-                              y={labelY - 0.24}
-                              width={labelWidth}
-                              height={0.46}
-                              rx={0.16}
-                              className="vehicle-label-bg"
-                            />
-                            <text x={position[0]} y={labelY} className="vehicle-label-text">
-                              {vehicleLabel}
-                            </text>
-                          </g>
-                        </g>
-                      );
-                    })}
+                        );
+                      })}
 
                   {layers.routes &&
                     routeDestinationMarkers.map((marker) => (
@@ -5666,6 +5710,10 @@ function formatSeconds(value: number | null): string {
 
 function formatMeters(value: number | null): string {
   return value === null ? "pending" : `${value.toFixed(2)}m`;
+}
+
+function formatSpeedPerSecond(value: number | null): string {
+  return value === null ? "pending" : `${value.toFixed(2)}m/s`;
 }
 
 export default App;

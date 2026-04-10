@@ -2736,6 +2736,17 @@ h3 {
 .scene-vehicle {
   cursor: pointer;
   filter: drop-shadow(0 0.28px 0.2px rgba(24, 33, 44, 0.28));
+  transition:
+    filter 160ms ease,
+    opacity 160ms ease;
+}
+
+.scene-vehicle.moving {
+  filter: drop-shadow(0 0.34px 0.26px rgba(24, 33, 44, 0.32));
+}
+
+.scene-vehicle.route-following .vehicle-envelope {
+  stroke: rgba(0, 108, 103, 0.3);
 }
 
 .vehicle-body {
@@ -2806,6 +2817,13 @@ h3 {
   stroke-linejoin: round;
 }
 
+.vehicle-motion-trail {
+  stroke: rgba(201, 106, 24, 0.22);
+  stroke-width: 0.06;
+  stroke-linecap: round;
+  stroke-dasharray: 0.16 0.1;
+}
+
 .vehicle-selection-ring {
   fill: rgba(255, 255, 255, 0.12);
   stroke: rgba(201, 106, 24, 0.72);
@@ -2837,6 +2855,18 @@ h3 {
   stroke-width: 0.08;
 }
 
+.vehicle-label-secondary {
+  fill: var(--muted);
+  font-size: 0.29px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  paint-order: stroke fill;
+  stroke: rgba(255, 255, 255, 0.82);
+  stroke-width: 0.06;
+}
+
 .scene-vehicle text {
   fill: var(--ink);
   font-size: 0.58px;
@@ -2861,18 +2891,64 @@ h3 {
   stroke-width: 0.06;
 }
 
+.scene-vehicle.selected.moving .vehicle-envelope {
+  fill: rgba(201, 106, 24, 0.11);
+  stroke: rgba(201, 106, 24, 0.5);
+}
+
 .scene-vehicle.selected .vehicle-label-bg {
   fill: rgba(255, 250, 244, 0.98);
   stroke: rgba(201, 106, 24, 0.28);
 }
 
-.scene-vehicle.selected .vehicle-selection-ring {
+.scene-vehicle.selected.moving .vehicle-label-bg {
+  fill: rgba(255, 246, 237, 0.99);
+  stroke: rgba(201, 106, 24, 0.34);
+}
+
+.scene-vehicle.selected.moving .vehicle-selection-ring {
   fill: rgba(255, 250, 244, 0.14);
+  animation: vehicle-selection-pulse 2.8s ease-in-out infinite;
 }
 
 .scene-vehicle.selected .vehicle-heading {
   fill: rgba(201, 106, 24, 0.96);
   stroke: rgba(255, 255, 255, 0.98);
+}
+
+.scene-vehicle.selected.moving .vehicle-heading {
+  fill: rgba(201, 106, 24, 0.99);
+}
+
+.scene-vehicle.moving .vehicle-motion-trail {
+  opacity: 0.9;
+}
+
+.scene-vehicle.selected .vehicle-motion-trail {
+  stroke: rgba(201, 106, 24, 0.35);
+  stroke-width: 0.07;
+}
+
+.scene-vehicle.selected .vehicle-label-secondary {
+  fill: rgba(95, 109, 121, 0.98);
+}
+
+.scene-vehicle.route-following.selected .vehicle-label-secondary {
+  fill: rgba(0, 108, 103, 0.98);
+}
+
+.scene-vehicle.route-following.selected .vehicle-selection-ring {
+  stroke: rgba(0, 108, 103, 0.78);
+}
+
+@keyframes vehicle-selection-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0.18px rgba(201, 106, 24, 0.24));
+  }
+  50% {
+    filter: drop-shadow(0 0 0.28px rgba(201, 106, 24, 0.34));
+  }
 }
 
 .scene-road.selected {
