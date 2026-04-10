@@ -1716,49 +1716,56 @@ function App(): JSX.Element {
                     ))}
 
                   {layers.roads &&
-                    (bundle?.render_geometry?.roads ?? []).map((road, index) => (
-                      <g key={road.road_id ?? `road-${index}`}>
-                        <polyline
-                          points={toPointString(road.centerline)}
-                          className={`scene-road-heatmap scene-road-heatmap-${
-                            trafficRoadById.get(road.road_id ?? "")?.congestion_level ?? "free"
-                          }`}
-                          strokeWidth={Math.max(road.width_m ?? 1.4, 0.9) + 4}
-                          style={{
-                            opacity: Math.max(
-                              0.08,
-                              (trafficRoadById.get(road.road_id ?? "")?.congestion_intensity ?? 0) *
-                                0.7,
-                            ),
-                          }}
-                          aria-hidden="true"
-                        />
-                        <polyline
-                          points={toPointString(road.centerline)}
-                          className={`scene-road scene-road-${road.road_class ?? "connector"} ${
-                            selectedTarget?.kind === "road" &&
-                            selectedTarget.roadId === road.road_id
-                              ? "selected"
-                              : ""
-                          }`}
-                          strokeWidth={Math.max(road.width_m ?? 1.4, 0.9)}
-                          onClick={() => selectRoad(road.road_id)}
-                          onMouseEnter={() => {
-                            const roadTraffic = trafficRoadById.get(road.road_id ?? "");
-                            setHoverTarget({
-                              label: road.road_id ?? "road",
-                              detail: roadTraffic
-                                ? `${road.directionality ?? "unknown"} · ${
-                                    road.lane_count ?? 0
-                                  } lane(s) · ${roadTraffic.congestion_level} · ${
-                                    roadTraffic.queued_vehicle_ids?.length ?? 0
-                                  } queued`
-                                : `${road.directionality ?? "unknown"} · ${road.lane_count ?? 0} lane(s)`,
-                            });
-                          }}
-                        />
-                      </g>
-                    ))}
+                    (bundle?.render_geometry?.roads ?? []).map((road, index) => {
+                      const roadWidth = Math.min(
+                        Math.max((road.width_m ?? 1.4) * 0.42, 0.58),
+                        2.2,
+                      );
+                      const roadTraffic = trafficRoadById.get(road.road_id ?? "");
+                      return (
+                        <g key={road.road_id ?? `road-${index}`}>
+                          <polyline
+                            points={toPointString(road.centerline)}
+                            className={`scene-road-heatmap scene-road-heatmap-${
+                              roadTraffic?.congestion_level ?? "free"
+                            }`}
+                            strokeWidth={roadWidth + 0.5}
+                            style={{
+                              opacity: Math.max(
+                                0.06,
+                                (roadTraffic?.congestion_intensity ?? 0) * 0.45,
+                              ),
+                            }}
+                            aria-hidden="true"
+                          />
+                          <polyline
+                            points={toPointString(road.centerline)}
+                            className={`scene-road scene-road-${road.road_class ?? "connector"} ${
+                              selectedTarget?.kind === "road" &&
+                              selectedTarget.roadId === road.road_id
+                                ? "selected"
+                                : ""
+                            }`}
+                            strokeWidth={roadWidth}
+                            onClick={() => selectRoad(road.road_id)}
+                            onMouseEnter={() => {
+                              setHoverTarget({
+                                label: road.road_id ?? "road",
+                                detail: roadTraffic
+                                  ? `${road.directionality ?? "unknown"} · ${
+                                      road.lane_count ?? 0
+                                    } lane(s) · ${roadTraffic.congestion_level} · ${
+                                      roadTraffic.queued_vehicle_ids?.length ?? 0
+                                    } queued`
+                                  : `${road.directionality ?? "unknown"} · ${
+                                      road.lane_count ?? 0
+                                    } lane(s)`,
+                              });
+                            }}
+                          />
+                        </g>
+                      );
+                    })}
 
                   {layers.intersections &&
                     (bundle?.render_geometry?.intersections ?? []).map((intersection, index) => {
@@ -1849,6 +1856,46 @@ function App(): JSX.Element {
                       />
                     ))}
 
+                  {layers.reservations &&
+                    (bundle?.traffic_baseline?.queue_records ?? []).map((record, queueIndex) => {
+                      const road = (bundle?.render_geometry?.roads ?? []).find(
+                        (entry) => entry.road_id === record.road_id,
+                      );
+                      const roadTraffic =
+                        typeof record.road_id === "string"
+                          ? trafficRoadById.get(record.road_id) ?? null
+                          : null;
+                      const roadWidth = Math.min(
+                        Math.max((road?.width_m ?? 1.4) * 0.42, 0.58),
+                        2.2,
+                      );
+                      if (!road?.centerline || road.centerline.length < 2) {
+                        return null;
+                      }
+                      return (
+                        <polyline
+                          key={`reservation-${queueIndex}`}
+                          points={toPointString(road.centerline)}
+                          className={`scene-reservation scene-queue-overlay ${
+                            selectedTarget?.kind === "queue" &&
+                            selectedTarget.roadId === record.road_id
+                              ? "selected"
+                              : selectedRoutePreviewRoadIds.has(record.road_id ?? "")
+                                ? "selected preview"
+                              : ""
+                          }`}
+                          strokeWidth={roadWidth + 0.42}
+                          onClick={() => selectQueue(record.road_id ?? undefined)}
+                          onMouseEnter={() =>
+                            setHoverTarget({
+                              label: `Queue ${record.road_id ?? "road"}`,
+                              detail: `${roadTraffic?.queued_vehicle_ids?.length ?? 0} vehicle(s) queued`,
+                            })
+                          }
+                        />
+                      );
+                    })}
+
                   {layers.routes &&
                     routePreviews.map((preview, previewIndex) => {
                       const routePoints = buildRoutePreviewPoints(
@@ -1869,42 +1916,6 @@ function App(): JSX.Element {
                             setHoverTarget({
                               label: `Route preview V${preview.vehicle_id ?? "?"}`,
                               detail: preview.reason ?? "actionable preview",
-                            })
-                          }
-                        />
-                      );
-                    })}
-
-                  {layers.reservations &&
-                    (bundle?.traffic_baseline?.queue_records ?? []).map((record, queueIndex) => {
-                      const road = (bundle?.render_geometry?.roads ?? []).find(
-                        (entry) => entry.road_id === record.road_id,
-                      );
-                      const roadTraffic =
-                        typeof record.road_id === "string"
-                          ? trafficRoadById.get(record.road_id) ?? null
-                          : null;
-                      if (!road?.centerline || road.centerline.length < 2) {
-                        return null;
-                      }
-                      return (
-                        <polyline
-                          key={`reservation-${queueIndex}`}
-                          points={toPointString(road.centerline)}
-                          className={`scene-reservation scene-queue-overlay ${
-                            selectedTarget?.kind === "queue" &&
-                            selectedTarget.roadId === record.road_id
-                              ? "selected"
-                              : selectedRoutePreviewRoadIds.has(record.road_id ?? "")
-                                ? "selected preview"
-                              : ""
-                          }`}
-                          strokeWidth={Math.max(road.width_m ?? 1.4, 0.9) + 2}
-                          onClick={() => selectQueue(record.road_id ?? undefined)}
-                          onMouseEnter={() =>
-                            setHoverTarget({
-                              label: `Queue ${record.road_id ?? "road"}`,
-                              detail: `${roadTraffic?.queued_vehicle_ids?.length ?? 0} vehicle(s) queued`,
                             })
                           }
                         />

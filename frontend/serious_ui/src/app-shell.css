@@ -864,11 +864,11 @@ h3 {
 
 .scene-road {
   fill: none;
-  stroke: rgba(52, 64, 74, 0.76);
+  stroke: rgba(56, 62, 68, 0.88);
   stroke-linecap: round;
   stroke-linejoin: round;
   cursor: pointer;
-  filter: drop-shadow(0 0.12px 0.12px rgba(255, 255, 255, 0.45));
+  filter: drop-shadow(0 0.08px 0.1px rgba(255, 255, 255, 0.28));
 }
 
 .scene-road-heatmap {
@@ -877,25 +877,25 @@ h3 {
   stroke-linecap: round;
   stroke-linejoin: round;
   mix-blend-mode: multiply;
-  filter: blur(0.02px);
-  stroke-dasharray: 1.4 0.85;
+  filter: blur(0.01px);
+  stroke-dasharray: 1 0.95;
   animation: traffic-flow 3.2s linear infinite;
 }
 
 .scene-road-heatmap-free {
-  stroke: rgba(95, 109, 121, 0.12);
+  stroke: rgba(95, 109, 121, 0.08);
 }
 
 .scene-road-heatmap-active {
-  stroke: rgba(36, 83, 199, 0.22);
+  stroke: rgba(36, 83, 199, 0.16);
 }
 
 .scene-road-heatmap-congested {
-  stroke: rgba(187, 101, 30, 0.48);
+  stroke: rgba(187, 101, 30, 0.28);
 }
 
 .scene-road-heatmap-queued {
-  stroke: rgba(178, 74, 59, 0.58);
+  stroke: rgba(178, 74, 59, 0.36);
 }
 
 .scene-lane {
@@ -940,22 +940,22 @@ h3 {
 
 .scene-route-preview {
   fill: none;
-  stroke: rgba(0, 108, 103, 0.8);
-  stroke-width: 0.32;
-  stroke-dasharray: 0.9 0.6;
-  filter: drop-shadow(0 0 0.18px rgba(10, 118, 108, 0.42));
+  stroke: rgba(0, 108, 103, 0.84);
+  stroke-width: 0.24;
+  stroke-dasharray: 0.76 0.54;
+  filter: drop-shadow(0 0 0.14px rgba(10, 118, 108, 0.36));
 }
 
 .scene-route-preview.selected {
   stroke: rgba(201, 106, 24, 0.98);
-  stroke-width: 0.46;
-  stroke-dasharray: 0.6 0.4;
+  stroke-width: 0.34;
+  stroke-dasharray: 0.62 0.42;
 }
 
 .scene-reservation {
-  stroke: rgba(29, 78, 216, 0.55);
-  stroke-width: 0.22;
-  stroke-dasharray: 0.4 0.35;
+  stroke: rgba(29, 78, 216, 0.38);
+  stroke-width: 0.18;
+  stroke-dasharray: 0.56 0.42;
   cursor: pointer;
 }
 
@@ -964,8 +964,8 @@ h3 {
 }
 
 .scene-queue-overlay.preview {
-  stroke: rgba(201, 106, 24, 0.9);
-  stroke-dasharray: 0.35 0.22;
+  stroke: rgba(201, 106, 24, 0.84);
+  stroke-dasharray: 0.44 0.28;
 }
 
 .scene-hazard {
@@ -977,29 +977,29 @@ h3 {
 
 .scene-vehicle {
   cursor: pointer;
-  filter: drop-shadow(0 0.14px 0.12px rgba(24, 33, 44, 0.18));
+  filter: drop-shadow(0 0.2px 0.16px rgba(24, 33, 44, 0.3));
 }
 
 .vehicle-body {
-  stroke: rgba(255, 255, 255, 0.92);
-  stroke-width: 0.08;
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-width: 0.09;
 }
 
 .vehicle-envelope {
-  fill: rgba(201, 106, 24, 0.08);
-  stroke: rgba(201, 106, 24, 0.28);
-  stroke-dasharray: 0.18 0.14;
-  stroke-width: 0.06;
+  fill: rgba(201, 106, 24, 0.05);
+  stroke: rgba(201, 106, 24, 0.18);
+  stroke-dasharray: 0.16 0.16;
+  stroke-width: 0.05;
 }
 
 .vehicle-cab {
-  stroke: rgba(255, 255, 255, 0.92);
-  stroke-width: 0.08;
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-width: 0.09;
 }
 
 .vehicle-fork {
-  stroke: rgba(215, 245, 239, 0.96);
-  stroke-width: 0.08;
+  stroke: rgba(215, 245, 239, 0.98);
+  stroke-width: 0.07;
 }
 
 .vehicle-body-haul {
@@ -1041,6 +1041,9 @@ h3 {
   font-size: 0.58px;
   font-weight: 700;
   text-anchor: middle;
+  paint-order: stroke fill;
+  stroke: rgba(255, 255, 255, 0.82);
+  stroke-width: 0.08;
 }
 
 .scene-vehicle.selected .vehicle-body,
@@ -1055,12 +1058,13 @@ h3 {
 
 .scene-road.selected {
   stroke: rgba(201, 106, 24, 0.96);
-  stroke-width: 1.85;
+  stroke-width: 1.28;
+  filter: drop-shadow(0 0 0.18px rgba(201, 106, 24, 0.22));
 }
 
 .scene-reservation.selected {
   stroke: rgba(0, 108, 103, 0.98);
-  stroke-width: 0.42;
+  stroke-width: 0.32;
 }
 
 .scene-hazard.selected {
