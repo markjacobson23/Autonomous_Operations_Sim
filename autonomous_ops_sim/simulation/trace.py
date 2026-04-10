@@ -21,6 +21,11 @@ class TraceEventType(str, Enum):
     SERVICE_COMPLETE = "service_complete"
     TASK_COMPLETE = "task_complete"
     JOB_COMPLETE = "job_complete"
+    VEHICLE_SPAWNED = "vehicle_spawned"
+    VEHICLE_REMOVED = "vehicle_removed"
+    JOB_INJECTED = "job_injected"
+    TEMPORARY_HAZARD_APPLIED = "temporary_hazard_applied"
+    TEMPORARY_HAZARD_CLEARED = "temporary_hazard_cleared"
 
 
 @dataclass(frozen=True)

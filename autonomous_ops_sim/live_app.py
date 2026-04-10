@@ -28,12 +28,18 @@ from autonomous_ops_sim.authoring import (
 from autonomous_ops_sim.io.scenario_loader import load_scenario
 from autonomous_ops_sim.simulation import (
     AssignVehicleDestinationCommand,
+    ClearTemporaryHazardCommand,
     BlockEdgeCommand,
+    DeclareTemporaryHazardCommand,
+    InjectJobCommand,
+    RemoveVehicleCommand,
     LiveSimulationSession,
     RepositionVehicleCommand,
     SimulationCommand,
+    SpawnVehicleCommand,
     UnblockEdgeCommand,
 )
+from autonomous_ops_sim.simulation.commands import job_from_dict
 from autonomous_ops_sim.simulation.scenario_executor import build_scenario_engine
 from autonomous_ops_sim.simulation.live_session import session_advance_to_dict
 from autonomous_ops_sim.visualization import export_serious_viewer_html
@@ -411,7 +417,7 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
 
     def _handle_live_command(self, payload: dict[str, object]) -> None:
         try:
-            command = _simulation_command_from_payload(payload)
+            commands = _simulation_commands_from_payload(payload)
         except (KeyError, TypeError, ValueError) as exc:
             self._write_json_response(
                 400,
@@ -426,16 +432,26 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
         selected_vehicle_ids, route_preview_requests = _selection_requests_from_payload(
             payload
         )
-        command_result, bundle = self._runtime.apply_command(
-            command,
-            selected_vehicle_ids=selected_vehicle_ids,
-            route_preview_requests=route_preview_requests,
-        )
+        command_results: list[dict[str, object]] = []
+        bundle: dict[str, object] | None = None
+        for command in commands:
+            command_result, bundle = self._runtime.apply_command(
+                command,
+                selected_vehicle_ids=selected_vehicle_ids,
+                route_preview_requests=route_preview_requests,
+            )
+            command_results.append(command_result)
+        assert bundle is not None
+        if len(command_results) == 1:
+            response_command_result: dict[str, object] | list[dict[str, object]] = command_results[0]
+        else:
+            response_command_result = command_results
         self._write_json_response(
             200,
             {
-                "ok": command_result["status"] == "accepted",
-                "command_result": command_result,
+                "ok": all(result["status"] == "accepted" for result in command_results),
+                "command_result": response_command_result,
+                "command_results": command_results,
                 "bundle": bundle,
                 "working_scenario_path": str(self._artifacts.working_scenario_path),
             },
@@ -447,16 +463,20 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
         )
         try:
             if not route_preview_requests:
-                vehicle_id = _payload_int(payload, "vehicle_id")
+                vehicle_ids = _payload_int_list(payload, "vehicle_ids")
                 destination_node_id = _payload_int(payload, "destination_node_id")
-                route_preview_requests = (
+                preview_vehicle_ids = vehicle_ids
+                if not preview_vehicle_ids:
+                    preview_vehicle_ids = (_payload_int(payload, "vehicle_id"),)
+                route_preview_requests = tuple(
                     RoutePreviewRequest(
-                        vehicle_id=vehicle_id,
+                        vehicle_id=preview_vehicle_id,
                         destination_node_id=destination_node_id,
-                    ),
+                    )
+                    for preview_vehicle_id in preview_vehicle_ids
                 )
                 if not selected_vehicle_ids:
-                    selected_vehicle_ids = (vehicle_id,)
+                    selected_vehicle_ids = preview_vehicle_ids
         except (KeyError, TypeError, ValueError) as exc:
             self._write_json_response(
                 400,
@@ -774,23 +794,109 @@ def _payload_int(payload: dict[str, object], key: str) -> int:
     return int(value)
 
 
+def _payload_float(payload: dict[str, object], key: str) -> float:
+    value = payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise ValueError(f"{key} must be numeric")
+    return float(value)
+
+
+def _payload_optional_float(
+    payload: dict[str, object],
+    key: str,
+    default: float,
+) -> float:
+    value = payload.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return default
+    return float(value)
+
+
 def _simulation_command_from_payload(payload: dict[str, object]) -> SimulationCommand:
+    commands = _simulation_commands_from_payload(payload)
+    if len(commands) != 1:
+        raise ValueError("Expected exactly one command")
+    return commands[0]
+
+
+def _simulation_commands_from_payload(
+    payload: dict[str, object],
+) -> tuple[SimulationCommand, ...]:
     command_type = str(payload.get("command_type", "")).strip()
+    selected_vehicle_ids = _payload_int_list(payload, "selected_vehicle_ids")
+    explicit_vehicle_ids = _payload_int_list(payload, "vehicle_ids")
+    vehicle_ids = explicit_vehicle_ids or selected_vehicle_ids
     if command_type == "block_edge":
-        return BlockEdgeCommand(edge_id=_payload_int(payload, "edge_id"))
+        return (BlockEdgeCommand(edge_id=_payload_int(payload, "edge_id")),)
     if command_type == "unblock_edge":
-        return UnblockEdgeCommand(edge_id=_payload_int(payload, "edge_id"))
+        return (UnblockEdgeCommand(edge_id=_payload_int(payload, "edge_id")),)
     if command_type == "reposition_vehicle":
-        return RepositionVehicleCommand(
-            vehicle_id=_payload_int(payload, "vehicle_id"),
-            node_id=_payload_int(payload, "node_id"),
+        target_vehicle_ids = vehicle_ids or (_payload_int(payload, "vehicle_id"),)
+        return tuple(
+            RepositionVehicleCommand(vehicle_id=vehicle_id, node_id=_payload_int(payload, "node_id"))
+            for vehicle_id in target_vehicle_ids
         )
     if command_type == "assign_vehicle_destination":
-        return AssignVehicleDestinationCommand(
-            vehicle_id=_payload_int(payload, "vehicle_id"),
-            destination_node_id=_payload_int(payload, "destination_node_id"),
+        target_vehicle_ids = vehicle_ids or (_payload_int(payload, "vehicle_id"),)
+        return tuple(
+            AssignVehicleDestinationCommand(
+                vehicle_id=vehicle_id,
+                destination_node_id=_payload_int(payload, "destination_node_id"),
+            )
+            for vehicle_id in target_vehicle_ids
+        )
+    if command_type == "spawn_vehicle":
+        return (
+            SpawnVehicleCommand(
+                vehicle_id=_payload_int(payload, "vehicle_id"),
+                node_id=_payload_int(payload, "node_id"),
+                max_speed=_payload_float(payload, "max_speed"),
+                max_payload=_payload_float(payload, "max_payload"),
+                vehicle_type=str(payload.get("vehicle_type", "GENERIC")),
+                payload=_payload_optional_float(payload, "payload", 0.0),
+                velocity=_payload_optional_float(payload, "velocity", 0.0),
+            ),
+        )
+    if command_type == "remove_vehicle":
+        return (
+            RemoveVehicleCommand(vehicle_id=_payload_int(payload, "vehicle_id")),
+        )
+    if command_type == "inject_job":
+        job_payload = payload.get("job")
+        if not isinstance(job_payload, dict):
+            raise ValueError("job must be an object")
+        return (
+            InjectJobCommand(
+                vehicle_id=_payload_int(payload, "vehicle_id"),
+                job=job_from_dict(job_payload),
+            ),
+        )
+    if command_type == "declare_temporary_hazard":
+        return (
+            DeclareTemporaryHazardCommand(
+                edge_id=_payload_int(payload, "edge_id"),
+                hazard_label=str(payload.get("hazard_label", "")).strip(),
+            ),
+        )
+    if command_type == "clear_temporary_hazard":
+        return (
+            ClearTemporaryHazardCommand(
+                edge_id=_payload_int(payload, "edge_id"),
+            ),
         )
     raise ValueError(f"Unknown command_type: {command_type}")
+
+
+def _payload_int_list(payload: dict[str, object], key: str) -> tuple[int, ...]:
+    value = payload.get(key)
+    if not isinstance(value, list):
+        return ()
+    numbers: list[int] = []
+    for item in value:
+        if isinstance(item, bool) or not isinstance(item, (int, float, str)):
+            continue
+        numbers.append(int(item))
+    return tuple(numbers)
 
 
 __all__ = [

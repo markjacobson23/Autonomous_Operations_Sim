@@ -32,6 +32,7 @@ class Vehicle:
     max_speed: float
     vehicle_type: VehicleType = VehicleType.GENERIC
     behavior: VehicleBehaviorController | None = None
+    is_active: bool = True
 
     def __post_init__(self) -> None:
         from autonomous_ops_sim.simulation.behavior import VehicleBehaviorController
@@ -77,6 +78,11 @@ class Vehicle:
         if not math.isfinite(new_velocity):
             raise ValueError("velocity must be finite")
         self.velocity = new_velocity
+
+    def deactivate(self) -> None:
+        """Mark this runtime vehicle as retired from active control."""
+
+        self.is_active = False
 
     def load_payload(self, amount: float) -> None:
         self.set_payload(self.payload + amount)

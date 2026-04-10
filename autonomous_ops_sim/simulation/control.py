@@ -6,9 +6,14 @@ from typing import Any
 
 from autonomous_ops_sim.simulation.commands import (
     AssignVehicleDestinationCommand,
+    ClearTemporaryHazardCommand,
     BlockEdgeCommand,
+    DeclareTemporaryHazardCommand,
+    InjectJobCommand,
+    RemoveVehicleCommand,
     RepositionVehicleCommand,
     SimulationCommand,
+    SpawnVehicleCommand,
     UnblockEdgeCommand,
     command_to_dict,
 )
@@ -17,7 +22,9 @@ from autonomous_ops_sim.simulation.metrics import (
     ExecutionMetricsSummary,
     summarize_engine_execution,
 )
-from autonomous_ops_sim.vehicles.vehicle import Vehicle
+from autonomous_ops_sim.simulation.trace import TraceEventType
+from autonomous_ops_sim.operations.tasks import LoadTask, MoveTask, UnloadTask
+from autonomous_ops_sim.vehicles.vehicle import Vehicle, VehicleType
 
 
 class CommandValidationError(ValueError):
@@ -40,6 +47,7 @@ class SimulationController:
     def __init__(self, engine: SimulationEngine):
         self._engine = engine
         self._history: list[CommandApplicationRecord] = []
+        self._temporary_hazards: dict[int, str] = {}
 
     @property
     def engine(self) -> SimulationEngine:
@@ -52,6 +60,12 @@ class SimulationController:
         """Return all applied commands in stable application order."""
 
         return tuple(self._history)
+
+    @property
+    def temporary_hazards(self) -> dict[int, str]:
+        """Return the current temporary hazard labels keyed by edge id."""
+
+        return dict(self._temporary_hazards)
 
     def apply(self, command: SimulationCommand) -> CommandApplicationRecord:
         """Validate and apply one explicit command."""
@@ -69,6 +83,16 @@ class SimulationController:
                 node_id=command.node_id,
                 position=self.engine.map.get_position(command.node_id),
             )
+        elif isinstance(command, SpawnVehicleCommand):
+            self._apply_spawn_vehicle(command)
+        elif isinstance(command, RemoveVehicleCommand):
+            self._apply_remove_vehicle(command)
+        elif isinstance(command, InjectJobCommand):
+            self._apply_inject_job(command)
+        elif isinstance(command, DeclareTemporaryHazardCommand):
+            self._apply_declare_temporary_hazard(command)
+        elif isinstance(command, ClearTemporaryHazardCommand):
+            self._apply_clear_temporary_hazard(command)
         else:
             vehicle = self.engine.get_vehicle(command.vehicle_id)
             self.engine.execute_vehicle_route(
@@ -104,6 +128,21 @@ class SimulationController:
             return
         if isinstance(command, RepositionVehicleCommand):
             self._validate_reposition_vehicle(command)
+            return
+        if isinstance(command, SpawnVehicleCommand):
+            self._validate_spawn_vehicle(command)
+            return
+        if isinstance(command, RemoveVehicleCommand):
+            self._validate_remove_vehicle(command)
+            return
+        if isinstance(command, InjectJobCommand):
+            self._validate_inject_job(command)
+            return
+        if isinstance(command, DeclareTemporaryHazardCommand):
+            self._validate_declare_temporary_hazard(command)
+            return
+        if isinstance(command, ClearTemporaryHazardCommand):
+            self._validate_clear_temporary_hazard(command)
             return
         self._validate_assign_vehicle_destination(command)
 
@@ -162,6 +201,92 @@ class SimulationController:
                 f"{vehicle.id} to destination_node_id {command.destination_node_id}"
             ) from exc
 
+    def _validate_spawn_vehicle(self, command: SpawnVehicleCommand) -> None:
+        if command.vehicle_id in self.engine._vehicles:
+            raise CommandValidationError(
+                f"vehicle_id {command.vehicle_id} is already registered"
+            )
+        try:
+            self.engine.map.get_position(command.node_id)
+        except KeyError as exc:
+            raise CommandValidationError(f"Unknown node_id: {command.node_id}") from exc
+
+    def _validate_remove_vehicle(self, command: RemoveVehicleCommand) -> None:
+        vehicle = self._require_vehicle(command.vehicle_id)
+        self._require_active_vehicle(vehicle=vehicle)
+        self._require_idle_vehicle(vehicle_id=vehicle.id)
+
+    def _validate_inject_job(self, command: InjectJobCommand) -> None:
+        vehicle = self._require_vehicle(command.vehicle_id)
+        self._require_active_vehicle(vehicle=vehicle)
+        self._require_idle_vehicle(vehicle_id=vehicle.id)
+        current_node_id = vehicle.current_node_id
+        projected_payload = vehicle.payload
+        for task in command.job.tasks:
+            if isinstance(task, MoveTask):
+                try:
+                    self.engine.router.route(
+                        self.engine.map.graph,
+                        current_node_id,
+                        task.destination_node_id,
+                        world_state=self.engine.world_state,
+                    )
+                except ValueError as exc:
+                    raise CommandValidationError(
+                        "No route exists for vehicle "
+                        f"{vehicle.id} to destination_node_id {task.destination_node_id}"
+                    ) from exc
+                current_node_id = task.destination_node_id
+                continue
+
+            if task.node_id != current_node_id:
+                raise CommandValidationError(
+                    f"job task node mismatch for vehicle_id {vehicle.id}"
+                )
+            if isinstance(task, LoadTask):
+                projected_payload += task.amount
+                if projected_payload > vehicle.max_payload:
+                    raise CommandValidationError(
+                        "job would exceed vehicle max_payload"
+                    )
+                continue
+            if isinstance(task, UnloadTask):
+                if task.amount > projected_payload:
+                    raise CommandValidationError(
+                        "job would reduce payload below zero"
+                    )
+                projected_payload -= task.amount
+                continue
+            raise CommandValidationError(
+                f"Unsupported job task type: {type(task).__name__}"
+            )
+
+    def _validate_declare_temporary_hazard(
+        self,
+        command: DeclareTemporaryHazardCommand,
+    ) -> None:
+        try:
+            is_blocked = self.engine.world_state.is_edge_blocked(command.edge_id)
+        except KeyError as exc:
+            raise CommandValidationError(f"Unknown edge_id: {command.edge_id}") from exc
+        if is_blocked:
+            raise CommandValidationError(
+                f"edge_id {command.edge_id} is already blocked"
+            )
+
+    def _validate_clear_temporary_hazard(
+        self,
+        command: ClearTemporaryHazardCommand,
+    ) -> None:
+        try:
+            is_blocked = self.engine.world_state.is_edge_blocked(command.edge_id)
+        except KeyError as exc:
+            raise CommandValidationError(f"Unknown edge_id: {command.edge_id}") from exc
+        if not is_blocked or command.edge_id not in self._temporary_hazards:
+            raise CommandValidationError(
+                f"edge_id {command.edge_id} does not have an active temporary hazard"
+            )
+
     def _require_vehicle(self, vehicle_id: int) -> Vehicle:
         try:
             return self.engine.get_vehicle(vehicle_id)
@@ -172,10 +297,71 @@ class SimulationController:
 
     def _require_idle_vehicle(self, *, vehicle_id: int) -> None:
         vehicle = self.engine.get_vehicle(vehicle_id)
+        self._require_active_vehicle(vehicle=vehicle)
         if vehicle.operational_state != "idle":
             raise CommandValidationError(
                 f"vehicle_id {vehicle_id} must be idle to accept control commands"
             )
+
+    def _require_active_vehicle(self, *, vehicle: Vehicle) -> None:
+        if not getattr(vehicle, "is_active", True):
+            raise CommandValidationError(
+                f"vehicle_id {vehicle.id} is not active in the live session"
+            )
+
+    def _apply_spawn_vehicle(self, command: SpawnVehicleCommand) -> None:
+        vehicle_type = _parse_vehicle_type(command.vehicle_type)
+        vehicle = Vehicle(
+            id=command.vehicle_id,
+            current_node_id=command.node_id,
+            position=self.engine.map.get_position(command.node_id),
+            velocity=command.velocity,
+            payload=command.payload,
+            max_payload=command.max_payload,
+            max_speed=command.max_speed,
+            vehicle_type=vehicle_type,
+        )
+        self.engine.add_vehicle(vehicle)
+        self.engine.trace.emit(
+            timestamp_s=self.engine.simulated_time_s,
+            vehicle_id=vehicle.id,
+            event_type=TraceEventType.VEHICLE_SPAWNED,
+            node_id=vehicle.current_node_id,
+        )
+
+    def _apply_remove_vehicle(self, command: RemoveVehicleCommand) -> None:
+        vehicle = self.engine.remove_vehicle(command.vehicle_id)
+        self.engine.trace.emit(
+            timestamp_s=self.engine.simulated_time_s,
+            vehicle_id=vehicle.id,
+            event_type=TraceEventType.VEHICLE_REMOVED,
+            node_id=vehicle.current_node_id,
+        )
+
+    def _apply_inject_job(self, command: InjectJobCommand) -> None:
+        vehicle = self.engine.get_vehicle(command.vehicle_id)
+        result = self.engine.execute_job(vehicle=vehicle, job=command.job)
+        self.engine.trace.emit(
+            timestamp_s=self.engine.simulated_time_s,
+            vehicle_id=vehicle.id,
+            event_type=TraceEventType.JOB_INJECTED,
+            node_id=result.final_node_id,
+            job_id=result.job_id,
+        )
+
+    def _apply_declare_temporary_hazard(
+        self,
+        command: DeclareTemporaryHazardCommand,
+    ) -> None:
+        self.engine.world_state.block_edge(command.edge_id)
+        self._temporary_hazards[command.edge_id] = command.hazard_label
+
+    def _apply_clear_temporary_hazard(
+        self,
+        command: ClearTemporaryHazardCommand,
+    ) -> None:
+        self.engine.world_state.unblock_edge(command.edge_id)
+        self._temporary_hazards.pop(command.edge_id, None)
 
 
 def build_controlled_engine_export(
@@ -217,3 +403,13 @@ def command_application_to_dict(
         "started_at_s": record.started_at_s,
         "completed_at_s": record.completed_at_s,
     }
+
+
+def _parse_vehicle_type(vehicle_type_name: str) -> VehicleType:
+    normalized = vehicle_type_name.strip().upper()
+    if not normalized:
+        return VehicleType.GENERIC
+    try:
+        return VehicleType[normalized]
+    except KeyError:
+        return VehicleType.GENERIC

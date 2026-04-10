@@ -6,6 +6,7 @@ from typing import Any
 
 from autonomous_ops_sim.simulation.commands import (
     AssignVehicleDestinationCommand,
+    InjectJobCommand,
     command_to_dict,
 )
 from autonomous_ops_sim.simulation.control import (
@@ -303,7 +304,7 @@ def _select_command_updates(
     record: CommandApplicationRecord,
     updates: tuple[LiveStateUpdate, ...],
 ) -> tuple[LiveStateUpdate, ...]:
-    if not isinstance(record.command, AssignVehicleDestinationCommand):
+    if not isinstance(record.command, (AssignVehicleDestinationCommand, InjectJobCommand)):
         return tuple(
             update
             for update in updates

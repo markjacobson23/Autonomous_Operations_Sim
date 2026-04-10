@@ -10,9 +10,14 @@ from autonomous_ops_sim.io.exports import (
 )
 from autonomous_ops_sim.simulation.commands import (
     AssignVehicleDestinationCommand,
+    ClearTemporaryHazardCommand,
     BlockEdgeCommand,
+    DeclareTemporaryHazardCommand,
+    InjectJobCommand,
+    RemoveVehicleCommand,
     RepositionVehicleCommand,
     SimulationCommand,
+    SpawnVehicleCommand,
     UnblockEdgeCommand,
     command_to_dict,
 )
@@ -578,6 +583,7 @@ def _build_vehicle_presentations(
             vehicle_type=vehicle.vehicle_type,
         )
         for vehicle in sorted(vehicles, key=lambda vehicle: vehicle.id)
+        if getattr(vehicle, "is_active", True)
     )
 
 
@@ -604,7 +610,15 @@ def _select_replay_result_frame(
 
         if isinstance(
             record.command,
-            (BlockEdgeCommand, RepositionVehicleCommand, UnblockEdgeCommand),
+            (
+                BlockEdgeCommand,
+                RepositionVehicleCommand,
+                UnblockEdgeCommand,
+                SpawnVehicleCommand,
+                RemoveVehicleCommand,
+                DeclareTemporaryHazardCommand,
+                ClearTemporaryHazardCommand,
+            ),
         ):
             if (
                 frame.trigger.source == "command"
@@ -613,7 +627,10 @@ def _select_replay_result_frame(
                 return frame, frame_index
             continue
 
-        assert isinstance(record.command, AssignVehicleDestinationCommand)
+        assert isinstance(
+            record.command,
+            (AssignVehicleDestinationCommand, InjectJobCommand),
+        )
         trace_event = frame.trigger.trace_event
         if (
             frame.trigger.source != "trace"
@@ -662,7 +679,9 @@ def _build_current_vehicle_surface_states(
     engine: SimulationEngine,
 ) -> tuple[VehicleSurfaceState, ...]:
     return tuple(
-        _vehicle_to_surface_state(vehicle) for vehicle in engine.vehicles
+        _vehicle_to_surface_state(vehicle)
+        for vehicle in engine.vehicles
+        if getattr(vehicle, "is_active", True)
     )
 
 

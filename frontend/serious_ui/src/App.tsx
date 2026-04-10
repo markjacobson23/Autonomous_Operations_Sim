@@ -64,6 +64,16 @@ type RecentCommandPayload = {
   vehicle_id?: number;
   node_id?: number;
   destination_node_id?: number;
+  hazard_label?: string;
+  vehicle_type?: string;
+  payload?: number;
+  velocity?: number;
+  max_payload?: number;
+  max_speed?: number;
+  job?: {
+    id?: string;
+    tasks?: Array<Record<string, unknown>>;
+  };
 };
 
 type DiagnosticPayload = {
@@ -240,6 +250,7 @@ type TrafficBaselinePayload = {
   control_points?: TrafficControlPointPayload[];
   queue_records?: Array<{
     vehicle_id?: number;
+    vehicle_ids?: number[];
     node_id?: number;
     road_id?: string | null;
     queue_start_s?: number;
@@ -395,6 +406,15 @@ type LiveCommandDraft = {
   destinationNodeId: string;
   edgeId: string;
   nodeId: string;
+  hazardLabel: string;
+  spawnVehicleType: string;
+  spawnPayload: string;
+  spawnVelocity: string;
+  spawnMaxPayload: string;
+  spawnMaxSpeed: string;
+  jobId: string;
+  jobTaskNodeId: string;
+  jobTaskDestinationNodeId: string;
   stepSeconds: string;
 };
 
@@ -450,8 +470,18 @@ function App(): JSX.Element {
     destinationNodeId: "",
     edgeId: "",
     nodeId: "",
+    hazardLabel: "temporary closure",
+    spawnVehicleType: "GENERIC",
+    spawnPayload: "0",
+    spawnVelocity: "0",
+    spawnMaxPayload: "120",
+    spawnMaxSpeed: "12",
+    jobId: "live-injection",
+    jobTaskNodeId: "",
+    jobTaskDestinationNodeId: "",
     stepSeconds: "0.5",
   });
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<number[] | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [bootstrap, setBootstrap] = useState<BootstrapSummary>({
     loadState: "idle",
@@ -673,24 +703,31 @@ function App(): JSX.Element {
   const suggestions = bootstrap.commandCenter.ai_assist?.suggestions ?? [];
   const anomalies = bootstrap.commandCenter.ai_assist?.anomalies ?? [];
   const explanations = bootstrap.commandCenter.ai_assist?.explanations ?? [];
+  const commandCenterSelectedVehicleIds = bootstrap.commandCenter.selected_vehicle_ids ?? [];
+  const effectiveSelectedVehicleIds =
+    selectedVehicleIds ?? commandCenterSelectedVehicleIds;
+  const primaryVehicleId =
+    effectiveSelectedVehicleIds[0] ??
+    inspections[0]?.vehicle_id ??
+    null;
   const selectedRoutePreview =
-    routePreviews.find((preview) => preview.vehicle_id === selectedVehicleId) ??
+    routePreviews.find((preview) => preview.vehicle_id === primaryVehicleId) ??
     routePreviews[0] ??
     null;
   const selectedRoutePreviewRoadIds = new Set(
     (bundle?.render_geometry?.roads ?? [])
       .filter((road) =>
-        (selectedRoutePreview?.edge_ids ?? []).some((edgeId) =>
-          (road.edge_ids ?? []).includes(edgeId),
+        routePreviews.some(
+          (preview) =>
+            effectiveSelectedVehicleIds.includes(preview.vehicle_id ?? -1) &&
+            (preview.edge_ids ?? []).some((edgeId) => (road.edge_ids ?? []).includes(edgeId)),
         ),
       )
       .map((road) => road.road_id)
       .filter((roadId): roadId is string => Boolean(roadId)),
   );
-  const defaultVehicleId =
-    bootstrap.commandCenter.selected_vehicle_ids?.[0] ?? inspections[0]?.vehicle_id ?? null;
   const selectedVehicleId =
-    selectedTarget?.kind === "vehicle" ? selectedTarget.vehicleId : defaultVehicleId;
+    selectedTarget?.kind === "vehicle" ? selectedTarget.vehicleId : primaryVehicleId;
   const selectedVehicle = findVehicleById(bundle, selectedVehicleId);
   const displayedSelectedVehicle =
     selectedVehicleId !== null
@@ -699,6 +736,9 @@ function App(): JSX.Element {
   const selectedInspection = selectedVehicleId
     ? inspections.find((inspection) => inspection.vehicle_id === selectedVehicleId) ?? null
     : null;
+  const selectedVehicleInspections = inspections.filter((inspection) =>
+    effectiveSelectedVehicleIds.includes(inspection.vehicle_id ?? -1),
+  );
   const selectedRoad =
     selectedTarget?.kind === "road"
       ? (bundle?.render_geometry?.roads ?? []).find(
@@ -722,7 +762,7 @@ function App(): JSX.Element {
         ) ?? null
       : null;
   const selectedQueueTraffic =
-    selectedQueueRecord?.road_id !== undefined
+    typeof selectedQueueRecord?.road_id === "string"
       ? trafficRoadById.get(selectedQueueRecord.road_id) ?? null
       : null;
   const selectedHazardEdge =
@@ -822,9 +862,40 @@ function App(): JSX.Element {
     }));
   }
 
-  function selectVehicle(vehicleId: number | undefined): void {
+  function selectVehicle(
+    vehicleId: number | undefined,
+    options: { additive?: boolean } = {},
+  ): void {
     if (vehicleId !== undefined) {
       setSelectedTarget({ kind: "vehicle", vehicleId });
+      setSelectedVehicleIds((current) => {
+        const currentSelection = current ?? [];
+        if (options.additive) {
+          if (currentSelection.includes(vehicleId)) {
+            return currentSelection.filter((existingVehicleId) => existingVehicleId !== vehicleId);
+          }
+          return [...currentSelection, vehicleId];
+        }
+        return [vehicleId];
+      });
+    }
+  }
+
+  function selectAllVisibleVehicles(): void {
+    const visibleVehicleIds = displayedVehicles
+      .map((vehicle) => vehicle.vehicle_id)
+      .filter((vehicleId): vehicleId is number => vehicleId !== undefined);
+    if (visibleVehicleIds.length === 0) {
+      return;
+    }
+    setSelectedVehicleIds(visibleVehicleIds);
+    setSelectedTarget({ kind: "vehicle", vehicleId: visibleVehicleIds[0] });
+  }
+
+  function clearVehicleSelection(): void {
+    setSelectedVehicleIds([]);
+    if (selectedTarget?.kind === "vehicle") {
+      setSelectedTarget(null);
     }
   }
 
@@ -927,7 +998,9 @@ function App(): JSX.Element {
     setLiveCommandDraft((current) => ({
       vehicleId:
         current.vehicleId ||
-        (selectedVehicleId !== null ? String(selectedVehicleId) : current.vehicleId),
+        (effectiveSelectedVehicleIds[0] !== undefined
+          ? String(effectiveSelectedVehicleIds[0])
+          : current.vehicleId),
       destinationNodeId:
         current.destinationNodeId ||
         (routePreviews[0]?.destination_node_id !== undefined
@@ -945,6 +1018,16 @@ function App(): JSX.Element {
         (selectedInspection?.current_node_id !== undefined
           ? String(selectedInspection.current_node_id)
           : current.nodeId),
+      jobTaskNodeId:
+        current.jobTaskNodeId ||
+        (selectedInspection?.current_node_id !== undefined
+          ? String(selectedInspection.current_node_id)
+          : current.jobTaskNodeId),
+      jobTaskDestinationNodeId:
+        current.jobTaskDestinationNodeId ||
+        (routePreviews[0]?.destination_node_id !== undefined
+          ? String(routePreviews[0].destination_node_id)
+          : current.jobTaskDestinationNodeId),
       stepSeconds:
         current.stepSeconds || String(sessionControl?.step_seconds ?? 0.5),
     }));
@@ -954,7 +1037,7 @@ function App(): JSX.Element {
     selectedRoad?.edge_ids,
     selectedTarget?.kind,
     selectedTarget?.kind === "hazard" ? selectedTarget.edgeId : undefined,
-    selectedVehicleId,
+    effectiveSelectedVehicleIds,
     sessionControl?.step_seconds,
   ]);
 
@@ -974,9 +1057,26 @@ function App(): JSX.Element {
     return Number.isFinite(parsed) ? parsed : null;
   }
 
+  function resolveCommandVehicleIds(fallbackVehicleId: number | null = null): number[] {
+    if (selectedVehicleIds !== null) {
+      return selectedVehicleIds.length > 0 ? selectedVehicleIds : fallbackVehicleId !== null ? [fallbackVehicleId] : [];
+    }
+    if (selectedTarget?.kind === "vehicle") {
+      return [selectedTarget.vehicleId];
+    }
+    if (fallbackVehicleId !== null) {
+      return [fallbackVehicleId];
+    }
+    return commandCenterSelectedVehicleIds;
+  }
+
   function submitLiveCommand(commandPayload: Record<string, unknown>): void {
     const endpoint = sessionControl?.command_endpoint ?? "/api/live/command";
     setLiveCommandMessage("Sending live command to the Python session...");
+    const targetVehicleIds =
+      commandPayload.vehicle_ids !== undefined
+        ? commandPayload.vehicle_ids
+        : effectiveSelectedVehicleIds;
     void fetch(endpoint, {
       method: "POST",
       headers: {
@@ -984,7 +1084,7 @@ function App(): JSX.Element {
       },
       body: JSON.stringify({
         ...commandPayload,
-        selected_vehicle_ids: selectedVehicleId !== null ? [selectedVehicleId] : [],
+        selected_vehicle_ids: targetVehicleIds,
       }),
     })
       .then(async (response) => {
@@ -1019,6 +1119,10 @@ function App(): JSX.Element {
   function submitRoutePreview(previewPayload: Record<string, unknown>): void {
     const endpoint = sessionControl?.route_preview_endpoint ?? "/api/live/preview";
     setLiveCommandMessage("Requesting a route preview from the Python session...");
+    const targetVehicleIds =
+      previewPayload.vehicle_ids !== undefined
+        ? previewPayload.vehicle_ids
+        : effectiveSelectedVehicleIds;
     void fetch(endpoint, {
       method: "POST",
       headers: {
@@ -1026,7 +1130,7 @@ function App(): JSX.Element {
       },
       body: JSON.stringify({
         ...previewPayload,
-        selected_vehicle_ids: selectedVehicleId !== null ? [selectedVehicleId] : [],
+        selected_vehicle_ids: targetVehicleIds,
       }),
     })
       .then(async (response) => {
@@ -1070,7 +1174,7 @@ function App(): JSX.Element {
       body: JSON.stringify({
         action,
         delta_s: stepSeconds,
-        selected_vehicle_ids: selectedVehicleId !== null ? [selectedVehicleId] : [],
+        selected_vehicle_ids: effectiveSelectedVehicleIds,
       }),
     })
       .then(async (response) => {
@@ -1112,10 +1216,12 @@ function App(): JSX.Element {
       setLiveCommandMessage("Enter a valid vehicle id and destination node id first.");
       return;
     }
+    const vehicleIds = resolveCommandVehicleIds(vehicleId);
     submitLiveCommand({
       command_type: "assign_vehicle_destination",
       vehicle_id: vehicleId,
       destination_node_id: destinationNodeId,
+      vehicle_ids: vehicleIds,
     });
   }
 
@@ -1126,9 +1232,11 @@ function App(): JSX.Element {
       setLiveCommandMessage("Enter a valid vehicle id and destination node id first.");
       return;
     }
+    const vehicleIds = resolveCommandVehicleIds(vehicleId);
     submitRoutePreview({
       vehicle_id: vehicleId,
       destination_node_id: destinationNodeId,
+      vehicle_ids: vehicleIds,
     });
   }
 
@@ -1139,10 +1247,12 @@ function App(): JSX.Element {
       setLiveCommandMessage("Enter a valid vehicle id and node id first.");
       return;
     }
+    const vehicleIds = resolveCommandVehicleIds(vehicleId);
     submitLiveCommand({
       command_type: "reposition_vehicle",
       vehicle_id: vehicleId,
       node_id: nodeId,
+      vehicle_ids: vehicleIds,
     });
   }
 
@@ -1166,6 +1276,88 @@ function App(): JSX.Element {
     }
     submitLiveCommand({
       command_type: "unblock_edge",
+      edge_id: edgeId,
+    });
+  }
+
+  function spawnVehicleFromDraft(): void {
+    const vehicleId = parseDraftInteger(liveCommandDraft.vehicleId);
+    const nodeId = parseDraftInteger(liveCommandDraft.nodeId);
+    const maxSpeed = parseDraftFloat(liveCommandDraft.spawnMaxSpeed);
+    const maxPayload = parseDraftFloat(liveCommandDraft.spawnMaxPayload);
+    const payload = parseDraftFloat(liveCommandDraft.spawnPayload) ?? 0;
+    const velocity = parseDraftFloat(liveCommandDraft.spawnVelocity) ?? 0;
+    if (vehicleId === null || nodeId === null || maxSpeed === null || maxPayload === null) {
+      setLiveCommandMessage("Enter valid spawn vehicle, node, max speed, and payload values first.");
+      return;
+    }
+    submitLiveCommand({
+      command_type: "spawn_vehicle",
+      vehicle_id: vehicleId,
+      node_id: nodeId,
+      max_speed: maxSpeed,
+      max_payload: maxPayload,
+      vehicle_type: liveCommandDraft.spawnVehicleType || "GENERIC",
+      payload,
+      velocity,
+    });
+  }
+
+  function removeVehicleFromDraft(): void {
+    const vehicleId = parseDraftInteger(liveCommandDraft.vehicleId);
+    if (vehicleId === null) {
+      setLiveCommandMessage("Enter a valid vehicle id first.");
+      return;
+    }
+    submitLiveCommand({
+      command_type: "remove_vehicle",
+      vehicle_id: vehicleId,
+    });
+  }
+
+  function injectJobFromDraft(): void {
+    const vehicleId = parseDraftInteger(liveCommandDraft.vehicleId);
+    const destinationNodeId = parseDraftInteger(liveCommandDraft.jobTaskDestinationNodeId);
+    if (vehicleId === null || destinationNodeId === null) {
+      setLiveCommandMessage("Enter a valid vehicle id and job destination node id first.");
+      return;
+    }
+    submitLiveCommand({
+      command_type: "inject_job",
+      vehicle_id: vehicleId,
+      job: {
+        id: liveCommandDraft.jobId || `live-job-${vehicleId}-${destinationNodeId}`,
+        tasks: [
+          {
+            kind: "move",
+            destination_node_id: destinationNodeId,
+          },
+        ],
+      },
+    });
+  }
+
+  function declareTemporaryHazardFromDraft(): void {
+    const edgeId = parseDraftInteger(liveCommandDraft.edgeId);
+    if (edgeId === null) {
+      setLiveCommandMessage("Enter a valid edge id first.");
+      return;
+    }
+    submitLiveCommand({
+      command_type: "declare_temporary_hazard",
+      edge_id: edgeId,
+      hazard_label: liveCommandDraft.hazardLabel || "temporary closure",
+    });
+  }
+
+  function clearTemporaryHazardFromDraft(): void {
+    const edgeId = parseDraftInteger(liveCommandDraft.edgeId);
+    if (edgeId === null) {
+      setLiveCommandMessage("Enter a valid edge id first.");
+      return;
+    }
+    submitLiveCommand({
+      command_type: "clear_temporary_hazard",
       edge_id: edgeId,
     });
   }
@@ -1356,6 +1548,10 @@ function App(): JSX.Element {
         <div className="metric-pill">
           <span className="metric-label">Vehicles</span>
           <strong>{formatMaybeNumber(bootstrap.vehicleCount)}</strong>
+        </div>
+        <div className="metric-pill">
+          <span className="metric-label">Selected Fleet</span>
+          <strong>{formatMaybeNumber(effectiveSelectedVehicleIds.length)}</strong>
         </div>
         <div className="metric-pill">
           <span className="metric-label">Min Spacing</span>
@@ -1679,7 +1875,7 @@ function App(): JSX.Element {
                         (entry) => entry.road_id === record.road_id,
                       );
                       const roadTraffic =
-                        record.road_id !== undefined
+                        typeof record.road_id === "string"
                           ? trafficRoadById.get(record.road_id) ?? null
                           : null;
                       if (!road?.centerline || road.centerline.length < 2) {
@@ -1803,12 +1999,18 @@ function App(): JSX.Element {
                   {layers.vehicles &&
                     displayedVehicles.map((vehicle, vehicleIndex) => {
                       const position = vehicle.position ?? [0, 0, 0];
-                      const isSelected = vehicle.vehicle_id === selectedVehicleId;
+                      const isSelected = effectiveSelectedVehicleIds.includes(
+                        vehicle.vehicle_id ?? -1,
+                      );
                       return (
-                          <g
+                        <g
                           key={vehicle.vehicle_id ?? `vehicle-${vehicleIndex}`}
                           className={isSelected ? "scene-vehicle selected" : "scene-vehicle"}
-                          onClick={() => selectVehicle(vehicle.vehicle_id)}
+                          onClick={(event) =>
+                            selectVehicle(vehicle.vehicle_id, {
+                              additive: event.shiftKey || event.metaKey || event.ctrlKey,
+                            })
+                          }
                           onMouseEnter={() =>
                             setHoverTarget({
                               label: `Vehicle ${vehicle.vehicle_id ?? vehicleIndex}`,
@@ -2066,13 +2268,34 @@ function App(): JSX.Element {
                 <h2 id="command-center-title">Fleet Actions</h2>
               </div>
               <span className="status-pill secondary">
-                {formatMaybeNumber(bootstrap.selectedVehicleCount)} selected ·{" "}
+                {formatMaybeNumber(effectiveSelectedVehicleIds.length)} selected ·{" "}
                 {liveSessionPlaying ? "playing" : "paused"}
               </span>
             </div>
             <div className="section-stack">
               <div className="subsection">
                 <h3>Live Command Console</h3>
+                <div className="selection-strip">
+                  <span className="selection-pill">
+                    Fleet selection: {effectiveSelectedVehicleIds.length} vehicle(s)
+                  </span>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={selectAllVisibleVehicles}
+                    disabled={displayedVehicles.length === 0}
+                  >
+                    Select Visible
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={clearVehicleSelection}
+                    disabled={effectiveSelectedVehicleIds.length === 0}
+                  >
+                    Clear Selection
+                  </button>
+                </div>
                 <div className="command-grid">
                   <label className="form-field">
                     <span>Vehicle ID</span>
@@ -2159,6 +2382,126 @@ function App(): JSX.Element {
                       placeholder={String(sessionControl?.step_seconds ?? 0.5)}
                     />
                   </label>
+                  <label className="form-field">
+                    <span>Hazard Label</span>
+                    <input
+                      type="text"
+                      value={liveCommandDraft.hazardLabel}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          hazardLabel: event.target.value,
+                        }))
+                      }
+                      placeholder="temporary closure"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Spawn Type</span>
+                    <input
+                      type="text"
+                      value={liveCommandDraft.spawnVehicleType}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          spawnVehicleType: event.target.value,
+                        }))
+                      }
+                      placeholder="GENERIC"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Spawn Max Speed</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={liveCommandDraft.spawnMaxSpeed}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          spawnMaxSpeed: event.target.value,
+                        }))
+                      }
+                      placeholder="12"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Spawn Max Payload</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={liveCommandDraft.spawnMaxPayload}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          spawnMaxPayload: event.target.value,
+                        }))
+                      }
+                      placeholder="120"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Spawn Payload</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={liveCommandDraft.spawnPayload}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          spawnPayload: event.target.value,
+                        }))
+                      }
+                      placeholder="0"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Spawn Velocity</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={liveCommandDraft.spawnVelocity}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          spawnVelocity: event.target.value,
+                        }))
+                      }
+                      placeholder="0"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Job ID</span>
+                    <input
+                      type="text"
+                      value={liveCommandDraft.jobId}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          jobId: event.target.value,
+                        }))
+                      }
+                      placeholder="live-job-77"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Job Destination</span>
+                    <input
+                      type="number"
+                      value={liveCommandDraft.jobTaskDestinationNodeId}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          jobTaskDestinationNodeId: event.target.value,
+                        }))
+                      }
+                      placeholder={
+                        routePreviews[0]?.destination_node_id !== undefined
+                          ? String(routePreviews[0].destination_node_id)
+                          : "3"
+                      }
+                    />
+                  </label>
                 </div>
                 <div className="action-row">
                   <button
@@ -2201,7 +2544,53 @@ function App(): JSX.Element {
                   >
                     Unblock Road
                   </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={spawnVehicleFromDraft}
+                    disabled={!sessionControl?.command_endpoint}
+                  >
+                    Spawn Vehicle
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={removeVehicleFromDraft}
+                    disabled={!sessionControl?.command_endpoint}
+                  >
+                    Remove Vehicle
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={injectJobFromDraft}
+                    disabled={!sessionControl?.command_endpoint}
+                  >
+                    Inject Job
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={declareTemporaryHazardFromDraft}
+                    disabled={!sessionControl?.command_endpoint}
+                  >
+                    Declare Hazard
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={clearTemporaryHazardFromDraft}
+                    disabled={!sessionControl?.command_endpoint}
+                  >
+                    Clear Hazard
+                  </button>
                 </div>
+                {effectiveSelectedVehicleIds.length > 1 ? (
+                  <p className="status-copy">
+                    Batch mode is active for vehicles {effectiveSelectedVehicleIds.join(", ")}.
+                    Destination and reposition actions will apply to every selected vehicle.
+                  </p>
+                ) : null}
               </div>
 
               <div className="subsection">
@@ -2295,12 +2684,14 @@ function App(): JSX.Element {
                   {(bundle?.traffic_baseline?.queue_records ?? []).length > 0 ? (
                     (bundle?.traffic_baseline?.queue_records ?? []).slice(0, 5).map((record, index) => {
                       const roadTraffic =
-                        record.road_id !== undefined
+                        typeof record.road_id === "string"
                           ? trafficRoadById.get(record.road_id) ?? null
                           : null;
+                      const queuedVehicleCount =
+                        record.vehicle_ids?.length ?? (record.vehicle_id !== undefined ? 1 : 0);
                       return (
                         <li key={`${record.road_id ?? "queue"}-${index}`}>
-                          Road {record.road_id ?? "unknown"} · {record.vehicle_ids?.length ?? 0} vehicle(s)
+                          Road {record.road_id ?? "unknown"} · {queuedVehicleCount} vehicle(s)
                           · {roadTraffic?.control_state ?? "yield"} ·{" "}
                           {roadTraffic?.congestion_level ?? "free"} · {record.reason ?? "queued"}
                         </li>
@@ -2392,8 +2783,17 @@ function App(): JSX.Element {
                     <span>reservation queue</span>
                   </div>
                   <ul className="mini-list">
-                    <li>Queued vehicles: {selectedQueueRecord.vehicle_ids?.join(", ") || "none"}</li>
-                    <li>Queue length: {selectedQueueRecord.vehicle_ids?.length ?? 0}</li>
+                    <li>
+                      Queued vehicles:{" "}
+                      {selectedQueueRecord.vehicle_ids?.join(", ") ||
+                        (selectedQueueRecord.vehicle_id !== undefined
+                          ? String(selectedQueueRecord.vehicle_id)
+                          : "none")}
+                    </li>
+                    <li>
+                      Queue length:{" "}
+                      {selectedQueueRecord.vehicle_ids?.length ?? (selectedQueueRecord.vehicle_id !== undefined ? 1 : 0)}
+                    </li>
                     <li>Road traffic: {selectedQueueTraffic?.congestion_level ?? "queued"}</li>
                     <li>Intensity: {Math.round((selectedQueueTraffic?.congestion_intensity ?? 0) * 100)}%</li>
                     <li>Queue window: {formatSeconds(selectedQueueRecord.queue_start_s ?? null)} to {formatSeconds(selectedQueueRecord.queue_end_s ?? null)}</li>
@@ -2414,6 +2814,28 @@ function App(): JSX.Element {
                     <li>End node: {formatMaybeNumber(selectedHazardEdge.end_node_id ?? null)}</li>
                     <li>Distance: {selectedHazardEdge.distance ?? "pending"}</li>
                     <li>Speed limit: {selectedHazardEdge.speed_limit ?? "pending"}</li>
+                  </ul>
+                </article>
+              ) : null}
+
+              {effectiveSelectedVehicleIds.length > 1 ? (
+                <article className="inspection-card">
+                  <div className="inspection-header">
+                    <strong>Fleet Selection</strong>
+                    <span>multi-select</span>
+                  </div>
+                  <ul className="mini-list">
+                    <li>Vehicles: {effectiveSelectedVehicleIds.join(", ")}</li>
+                    <li>Selected records: {selectedVehicleInspections.length}</li>
+                    <li>
+                      Route previews:{" "}
+                      {
+                        routePreviews.filter((preview) =>
+                          effectiveSelectedVehicleIds.includes(preview.vehicle_id ?? -1),
+                        ).length
+                      }
+                    </li>
+                    <li>Batch commands: assign and reposition apply to every selected vehicle.</li>
                   </ul>
                 </article>
               ) : null}
@@ -2935,7 +3357,7 @@ function sampleDisplayedVehicles(
       (left.segment_index ?? 0) - (right.segment_index ?? 0),
   );
 
-  const activeEntries: Array<{
+  type MotionSpacingEntry = {
     vehicleId: number;
     edgeId: number;
     pathPoints: Position3[];
@@ -2950,7 +3372,8 @@ function sampleDisplayedVehicles(
     laneDirectionality?: string | null;
     laneSelectionReason?: string | null;
     segment: MotionSegmentPayload;
-  }> = [];
+  };
+  const activeEntries: MotionSpacingEntry[] = [];
 
   for (const segment of motionSegments) {
     const vehicleId = segment.vehicle_id;
@@ -2984,6 +3407,9 @@ function sampleDisplayedVehicles(
         speed: 0,
       });
       existing = sampledVehicles.get(vehicleId);
+    }
+    if (!existing) {
+      continue;
     }
     if (existing.position === undefined && segment.start_position) {
       existing.position = segment.start_position;
@@ -3030,23 +3456,22 @@ function sampleDisplayedVehicles(
     if (!vehicle) {
       continue;
     }
-      vehicle.position = entry.position;
-      vehicle.node_id = entry.segment.start_node_id ?? vehicle.node_id;
-      vehicle.operational_state = entry.operationalState;
-      vehicle.heading_rad = entry.headingRad;
-      vehicle.speed = entry.speed;
-      vehicle.spacing_envelope_m = entry.spacingEnvelopeM;
-      vehicle.body_length_m = entry.segment.body_length_m ?? vehicle.body_length_m;
-      vehicle.body_width_m = entry.segment.body_width_m ?? vehicle.body_width_m;
-      vehicle.presentation_key = vehicle.presentation_key ?? "generic";
-      vehicle.road_id = entry.roadId ?? vehicle.road_id;
-      vehicle.lane_id = entry.laneId ?? vehicle.lane_id;
-      vehicle.lane_index = entry.laneIndex ?? vehicle.lane_index;
-      vehicle.lane_role = entry.laneRole ?? vehicle.lane_role;
-      vehicle.lane_directionality = entry.laneDirectionality ?? vehicle.lane_directionality;
-      vehicle.lane_selection_reason =
-        entry.laneSelectionReason ?? vehicle.lane_selection_reason;
-    }
+    vehicle.position = entry.position;
+    vehicle.node_id = entry.segment.start_node_id ?? vehicle.node_id;
+    vehicle.operational_state = entry.operationalState;
+    vehicle.heading_rad = entry.headingRad;
+    vehicle.speed = entry.speed;
+    vehicle.spacing_envelope_m = entry.spacingEnvelopeM;
+    vehicle.body_length_m = entry.segment.body_length_m ?? vehicle.body_length_m;
+    vehicle.body_width_m = entry.segment.body_width_m ?? vehicle.body_width_m;
+    vehicle.presentation_key = vehicle.presentation_key ?? "generic";
+    vehicle.road_id = entry.roadId ?? vehicle.road_id;
+    vehicle.lane_id = entry.laneId ?? vehicle.lane_id;
+    vehicle.lane_index = entry.laneIndex ?? vehicle.lane_index;
+    vehicle.lane_role = entry.laneRole ?? vehicle.lane_role;
+    vehicle.lane_directionality = entry.laneDirectionality ?? vehicle.lane_directionality;
+    vehicle.lane_selection_reason = entry.laneSelectionReason ?? vehicle.lane_selection_reason;
+  }
 
   return [...sampledVehicles.values()].sort(
     (left, right) => (left.vehicle_id ?? 0) - (right.vehicle_id ?? 0),
@@ -3309,6 +3734,12 @@ function applyFollowingSpacing(
     headingRad: number;
     speed: number;
     spacingEnvelopeM: number;
+    roadId?: string | null;
+    laneId?: string | null;
+    laneIndex?: number | null;
+    laneRole?: string | null;
+    laneDirectionality?: string | null;
+    laneSelectionReason?: string | null;
     segment: MotionSegmentPayload;
   }>,
 ): Array<{
@@ -3318,6 +3749,12 @@ function applyFollowingSpacing(
   speed: number;
   operationalState: string;
   spacingEnvelopeM: number;
+  roadId?: string | null;
+  laneId?: string | null;
+  laneIndex?: number | null;
+  laneRole?: string | null;
+  laneDirectionality?: string | null;
+  laneSelectionReason?: string | null;
   segment: MotionSegmentPayload;
 }> {
   const adjusted: Array<{
@@ -3327,6 +3764,12 @@ function applyFollowingSpacing(
     speed: number;
     operationalState: string;
     spacingEnvelopeM: number;
+    roadId?: string | null;
+    laneId?: string | null;
+    laneIndex?: number | null;
+    laneRole?: string | null;
+    laneDirectionality?: string | null;
+    laneSelectionReason?: string | null;
     segment: MotionSegmentPayload;
   }> = [];
   const grouped = new Map<number, typeof entries>();
@@ -3591,6 +4034,18 @@ function describeRecentCommand(command: RecentCommandPayload): string {
   }
   if (commandType === "block_edge" || commandType === "unblock_edge") {
     return `${commandType} · edge ${formatMaybeNumber(command.edge_id ?? null)}`;
+  }
+  if (commandType === "spawn_vehicle") {
+    return `spawn_vehicle · vehicle ${formatMaybeNumber(command.vehicle_id ?? null)} at node ${formatMaybeNumber(command.node_id ?? null)} type ${command.vehicle_type ?? "GENERIC"}`;
+  }
+  if (commandType === "remove_vehicle") {
+    return `remove_vehicle · vehicle ${formatMaybeNumber(command.vehicle_id ?? null)}`;
+  }
+  if (commandType === "inject_job") {
+    return `inject_job · vehicle ${formatMaybeNumber(command.vehicle_id ?? null)} job ${command.job?.id ?? "job"}`;
+  }
+  if (commandType === "declare_temporary_hazard" || commandType === "clear_temporary_hazard") {
+    return `${commandType} · edge ${formatMaybeNumber(command.edge_id ?? null)}${command.hazard_label ? ` (${command.hazard_label})` : ""}`;
   }
   return commandType;
 }

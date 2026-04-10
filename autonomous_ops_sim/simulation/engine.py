@@ -271,6 +271,25 @@ class SimulationEngine:
         except KeyError as exc:
             raise KeyError(f"Unknown vehicle_id: {vehicle_id}") from exc
 
+    def add_vehicle(self, vehicle: Vehicle) -> Vehicle:
+        """Register one runtime vehicle for the active run."""
+
+        existing_vehicle = self._vehicles.get(vehicle.id)
+        if existing_vehicle is not None and existing_vehicle is not vehicle:
+            raise ValueError(
+                f"vehicle_id {vehicle.id} is already registered to a different vehicle"
+            )
+        vehicle.is_active = True
+        self._vehicles[vehicle.id] = vehicle
+        return vehicle
+
+    def remove_vehicle(self, vehicle_id: int) -> Vehicle:
+        """Retire one runtime vehicle from the active run."""
+
+        vehicle = self.get_vehicle(vehicle_id)
+        vehicle.deactivate()
+        return vehicle
+
     def execute_job(
         self,
         *,

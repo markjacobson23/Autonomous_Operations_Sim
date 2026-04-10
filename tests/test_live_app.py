@@ -251,6 +251,67 @@ def test_live_app_frontend_server_supports_live_commands_and_session_control(
         server.stop()
 
 
+def test_live_app_frontend_server_supports_route_preview_and_batch_commands(
+    tmp_path,
+) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
+    vehicle_ids = [vehicle["vehicle_id"] for vehicle in bundle["command_center"]["vehicles"][:2]]
+    destination_node_id = bundle["map_surface"]["edges"][0]["end_node_id"]
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        preview_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/preview",
+                data=json.dumps(
+                    {
+                        "vehicle_ids": vehicle_ids,
+                        "destination_node_id": destination_node_id,
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        preview_payload = json.loads(preview_response.read().decode("utf-8"))
+        assert preview_payload["ok"] is True
+        assert [entry["vehicle_id"] for entry in preview_payload["route_previews"]] == vehicle_ids
+        assert preview_payload["bundle"]["command_center"]["selected_vehicle_ids"] == vehicle_ids
+
+        command_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/command",
+                data=json.dumps(
+                    {
+                        "command_type": "assign_vehicle_destination",
+                        "vehicle_ids": vehicle_ids,
+                        "destination_node_id": destination_node_id,
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        command_payload = json.loads(command_response.read().decode("utf-8"))
+        assert command_payload["ok"] is True
+        assert len(command_payload["command_results"]) == len(vehicle_ids)
+        assert [result["command"]["vehicle_id"] for result in command_payload["command_results"]] == vehicle_ids
+        assert command_payload["bundle"]["command_center"]["recent_commands"][-1]["vehicle_id"] == vehicle_ids[-1]
+    finally:
+        server.stop()
+
+
 def test_live_app_frontend_server_supports_route_preview_endpoint(tmp_path) -> None:
     frontend_dist = tmp_path / "dist"
     frontend_dist.mkdir()

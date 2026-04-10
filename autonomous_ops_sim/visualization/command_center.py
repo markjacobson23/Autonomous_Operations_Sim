@@ -243,6 +243,7 @@ def build_live_command_center_surface(
                 can_reposition=vehicle.operational_state == "idle",
             )
             for vehicle in session.engine.vehicles
+            if getattr(vehicle, "is_active", True)
         ),
         edges=tuple(
             CommandCenterEdgeSurface(
@@ -483,7 +484,9 @@ def _normalize_selected_vehicle_ids(
     for vehicle_id in selected_vehicle_ids:
         if vehicle_id in seen:
             continue
-        session.engine.get_vehicle(vehicle_id)
+        vehicle = session.engine.get_vehicle(vehicle_id)
+        if not getattr(vehicle, "is_active", True):
+            continue
         seen.add(vehicle_id)
         ordered_unique.append(vehicle_id)
     return tuple(ordered_unique)
@@ -966,6 +969,8 @@ def _build_deadlock_anomalies(
     skipped_ids = set(skipped_vehicle_ids)
     anomalies: list[AIAssistAnomaly] = []
     for vehicle in sorted(session.engine.vehicles, key=lambda vehicle: vehicle.id):
+        if not getattr(vehicle, "is_active", True):
+            continue
         if vehicle.id in skipped_ids:
             continue
         context = _active_execution_context(session, vehicle_id=vehicle.id)
@@ -1001,6 +1006,8 @@ def _build_deadlock_suggestions(
     skipped_ids = set(skipped_vehicle_ids)
     suggestions: list[AIAssistSuggestion] = []
     for vehicle in sorted(session.engine.vehicles, key=lambda vehicle: vehicle.id):
+        if not getattr(vehicle, "is_active", True):
+            continue
         if vehicle.id in skipped_ids:
             continue
         context = _active_execution_context(session, vehicle_id=vehicle.id)
@@ -1169,6 +1176,8 @@ def _waiting_vehicle_states(
 ) -> tuple[tuple[int, int, tuple[float, float, float]], ...]:
     waiting_states: list[tuple[int, int, tuple[float, float, float]]] = []
     for vehicle in sorted(session.engine.vehicles, key=lambda vehicle: vehicle.id):
+        if not getattr(vehicle, "is_active", True):
+            continue
         context = _active_execution_context(session, vehicle_id=vehicle.id)
         if context["wait_reason"] is None:
             continue

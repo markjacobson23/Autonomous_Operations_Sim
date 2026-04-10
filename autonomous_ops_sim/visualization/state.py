@@ -3,13 +3,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from autonomous_ops_sim.io.exports import trace_event_to_dict
 from autonomous_ops_sim.simulation.commands import (
     AssignVehicleDestinationCommand,
     BlockEdgeCommand,
+    ClearTemporaryHazardCommand,
+    DeclareTemporaryHazardCommand,
+    InjectJobCommand,
+    RemoveVehicleCommand,
     RepositionVehicleCommand,
+    SpawnVehicleCommand,
     UnblockEdgeCommand,
     command_to_dict,
 )
@@ -424,6 +429,11 @@ def _infer_initial_vehicle_states(
     command_history: tuple[CommandApplicationRecord, ...],
 ) -> dict[int, VehicleSurfaceState]:
     initial_states: dict[int, VehicleSurfaceState] = {}
+    spawned_vehicle_ids = {
+        record.command.vehicle_id
+        for record in command_history
+        if isinstance(record.command, SpawnVehicleCommand)
+    }
 
     for vehicle_id, node_id, state_name in _iter_vehicle_initial_hints(
         engine=engine,
@@ -441,6 +451,8 @@ def _infer_initial_vehicle_states(
         )
 
     for vehicle in engine.vehicles:
+        if vehicle.id in spawned_vehicle_ids:
+            continue
         initial_states.setdefault(
             vehicle.id,
             _build_vehicle_surface_state(
@@ -555,12 +567,39 @@ def _build_timeline(
             )
             session_index += 1
 
+    def append_trace_until(
+        *,
+        segment_complete: Callable[[TraceEvent], bool],
+    ) -> None:
+        nonlocal trace_index
+        while trace_index < len(trace_events):
+            event = trace_events[trace_index]
+            timeline.append(
+                _TimelineRecord(
+                    timestamp_s=event.timestamp_s,
+                    sort_group=2,
+                    sequence=event.sequence,
+                    trace_event=event,
+                )
+            )
+            trace_index += 1
+            if segment_complete(event):
+                return
+
     for record in command_history:
         append_pending_session_records(record.completed_at_s)
         command = record.command
         if isinstance(
             command,
-            (BlockEdgeCommand, RepositionVehicleCommand, UnblockEdgeCommand),
+            (
+                BlockEdgeCommand,
+                RepositionVehicleCommand,
+                UnblockEdgeCommand,
+                SpawnVehicleCommand,
+                RemoveVehicleCommand,
+                DeclareTemporaryHazardCommand,
+                ClearTemporaryHazardCommand,
+            ),
         ):
             timeline.append(
                 _TimelineRecord(
@@ -572,25 +611,25 @@ def _build_timeline(
             )
             continue
 
-        assert isinstance(command, AssignVehicleDestinationCommand)
-        segment_complete = False
-        while trace_index < len(trace_events) and not segment_complete:
-            event = trace_events[trace_index]
-            timeline.append(
-                _TimelineRecord(
-                    timestamp_s=event.timestamp_s,
-                    sort_group=2,
-                    sequence=event.sequence,
-                    trace_event=event,
-                )
+        if isinstance(command, AssignVehicleDestinationCommand):
+            append_trace_until(
+                segment_complete=lambda event: (
+                    event.vehicle_id == command.vehicle_id
+                    and event.event_type == TraceEventType.BEHAVIOR_TRANSITION
+                    and event.to_behavior_state == "idle"
+                    and event.transition_reason == "route_complete"
+                ),
             )
-            trace_index += 1
-            segment_complete = (
+            continue
+
+        assert isinstance(command, InjectJobCommand)
+        append_trace_until(
+            segment_complete=lambda event: (
                 event.vehicle_id == command.vehicle_id
-                and event.event_type == TraceEventType.BEHAVIOR_TRANSITION
-                and event.to_behavior_state == "idle"
-                and event.transition_reason == "route_complete"
-            )
+                and event.event_type == TraceEventType.JOB_COMPLETE
+                and event.job_id == command.job.id
+            ),
+        )
 
     while trace_index < len(trace_events):
         event = trace_events[trace_index]
@@ -624,6 +663,28 @@ def _apply_command_record(
     if isinstance(command, UnblockEdgeCommand):
         mutable_blocked_edge_ids.discard(command.edge_id)
         return
+    if isinstance(command, DeclareTemporaryHazardCommand):
+        mutable_blocked_edge_ids.add(command.edge_id)
+        return
+    if isinstance(command, ClearTemporaryHazardCommand):
+        mutable_blocked_edge_ids.discard(command.edge_id)
+        return
+    if isinstance(command, SpawnVehicleCommand):
+        mutable_vehicle_states[command.vehicle_id] = _build_vehicle_surface_state(
+            engine=engine,
+            vehicle_id=command.vehicle_id,
+            node_id=command.node_id,
+            position=engine.map.get_position(command.node_id),
+            operational_state="idle",
+        )
+        return
+    if isinstance(command, RemoveVehicleCommand):
+        mutable_vehicle_states.pop(command.vehicle_id, None)
+        return
+    if isinstance(command, InjectJobCommand):
+        return
+    if isinstance(command, AssignVehicleDestinationCommand):
+        return
 
     assert isinstance(command, RepositionVehicleCommand)
     mutable_vehicle_states[command.vehicle_id] = _build_vehicle_surface_state(
@@ -641,6 +702,21 @@ def _apply_trace_event(
     mutable_vehicle_states: dict[int, VehicleSurfaceState],
     engine: SimulationEngine,
 ) -> None:
+    if event.event_type == TraceEventType.VEHICLE_SPAWNED:
+        if event.node_id is None:
+            return
+        mutable_vehicle_states[event.vehicle_id] = _build_vehicle_surface_state(
+            engine=engine,
+            vehicle_id=event.vehicle_id,
+            node_id=event.node_id,
+            position=engine.map.get_position(event.node_id),
+            operational_state="idle",
+        )
+        return
+    if event.event_type == TraceEventType.VEHICLE_REMOVED:
+        mutable_vehicle_states.pop(event.vehicle_id, None)
+        return
+
     state = mutable_vehicle_states.get(event.vehicle_id)
     if state is None:
         node_id = _event_node_hint(event)
