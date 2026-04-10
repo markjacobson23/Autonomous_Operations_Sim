@@ -13,6 +13,9 @@ from autonomous_ops_sim.api import (
     export_live_session_bundle_json,
     export_live_sync_bundle_json,
     export_replay_bundle_json,
+    live_session_bundle_to_dict,
+    live_sync_bundle_to_dict,
+    replay_bundle_to_dict,
 )
 from autonomous_ops_sim.core.edge import Edge
 from autonomous_ops_sim.core.graph import Graph
@@ -109,10 +112,13 @@ def test_replay_bundle_is_versioned_and_matches_existing_replay_surface() -> Non
     controller = run_api_controller()
     bundle = build_replay_bundle_from_controller(controller)
     replay_state = build_visualization_state_from_controller(controller)
+    replay_dict = replay_bundle_to_dict(bundle)
 
     assert bundle.metadata.api_version == SIMULATION_API_VERSION
     assert bundle.metadata.surface_name == "replay_bundle"
     assert bundle.metadata.surface_schema_version == REPLAY_BUNDLE_SCHEMA_VERSION
+    assert replay_dict["final_frame"]["vehicles"][0]["presentation_key"] == "generic"
+    assert replay_dict["final_frame"]["vehicles"][0]["display_name"] == "Generic Vehicle"
     assert bundle.map_surface == replay_state.map_surface
     assert bundle.final_frame == replay_state.frames[-1]
     assert bundle.replay_timeline == replay_state.frames
@@ -146,11 +152,15 @@ def test_live_session_and_live_sync_bundles_share_one_api_version() -> None:
         selected_vehicle_ids=(77,),
         route_preview_requests=(RoutePreviewRequest(vehicle_id=77, destination_node_id=3),),
     )
+    live_dict = live_session_bundle_to_dict(live_bundle)
+    sync_dict = live_sync_bundle_to_dict(sync_bundle)
 
     assert live_bundle.metadata.api_version == SIMULATION_API_VERSION
     assert live_bundle.metadata.surface_schema_version == LIVE_SESSION_BUNDLE_SCHEMA_VERSION
     assert sync_bundle.metadata.api_version == SIMULATION_API_VERSION
     assert sync_bundle.metadata.surface_schema_version == LIVE_SYNC_BUNDLE_SCHEMA_VERSION
+    assert live_dict["snapshot"]["vehicles"][0]["vehicle_type"] == "GENERIC"
+    assert sync_dict["snapshot"]["vehicles"][0]["primary_color"] == "rgba(95, 109, 121, 0.96)"
     assert live_bundle.snapshot == build_live_runtime_snapshot(session)
     assert sync_bundle.snapshot == live_bundle.snapshot
     assert sync_bundle.map_surface == live_bundle.map_surface

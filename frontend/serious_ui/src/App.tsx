@@ -176,6 +176,14 @@ type VehicleSnapshotPayload = {
   node_id?: number;
   position?: Position3;
   operational_state?: string;
+  vehicle_type?: string;
+  presentation_key?: string;
+  display_name?: string;
+  role_label?: string;
+  body_length_m?: number;
+  body_width_m?: number;
+  primary_color?: string;
+  accent_color?: string;
 };
 
 type MotionSegmentPayload = {
@@ -863,12 +871,12 @@ function App(): JSX.Element {
       <div className="shell-accent shell-accent-right" aria-hidden="true" />
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 53 Curve-Following and Turn Arcs</p>
+          <p className="eyebrow">Step 54 Vehicle Presentation Upgrade</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
             The serious frontend now plays vehicles along curved path geometry
-            with heading-aware directional marks, so turns read naturally
-            through roads, connectors, and shaped intersections.
+            with typed haul-truck, forklift, car, and generic renderers so
+            mixed fleets read clearly at a glance.
           </p>
         </div>
         <div className="masthead-meta">
@@ -1317,10 +1325,17 @@ function App(): JSX.Element {
                               vehicle.heading_rad ?? 0,
                             )})`}
                           >
-                            {renderVehicleMarker()}
+                            {renderVehicleGlyph(vehicle)}
                           </g>
-                          <text x={position[0]} y={position[1] - 0.84}>
-                            V{vehicle.vehicle_id ?? vehicleIndex}
+                          <text x={position[0]} y={position[1] - 0.9}>
+                            {vehicle.presentation_key === "haul_truck"
+                              ? "HT"
+                              : vehicle.presentation_key === "forklift"
+                                ? "FL"
+                                : vehicle.presentation_key === "car"
+                                  ? "CV"
+                                  : "GV"}
+                            {vehicle.vehicle_id ?? vehicleIndex}
                           </text>
                         </g>
                       );
@@ -1328,11 +1343,12 @@ function App(): JSX.Element {
                 </svg>
 
                 <div className="focus-card">
-                  <strong>Curved motion and heading-aware playback are now live</strong>
+                  <strong>Curved motion and typed vehicle presentation are now live</strong>
                   <p>
                     Motion playback now follows authored path geometry instead of
-                    only straight edge interpolation, and vehicle heading updates
-                    continuously through turns and connectors.
+                    only straight edge interpolation, and haul trucks,
+                    forklifts, cars, and generic units now read as distinct
+                    operational families.
                   </p>
                 </div>
                 <div className="scene-legend">
@@ -1658,15 +1674,21 @@ function App(): JSX.Element {
                 <article className="inspection-card">
                   <div className="inspection-header">
                     <strong>
-                      Vehicle {formatMaybeNumber(selectedInspection.vehicle_id ?? null)}
+                      {displayedSelectedVehicle?.display_name ?? "Vehicle"}{" "}
+                      {formatMaybeNumber(selectedInspection.vehicle_id ?? null)}
                     </strong>
-                    <span>{selectedInspection.operational_state ?? "unknown_state"}</span>
+                    <span>
+                      {displayedSelectedVehicle?.role_label ??
+                        selectedInspection.operational_state ??
+                        "unknown_state"}
+                    </span>
                   </div>
                   <ul className="mini-list">
                     <li>Node: {formatMaybeNumber(selectedInspection.current_node_id ?? null)}</li>
                     <li>ETA: {formatSeconds(selectedInspection.eta_s ?? null)}</li>
                     <li>Job: {selectedInspection.current_job_id ?? "none"}</li>
                     <li>Wait: {selectedInspection.wait_reason ?? "none"}</li>
+                    <li>Type: {displayedSelectedVehicle?.vehicle_type ?? "GENERIC"}</li>
                     <li>Heading: {formatHeadingDegrees(displayedSelectedVehicle?.heading_rad ?? null)}</li>
                   </ul>
                   <div className="diagnostic-row">
@@ -1690,14 +1712,22 @@ function App(): JSX.Element {
                     className="inspection-card"
                   >
                     <div className="inspection-header">
-                      <strong>Vehicle {formatMaybeNumber(inspection.vehicle_id ?? null)}</strong>
-                      <span>{inspection.operational_state ?? "unknown_state"}</span>
+                      <strong>
+                        {findVehicleById(bundle, inspection.vehicle_id ?? null)?.display_name ?? "Vehicle"}{" "}
+                        {formatMaybeNumber(inspection.vehicle_id ?? null)}
+                      </strong>
+                      <span>
+                        {findVehicleById(bundle, inspection.vehicle_id ?? null)?.role_label ??
+                          inspection.operational_state ??
+                          "unknown_state"}
+                      </span>
                     </div>
                     <ul className="mini-list">
                       <li>Node: {formatMaybeNumber(inspection.current_node_id ?? null)}</li>
                       <li>ETA: {formatSeconds(inspection.eta_s ?? null)}</li>
                       <li>Job: {inspection.current_job_id ?? "none"}</li>
                       <li>Wait: {inspection.wait_reason ?? "none"}</li>
+                      <li>Type: {findVehicleById(bundle, inspection.vehicle_id ?? null)?.vehicle_type ?? "GENERIC"}</li>
                       <li>
                         Heading: {formatHeadingDegrees(findDisplayedVehicleById(displayedVehicles, inspection.vehicle_id ?? null)?.heading_rad ?? null)}
                       </li>
@@ -2084,6 +2114,14 @@ function sampleDisplayedVehicles(
         node_id: segment.start_node_id,
         position: segment.start_position,
         operational_state: "moving",
+        vehicle_type: "GENERIC",
+        presentation_key: "generic",
+        display_name: "Generic Vehicle",
+        role_label: "General operations",
+        body_length_m: 1.12,
+        body_width_m: 0.62,
+        primary_color: "rgba(95, 109, 121, 0.96)",
+        accent_color: "rgba(255, 255, 255, 0.92)",
         heading_rad: segment.heading_rad ?? 0,
         speed: 0,
       });
@@ -2224,11 +2262,113 @@ function radiansToDegrees(value: number): number {
   return (value * 180) / Math.PI;
 }
 
-function renderVehicleMarker(): JSX.Element {
+function renderVehicleGlyph(
+  vehicle: VehicleSnapshotPayload & { heading_rad?: number; speed?: number },
+): JSX.Element {
+  const length = vehicle.body_length_m ?? 1.12;
+  const width = vehicle.body_width_m ?? 0.62;
+  if (vehicle.presentation_key === "haul_truck") {
+    return (
+      <>
+        <rect
+          x={-length * 0.5}
+          y={-width * 0.42}
+          width={length * 0.82}
+          height={width * 0.84}
+          rx={0.1}
+          className="vehicle-body vehicle-body-haul"
+        />
+        <polygon
+          points={`${length * 0.24},${-width * 0.36} ${length * 0.54},0 ${length * 0.24},${width * 0.36}`}
+          className="vehicle-cab vehicle-cab-haul"
+        />
+        <rect
+          x={-length * 0.3}
+          y={-width * 0.55}
+          width={length * 0.22}
+          height={width * 0.18}
+          rx={0.06}
+          className="vehicle-cab vehicle-cab-haul"
+        />
+      </>
+    );
+  }
+  if (vehicle.presentation_key === "forklift") {
+    return (
+      <>
+        <rect
+          x={-length * 0.45}
+          y={-width * 0.32}
+          width={length * 0.68}
+          height={width * 0.64}
+          rx={0.08}
+          className="vehicle-body vehicle-body-forklift"
+        />
+        <rect
+          x={-length * 0.06}
+          y={-width * 0.16}
+          width={length * 0.18}
+          height={width * 0.32}
+          rx={0.06}
+          className="vehicle-cab vehicle-cab-forklift"
+        />
+        <line
+          x1={length * 0.21}
+          y1={-width * 0.4}
+          x2={length * 0.21}
+          y2={width * 0.4}
+          className="vehicle-fork"
+        />
+        <line
+          x1={length * 0.21}
+          y1={-width * 0.2}
+          x2={length * 0.58}
+          y2={-width * 0.2}
+          className="vehicle-fork"
+        />
+        <line
+          x1={length * 0.21}
+          y1={width * 0.2}
+          x2={length * 0.58}
+          y2={width * 0.2}
+          className="vehicle-fork"
+        />
+      </>
+    );
+  }
+  if (vehicle.presentation_key === "car") {
+    return (
+      <>
+        <rect
+          x={-length * 0.46}
+          y={-width * 0.3}
+          width={length * 0.92}
+          height={width * 0.6}
+          rx={0.18}
+          className="vehicle-body vehicle-body-car"
+        />
+        <rect
+          x={-length * 0.12}
+          y={-width * 0.22}
+          width={length * 0.32}
+          height={width * 0.44}
+          rx={0.12}
+          className="vehicle-cab vehicle-cab-car"
+        />
+      </>
+    );
+  }
   return (
     <>
-      <circle r={0.34} className="vehicle-body" />
-      <path d="M 0.08 -0.16 L 0.58 0 L 0.08 0.16 Z" className="vehicle-heading" />
+      <rect
+        x={-length * 0.42}
+        y={-width * 0.28}
+        width={length * 0.84}
+        height={width * 0.56}
+        rx={0.14}
+        className="vehicle-body vehicle-body-generic"
+      />
+      <path d="M 0.06 -0.14 L 0.54 0 L 0.06 0.14 Z" className="vehicle-heading" />
     </>
   );
 }

@@ -724,9 +724,46 @@ h3 {
 }
 
 .vehicle-body {
-  fill: rgba(95, 109, 121, 0.96);
   stroke: rgba(255, 255, 255, 0.92);
   stroke-width: 0.08;
+}
+
+.vehicle-cab {
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.08;
+}
+
+.vehicle-fork {
+  stroke: rgba(215, 245, 239, 0.96);
+  stroke-width: 0.08;
+}
+
+.vehicle-body-haul {
+  fill: rgba(187, 101, 30, 0.96);
+}
+
+.vehicle-cab-haul {
+  fill: rgba(246, 215, 167, 0.96);
+}
+
+.vehicle-body-forklift {
+  fill: rgba(10, 118, 108, 0.96);
+}
+
+.vehicle-cab-forklift {
+  fill: rgba(225, 250, 245, 0.96);
+}
+
+.vehicle-body-car {
+  fill: rgba(36, 83, 199, 0.96);
+}
+
+.vehicle-cab-car {
+  fill: rgba(216, 227, 255, 0.96);
+}
+
+.vehicle-body-generic {
+  fill: rgba(95, 109, 121, 0.96);
 }
 
 .vehicle-heading {
@@ -743,6 +780,8 @@ h3 {
 }
 
 .scene-vehicle.selected .vehicle-body,
+.scene-vehicle.selected .vehicle-cab,
+.scene-vehicle.selected .vehicle-fork,
 .scene-vehicle.selected .vehicle-heading {
   fill: rgba(201, 106, 24, 0.96);
   stroke: rgba(255, 255, 255, 0.95);

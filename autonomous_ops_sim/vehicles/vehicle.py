@@ -14,6 +14,9 @@ Position = tuple[float, float, float]
 
 class VehicleType(Enum):
     GENERIC = auto()
+    HAUL_TRUCK = auto()
+    FORKLIFT = auto()
+    CAR = auto()
 
 
 @dataclass

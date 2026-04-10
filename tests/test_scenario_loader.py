@@ -332,6 +332,38 @@ def test_load_scenario_parses_valid_vehicle_type(tmp_path, valid_scenario_data):
     scenario = load_scenario(scenario_path)
     assert scenario.vehicles[0].vehicle_type == VehicleType.GENERIC
 
+
+def test_load_scenario_parses_extended_vehicle_types(tmp_path, valid_scenario_data):
+    data = valid_scenario_data
+    data["vehicles"][0]["vehicle_type"] = "HAUL_TRUCK"
+    data["vehicles"].append(
+        {
+            "id": 2,
+            "position": [0, 0, 0],
+            "velocity": 0.0,
+            "payload": 0.0,
+            "max_payload": 10.0,
+            "max_speed": 20.0,
+            "vehicle_type": "FORKLIFT",
+        }
+    )
+    data["vehicles"].append(
+        {
+            "id": 3,
+            "position": [1, 0, 0],
+            "velocity": 0.0,
+            "payload": 0.0,
+            "max_payload": 10.0,
+            "max_speed": 20.0,
+            "vehicle_type": "CAR",
+        }
+    )
+    scenario_path = write_scenario(tmp_path, data)
+    scenario = load_scenario(scenario_path)
+    assert scenario.vehicles[0].vehicle_type == VehicleType.HAUL_TRUCK
+    assert scenario.vehicles[1].vehicle_type == VehicleType.FORKLIFT
+    assert scenario.vehicles[2].vehicle_type == VehicleType.CAR
+
 def test_load_scenario_accepts_missing_vehicle_type(tmp_path, valid_scenario_data):
     data = valid_scenario_data
     del data["vehicles"][0]["vehicle_type"]

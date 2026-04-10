@@ -12,6 +12,10 @@ from autonomous_ops_sim.simulation.control import (
     CommandApplicationRecord,
 )
 from autonomous_ops_sim.simulation.live_session import LiveSimulationSession
+from autonomous_ops_sim.vehicles.presentation import (
+    VehiclePresentationSurface,
+    build_vehicle_presentation_surface,
+)
 from autonomous_ops_sim.visualization.state import (
     FrameTrigger,
     MapSurface,
@@ -20,7 +24,7 @@ from autonomous_ops_sim.visualization.state import (
 )
 
 
-LIVE_SYNC_SCHEMA_VERSION = 1
+LIVE_SYNC_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -69,6 +73,7 @@ class LiveSyncSurface:
     schema_version: int
     seed: int
     map_surface: MapSurface
+    vehicle_presentations: tuple[VehiclePresentationSurface, ...]
     snapshot: LiveRuntimeSnapshot
     updates: tuple[LiveStateUpdate, ...]
     command_effects: tuple[LiveCommandEffect, ...]
@@ -113,6 +118,7 @@ def build_live_sync_surface(session: LiveSimulationSession) -> LiveSyncSurface:
     """Build the full stable live sync surface from one live session."""
 
     state = build_visualization_state_from_live_session(session)
+    vehicle_presentations = _build_vehicle_presentations(session)
     updates = tuple(
         LiveStateUpdate(
             update_index=frame.frame_index - 1,
@@ -128,6 +134,7 @@ def build_live_sync_surface(session: LiveSimulationSession) -> LiveSyncSurface:
         schema_version=LIVE_SYNC_SCHEMA_VERSION,
         seed=state.seed,
         map_surface=state.map_surface,
+        vehicle_presentations=vehicle_presentations,
         snapshot=LiveRuntimeSnapshot(
             simulated_time_s=session.engine.simulated_time_s,
             is_active=session.is_active,
@@ -145,21 +152,30 @@ def build_live_sync_surface(session: LiveSimulationSession) -> LiveSyncSurface:
     )
 
 
-def live_runtime_snapshot_to_dict(snapshot: LiveRuntimeSnapshot) -> dict[str, Any]:
+def live_runtime_snapshot_to_dict(
+    snapshot: LiveRuntimeSnapshot,
+    vehicle_lookup: dict[int, VehiclePresentationSurface] | None = None,
+) -> dict[str, Any]:
     """Convert one live runtime snapshot into a stable JSON-ready record."""
 
     return {
         "simulated_time_s": snapshot.simulated_time_s,
         "is_active": snapshot.is_active,
         "blocked_edge_ids": list(snapshot.blocked_edge_ids),
-        "vehicles": [_vehicle_surface_state_to_dict(vehicle) for vehicle in snapshot.vehicles],
+        "vehicles": [
+            _vehicle_surface_state_to_dict(vehicle, vehicle_lookup)
+            for vehicle in snapshot.vehicles
+        ],
         "command_count": snapshot.command_count,
         "session_step_count": snapshot.session_step_count,
         "trace_event_count": snapshot.trace_event_count,
     }
 
 
-def live_state_update_to_dict(update: LiveStateUpdate) -> dict[str, Any]:
+def live_state_update_to_dict(
+    update: LiveStateUpdate,
+    vehicle_lookup: dict[int, VehiclePresentationSurface] | None = None,
+) -> dict[str, Any]:
     """Convert one live ordered update into a stable JSON-ready record."""
 
     return {
@@ -168,11 +184,17 @@ def live_state_update_to_dict(update: LiveStateUpdate) -> dict[str, Any]:
         "timestamp_s": update.timestamp_s,
         "trigger": _frame_trigger_to_dict(update.trigger),
         "blocked_edge_ids": list(update.blocked_edge_ids),
-        "vehicles": [_vehicle_surface_state_to_dict(vehicle) for vehicle in update.vehicles],
+        "vehicles": [
+            _vehicle_surface_state_to_dict(vehicle, vehicle_lookup)
+            for vehicle in update.vehicles
+        ],
     }
 
 
-def live_command_effect_to_dict(effect: LiveCommandEffect) -> dict[str, Any]:
+def live_command_effect_to_dict(
+    effect: LiveCommandEffect,
+    vehicle_lookup: dict[int, VehiclePresentationSurface] | None = None,
+) -> dict[str, Any]:
     """Convert one command effect publication into a stable JSON-ready record."""
 
     return {
@@ -183,13 +205,17 @@ def live_command_effect_to_dict(effect: LiveCommandEffect) -> dict[str, Any]:
         "emitted_update_indices": list(effect.emitted_update_indices),
         "result_timestamp_s": effect.result_timestamp_s,
         "blocked_edge_ids": list(effect.blocked_edge_ids),
-        "vehicles": [_vehicle_surface_state_to_dict(vehicle) for vehicle in effect.vehicles],
+        "vehicles": [
+            _vehicle_surface_state_to_dict(vehicle, vehicle_lookup)
+            for vehicle in effect.vehicles
+        ],
     }
 
 
 def live_sync_surface_to_dict(surface: LiveSyncSurface) -> dict[str, Any]:
     """Convert the full live sync surface into a stable JSON-ready record."""
 
+    vehicle_lookup = _vehicle_presentation_lookup(surface.vehicle_presentations)
     return {
         "schema_version": surface.schema_version,
         "seed": surface.seed,
@@ -213,10 +239,14 @@ def live_sync_surface_to_dict(surface: LiveSyncSurface) -> dict[str, Any]:
                 for edge in surface.map_surface.edges
             ],
         },
-        "snapshot": live_runtime_snapshot_to_dict(surface.snapshot),
-        "updates": [live_state_update_to_dict(update) for update in surface.updates],
+        "snapshot": live_runtime_snapshot_to_dict(surface.snapshot, vehicle_lookup),
+        "updates": [
+            live_state_update_to_dict(update, vehicle_lookup)
+            for update in surface.updates
+        ],
         "command_effects": [
-            live_command_effect_to_dict(effect) for effect in surface.command_effects
+            live_command_effect_to_dict(effect, vehicle_lookup)
+            for effect in surface.command_effects
         ],
     }
 
@@ -293,13 +323,43 @@ def _select_command_updates(
 
 def _vehicle_surface_state_to_dict(
     vehicle: VehicleSurfaceState,
+    vehicle_lookup: dict[int, VehiclePresentationSurface] | None = None,
 ) -> dict[str, Any]:
+    presentation = vehicle_lookup.get(vehicle.vehicle_id) if vehicle_lookup else None
     return {
         "vehicle_id": vehicle.vehicle_id,
         "node_id": vehicle.node_id,
         "position": list(vehicle.position),
         "operational_state": vehicle.operational_state,
+        "vehicle_type": presentation.vehicle_type if presentation else "GENERIC",
+        "presentation_key": presentation.presentation_key if presentation else "generic",
+        "display_name": presentation.display_name if presentation else "Generic Vehicle",
+        "role_label": presentation.role_label if presentation else "General operations",
+        "body_length_m": presentation.body_length_m if presentation else 1.12,
+        "body_width_m": presentation.body_width_m if presentation else 0.62,
+        "primary_color": presentation.primary_color if presentation else "rgba(95, 109, 121, 0.96)",
+        "accent_color": presentation.accent_color if presentation else "rgba(255, 255, 255, 0.92)",
     }
+
+
+def _build_vehicle_presentations(
+    session: LiveSimulationSession,
+) -> tuple[VehiclePresentationSurface, ...]:
+    return tuple(
+        build_vehicle_presentation_surface(
+            vehicle_id=vehicle.id,
+            vehicle_type=vehicle.vehicle_type,
+        )
+        for vehicle in sorted(session.engine.vehicles, key=lambda vehicle: vehicle.id)
+    )
+
+
+def _vehicle_presentation_lookup(
+    vehicle_presentations: tuple[VehiclePresentationSurface, ...] | None,
+) -> dict[int, VehiclePresentationSurface]:
+    if vehicle_presentations is None:
+        return {}
+    return {presentation.vehicle_id: presentation for presentation in vehicle_presentations}
 
 
 def _frame_trigger_to_dict(trigger: FrameTrigger) -> dict[str, Any]:

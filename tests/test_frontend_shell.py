@@ -9,7 +9,7 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
         REPO_ROOT / "frontend" / "serious_ui" / "src" / "App.tsx"
     ).read_text(encoding="utf-8")
 
-    assert "Step 53 Curve-Following and Turn Arcs" in app_source
+    assert "Step 54 Vehicle Presentation Upgrade" in app_source
     assert "Command-Center Region" in app_source
     assert "Inspector Region" in app_source
     assert "Alerts Region" in app_source
@@ -19,13 +19,13 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "Autonomous Ops Command Deck" in app_source
     assert "Fit Scene" in app_source
     assert "Focus Selected" in app_source
-    assert "Curved motion and heading-aware playback are now live" in app_source
+    assert "Curved motion and typed vehicle presentation are now live" in app_source
     assert "Save Scenario" in app_source
     assert "Reload Scenario" in app_source
     assert "turn_connectors" in app_source
     assert "stop_lines" in app_source
     assert "merge_zones" in app_source
-    assert "renderVehicleMarker" in app_source
+    assert "renderVehicleGlyph" in app_source
     assert "motion_segments" in app_source
     assert "formatHeadingDegrees" in app_source
     assert "scene-legend" in app_source
@@ -59,8 +59,10 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".scene-turn-connector" in css_source
     assert ".scene-stop-line" in css_source
     assert ".scene-merge-zone" in css_source
-    assert ".vehicle-body" in css_source
-    assert ".vehicle-heading" in css_source
+    assert ".vehicle-body-haul" in css_source
+    assert ".vehicle-body-forklift" in css_source
+    assert ".vehicle-body-car" in css_source
+    assert ".vehicle-body-generic" in css_source
     assert ".scene-edit-handle" in css_source
     assert ".scene-area.selected" in css_source
     assert ".scene-road.selected" in css_source

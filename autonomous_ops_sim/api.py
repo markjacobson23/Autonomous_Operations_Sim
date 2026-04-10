@@ -31,6 +31,10 @@ from autonomous_ops_sim.simulation.metrics import (
     ExecutionMetricsSummary,
     summarize_engine_execution,
 )
+from autonomous_ops_sim.vehicles.presentation import (
+    VehiclePresentationSurface,
+    build_vehicle_presentation_surface,
+)
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
 from autonomous_ops_sim.visualization.command_center import (
     CommandCenterSurface,
@@ -72,9 +76,9 @@ from autonomous_ops_sim.visualization.state import (
 
 
 SIMULATION_API_VERSION = 1
-REPLAY_BUNDLE_SCHEMA_VERSION = 5
-LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 8
-LIVE_SYNC_BUNDLE_SCHEMA_VERSION = 8
+REPLAY_BUNDLE_SCHEMA_VERSION = 6
+LIVE_SESSION_BUNDLE_SCHEMA_VERSION = 9
+LIVE_SYNC_BUNDLE_SCHEMA_VERSION = 9
 
 
 @dataclass(frozen=True)
@@ -119,6 +123,7 @@ class ReplayBundle:
     session_history: tuple[SessionAdvanceRecord, ...]
     motion_segments: tuple[VehicleMotionSegment, ...]
     traffic_baseline: TrafficBaselineSurface
+    vehicle_presentations: tuple[VehiclePresentationSurface, ...]
 
 
 @dataclass(frozen=True)
@@ -138,6 +143,7 @@ class LiveSessionBundle:
     motion_segments: tuple[VehicleMotionSegment, ...]
     traffic_baseline: TrafficBaselineSurface
     command_center: CommandCenterSurface
+    vehicle_presentations: tuple[VehiclePresentationSurface, ...]
 
 
 @dataclass(frozen=True)
@@ -154,6 +160,7 @@ class LiveSyncBundle:
     motion_segments: tuple[VehicleMotionSegment, ...]
     traffic_baseline: TrafficBaselineSurface
     command_center: CommandCenterSurface
+    vehicle_presentations: tuple[VehiclePresentationSurface, ...]
 
 
 def apply_command_with_result(
@@ -207,6 +214,7 @@ def build_replay_bundle(
         replay_state,
         render_geometry=render_geometry,
     )
+    vehicle_presentations = _build_vehicle_presentations(engine.vehicles)
     command_results = _build_replay_command_results(
         command_history=tuple(command_history),
         frames=replay_state.frames,
@@ -235,6 +243,7 @@ def build_replay_bundle(
             render_geometry=render_geometry,
             motion_segments=motion_segments,
         ),
+        vehicle_presentations=vehicle_presentations,
     )
 
 
@@ -284,6 +293,7 @@ def build_live_session_bundle(
         replay_state,
         render_geometry=render_geometry,
     )
+    vehicle_presentations = _build_vehicle_presentations(session.engine.vehicles)
     return LiveSessionBundle(
         metadata=SimulationApiMetadata(
             api_version=SIMULATION_API_VERSION,
@@ -315,6 +325,7 @@ def build_live_session_bundle(
             selected_vehicle_ids=selected_vehicle_ids,
             route_preview_requests=route_preview_requests,
         ),
+        vehicle_presentations=vehicle_presentations,
     )
 
 
@@ -334,6 +345,7 @@ def build_live_sync_bundle(
         replay_state,
         render_geometry=render_geometry,
     )
+    vehicle_presentations = _build_vehicle_presentations(session.engine.vehicles)
     return LiveSyncBundle(
         metadata=SimulationApiMetadata(
             api_version=SIMULATION_API_VERSION,
@@ -370,6 +382,7 @@ def build_live_sync_bundle(
             selected_vehicle_ids=selected_vehicle_ids,
             route_preview_requests=route_preview_requests,
         ),
+        vehicle_presentations=vehicle_presentations,
     )
 
 
@@ -387,9 +400,11 @@ def simulation_api_metadata_to_dict(
 
 def simulation_command_result_to_dict(
     result: SimulationCommandResult,
+    vehicle_presentations: tuple[VehiclePresentationSurface, ...] | None = None,
 ) -> dict[str, Any]:
     """Convert one command acknowledgement into a stable JSON-ready record."""
 
+    vehicle_lookup = _vehicle_presentation_lookup(vehicle_presentations)
     payload = {
         "status": result.status,
         "command": result.command,
@@ -399,7 +414,10 @@ def simulation_command_result_to_dict(
         "result_timestamp_s": result.result_timestamp_s,
         "emitted_update_indices": list(result.emitted_update_indices),
         "blocked_edge_ids": list(result.blocked_edge_ids),
-        "vehicles": [_vehicle_surface_state_to_dict(vehicle) for vehicle in result.vehicles],
+        "vehicles": [
+            _vehicle_surface_state_to_dict(vehicle, vehicle_lookup)
+            for vehicle in result.vehicles
+        ],
     }
     if result.message is not None:
         payload["message"] = result.message
@@ -409,6 +427,7 @@ def simulation_command_result_to_dict(
 def replay_bundle_to_dict(bundle: ReplayBundle) -> dict[str, Any]:
     """Convert one replay bundle into a stable JSON-ready record."""
 
+    vehicle_lookup = _vehicle_presentation_lookup(bundle.vehicle_presentations)
     return {
         "metadata": simulation_api_metadata_to_dict(bundle.metadata),
         "seed": bundle.seed,
@@ -416,13 +435,14 @@ def replay_bundle_to_dict(bundle: ReplayBundle) -> dict[str, Any]:
         "summary": metrics_summary_to_dict(bundle.summary),
         "map_surface": _map_surface_to_dict(bundle.map_surface),
         "render_geometry": render_geometry_surface_to_dict(bundle.render_geometry),
-        "final_frame": _replay_frame_to_dict(bundle.final_frame),
+        "final_frame": _replay_frame_to_dict(bundle.final_frame, vehicle_lookup),
         "replay_timeline": [
-            _replay_frame_to_dict(frame) for frame in bundle.replay_timeline
+            _replay_frame_to_dict(frame, vehicle_lookup)
+            for frame in bundle.replay_timeline
         ],
         "trace_events": list(bundle.trace_events),
         "command_results": [
-            simulation_command_result_to_dict(result)
+            simulation_command_result_to_dict(result, bundle.vehicle_presentations)
             for result in bundle.command_results
         ],
         "session_history": [
@@ -438,6 +458,7 @@ def replay_bundle_to_dict(bundle: ReplayBundle) -> dict[str, Any]:
 def live_session_bundle_to_dict(bundle: LiveSessionBundle) -> dict[str, Any]:
     """Convert one live-session bundle into a stable JSON-ready record."""
 
+    vehicle_lookup = _vehicle_presentation_lookup(bundle.vehicle_presentations)
     return {
         "metadata": simulation_api_metadata_to_dict(bundle.metadata),
         "seed": bundle.seed,
@@ -445,13 +466,13 @@ def live_session_bundle_to_dict(bundle: LiveSessionBundle) -> dict[str, Any]:
         "summary": metrics_summary_to_dict(bundle.summary),
         "map_surface": _map_surface_to_dict(bundle.map_surface),
         "render_geometry": render_geometry_surface_to_dict(bundle.render_geometry),
-        "snapshot": live_runtime_snapshot_to_dict(bundle.snapshot),
+        "snapshot": live_runtime_snapshot_to_dict(bundle.snapshot, vehicle_lookup),
         "trace_events": list(bundle.trace_events),
         "session_history": [
             session_advance_to_dict(record) for record in bundle.session_history
         ],
         "command_results": [
-            simulation_command_result_to_dict(result)
+            simulation_command_result_to_dict(result, bundle.vehicle_presentations)
             for result in bundle.command_results
         ],
         "motion_segments": [
@@ -465,15 +486,18 @@ def live_session_bundle_to_dict(bundle: LiveSessionBundle) -> dict[str, Any]:
 def live_sync_bundle_to_dict(bundle: LiveSyncBundle) -> dict[str, Any]:
     """Convert one live sync bundle into a stable JSON-ready record."""
 
+    vehicle_lookup = _vehicle_presentation_lookup(bundle.vehicle_presentations)
     return {
         "metadata": simulation_api_metadata_to_dict(bundle.metadata),
         "seed": bundle.seed,
         "map_surface": _map_surface_to_dict(bundle.map_surface),
         "render_geometry": render_geometry_surface_to_dict(bundle.render_geometry),
-        "snapshot": live_runtime_snapshot_to_dict(bundle.snapshot),
-        "updates": [live_state_update_to_dict(update) for update in bundle.updates],
+        "snapshot": live_runtime_snapshot_to_dict(bundle.snapshot, vehicle_lookup),
+        "updates": [
+            live_state_update_to_dict(update, vehicle_lookup) for update in bundle.updates
+        ],
         "command_results": [
-            simulation_command_result_to_dict(result)
+            simulation_command_result_to_dict(result, bundle.vehicle_presentations)
             for result in bundle.command_results
         ],
         "motion_segments": [
@@ -540,6 +564,26 @@ def _build_replay_command_results(
         results.append(_build_replay_command_result(record=record, frame=frame))
 
     return tuple(results)
+
+
+def _build_vehicle_presentations(
+    vehicles: tuple[Vehicle, ...] | list[Vehicle],
+) -> tuple[VehiclePresentationSurface, ...]:
+    return tuple(
+        build_vehicle_presentation_surface(
+            vehicle_id=vehicle.id,
+            vehicle_type=vehicle.vehicle_type,
+        )
+        for vehicle in sorted(vehicles, key=lambda vehicle: vehicle.id)
+    )
+
+
+def _vehicle_presentation_lookup(
+    vehicle_presentations: tuple[VehiclePresentationSurface, ...] | None,
+) -> dict[int, VehiclePresentationSurface]:
+    if vehicle_presentations is None:
+        return {}
+    return {presentation.vehicle_id: presentation for presentation in vehicle_presentations}
 
 
 def _select_replay_result_frame(
@@ -642,13 +686,19 @@ def _map_surface_to_dict(map_surface: MapSurface) -> dict[str, Any]:
     }
 
 
-def _replay_frame_to_dict(frame: ReplayFrame) -> dict[str, Any]:
+def _replay_frame_to_dict(
+    frame: ReplayFrame,
+    vehicle_lookup: dict[int, VehiclePresentationSurface] | None = None,
+) -> dict[str, Any]:
     return {
         "frame_index": frame.frame_index,
         "timestamp_s": frame.timestamp_s,
         "trigger": _frame_trigger_to_dict(frame.trigger),
         "blocked_edge_ids": list(frame.blocked_edge_ids),
-        "vehicles": [_vehicle_surface_state_to_dict(vehicle) for vehicle in frame.vehicles],
+        "vehicles": [
+            _vehicle_surface_state_to_dict(vehicle, vehicle_lookup)
+            for vehicle in frame.vehicles
+        ],
     }
 
 
@@ -666,12 +716,24 @@ def _frame_trigger_to_dict(trigger: FrameTrigger) -> dict[str, Any]:
     return payload
 
 
-def _vehicle_surface_state_to_dict(vehicle: VehicleSurfaceState) -> dict[str, Any]:
+def _vehicle_surface_state_to_dict(
+    vehicle: VehicleSurfaceState,
+    vehicle_lookup: dict[int, VehiclePresentationSurface] | None = None,
+) -> dict[str, Any]:
+    presentation = vehicle_lookup.get(vehicle.vehicle_id) if vehicle_lookup else None
     return {
         "vehicle_id": vehicle.vehicle_id,
         "node_id": vehicle.node_id,
         "position": list(vehicle.position),
         "operational_state": vehicle.operational_state,
+        "vehicle_type": presentation.vehicle_type if presentation else "GENERIC",
+        "presentation_key": presentation.presentation_key if presentation else "generic",
+        "display_name": presentation.display_name if presentation else "Generic Vehicle",
+        "role_label": presentation.role_label if presentation else "General operations",
+        "body_length_m": presentation.body_length_m if presentation else 1.12,
+        "body_width_m": presentation.body_width_m if presentation else 0.62,
+        "primary_color": presentation.primary_color if presentation else "rgba(95, 109, 121, 0.96)",
+        "accent_color": presentation.accent_color if presentation else "rgba(255, 255, 255, 0.92)",
     }
 
 
