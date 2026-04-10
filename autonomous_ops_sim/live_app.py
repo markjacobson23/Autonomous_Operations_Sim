@@ -81,6 +81,8 @@ class LiveSessionRuntime:
     artifacts: LiveAppArtifacts
     session: LiveSimulationSession
     play_state: str = "paused"
+    playback_thread: threading.Thread | None = None
+    playback_stop_event: threading.Event = field(default_factory=threading.Event)
     lock: threading.RLock = field(default_factory=threading.RLock)
 
     @classmethod
@@ -150,8 +152,58 @@ class LiveSessionRuntime:
     ) -> dict[str, object]:
         if play_state not in {"paused", "playing"}:
             raise ValueError(f"Unknown play_state: {play_state}")
+        if play_state == "playing":
+            return self.start_playback(
+                selected_vehicle_ids=selected_vehicle_ids,
+                route_preview_requests=route_preview_requests,
+            )
+        return self.pause_playback(
+            selected_vehicle_ids=selected_vehicle_ids,
+            route_preview_requests=route_preview_requests,
+        )
+
+    def start_playback(
+        self,
+        *,
+        selected_vehicle_ids: tuple[int, ...] | list[int] = (),
+        route_preview_requests: tuple[RoutePreviewRequest, ...]
+        | list[RoutePreviewRequest] = (),
+    ) -> dict[str, object]:
         with self.lock:
-            self.play_state = play_state
+            self.play_state = "playing"
+            playback_thread = self.playback_thread
+            if playback_thread is None or not playback_thread.is_alive():
+                self.playback_stop_event = threading.Event()
+                self.playback_thread = threading.Thread(
+                    target=self._run_playback_loop,
+                    name="autonomous_ops_live_session_playback",
+                    daemon=True,
+                )
+                self.playback_thread.start()
+            return self._refresh_locked(
+                selected_vehicle_ids=selected_vehicle_ids,
+                route_preview_requests=route_preview_requests,
+            )
+
+    def pause_playback(
+        self,
+        *,
+        selected_vehicle_ids: tuple[int, ...] | list[int] = (),
+        route_preview_requests: tuple[RoutePreviewRequest, ...]
+        | list[RoutePreviewRequest] = (),
+    ) -> dict[str, object]:
+        playback_thread: threading.Thread | None = None
+        with self.lock:
+            self.play_state = "paused"
+            self.playback_stop_event.set()
+            playback_thread = self.playback_thread
+        if playback_thread is not None and playback_thread.is_alive():
+            playback_thread.join()
+        with self.lock:
+            if self.playback_thread is playback_thread and (
+                playback_thread is None or not playback_thread.is_alive()
+            ):
+                self.playback_thread = None
             return self._refresh_locked(
                 selected_vehicle_ids=selected_vehicle_ids,
                 route_preview_requests=route_preview_requests,
@@ -164,6 +216,7 @@ class LiveSessionRuntime:
         route_preview_requests: tuple[RoutePreviewRequest, ...]
         | list[RoutePreviewRequest] = (),
     ) -> dict[str, object]:
+        self.pause_playback()
         with self.lock:
             scenario = load_scenario(self.artifacts.working_scenario_path)
             self.session = LiveSimulationSession(build_scenario_engine(scenario))
@@ -197,6 +250,21 @@ class LiveSessionRuntime:
             encoding="utf-8",
         )
 
+    def _run_playback_loop(self) -> None:
+        current_thread = threading.current_thread()
+        try:
+            while not self.playback_stop_event.wait(DEFAULT_LIVE_SESSION_STEP_SECONDS):
+                self.advance_session(delta_s=DEFAULT_LIVE_SESSION_STEP_SECONDS)
+        except Exception:
+            with self.lock:
+                self.play_state = "paused"
+                self.playback_stop_event.set()
+            self._refresh_locked()
+        finally:
+            with self.lock:
+                if self.playback_thread is current_thread:
+                    self.playback_thread = None
+
 
 class LiveAppServer:
     """Serve one prepared live app directory for browser access."""
@@ -211,6 +279,7 @@ class LiveAppServer:
         port: int = 0,
     ) -> None:
         session_runtime = runtime or LiveSessionRuntime.from_artifacts(artifacts)
+        self._runtime = session_runtime
         handler = partial(
             LiveAppRequestHandler,
             directory=str(directory),
@@ -236,6 +305,7 @@ class LiveAppServer:
         self._thread.start()
 
     def stop(self) -> None:
+        self._runtime.pause_playback()
         self._server.shutdown()
         self._server.server_close()
         self._thread.join(timeout=1.0)
@@ -515,6 +585,17 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
         )
         try:
             if action == "step":
+                with self._runtime.lock:
+                    if self._runtime.play_state == "playing":
+                        self._write_json_response(
+                            409,
+                            {
+                                "ok": False,
+                                "message": "Cannot step while the session is playing.",
+                                "validation_messages": [],
+                            },
+                        )
+                        return
                 delta_s_value = payload.get("delta_s", DEFAULT_LIVE_SESSION_STEP_SECONDS)
                 if not isinstance(delta_s_value, (int, float, str)):
                     raise TypeError("delta_s must be numeric")

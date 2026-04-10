@@ -1,5 +1,6 @@
 import json
-from urllib import request
+import time
+from urllib import error, request
 
 from autonomous_ops_sim.live_app import (
     LiveAppServer,
@@ -7,6 +8,29 @@ from autonomous_ops_sim.live_app import (
     export_live_app_artifacts,
     launch_live_app,
 )
+
+
+def _read_live_bundle(base_url: str) -> dict[str, object]:
+    response = request.urlopen(f"{base_url}/live_session_bundle.json")
+    return json.loads(response.read().decode("utf-8"))
+
+
+def _wait_for_live_time(
+    base_url: str,
+    minimum_time_s: float,
+    *,
+    timeout_s: float = 5.0,
+) -> dict[str, object]:
+    deadline = time.monotonic() + timeout_s
+    latest_bundle: dict[str, object] | None = None
+    while time.monotonic() < deadline:
+        latest_bundle = _read_live_bundle(base_url)
+        if float(latest_bundle["simulated_time_s"]) >= minimum_time_s:
+            return latest_bundle
+        time.sleep(0.05)
+    raise AssertionError(
+        f"Live bundle did not reach simulated_time_s >= {minimum_time_s} within {timeout_s}s"
+    )
 
 
 def test_export_live_app_artifacts_falls_back_to_standalone_viewer_when_no_frontend_dist(
@@ -232,6 +256,53 @@ def test_live_app_frontend_server_supports_live_commands_and_session_control(
         assert play_payload["ok"] is True
         assert play_payload["bundle"]["session_control"]["play_state"] == "playing"
 
+        playback_thread = server._runtime.playback_thread
+        advanced_bundle = _wait_for_live_time(base_url, 1.0)
+        assert advanced_bundle["simulated_time_s"] >= 1.0
+        assert len(advanced_bundle["session_history"]) >= 2
+
+        repeated_play_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/session/control",
+                data=json.dumps(
+                    {
+                        "action": "play",
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        repeated_play_payload = json.loads(repeated_play_response.read().decode("utf-8"))
+        assert repeated_play_payload["ok"] is True
+        assert repeated_play_payload["bundle"]["session_control"]["play_state"] == "playing"
+        assert server._runtime.playback_thread is playback_thread
+
+        repeated_bundle = _wait_for_live_time(base_url, 1.5)
+        assert repeated_bundle["simulated_time_s"] >= 1.5
+        assert len(repeated_bundle["session_history"]) == len(advanced_bundle["session_history"]) + 1
+
+        try:
+            request.urlopen(
+                request.Request(
+                    url=f"{base_url}/api/live/session/control",
+                    data=json.dumps(
+                        {
+                            "action": "step",
+                            "delta_s": 0.5,
+                        }
+                    ).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+            )
+            raise AssertionError("step while playing should be rejected")
+        except error.HTTPError as exc:
+            assert exc.code == 409
+            step_error_payload = json.loads(exc.read().decode("utf-8"))
+            assert step_error_payload["ok"] is False
+            assert "Cannot step while the session is playing." in step_error_payload["message"]
+
         pause_response = request.urlopen(
             request.Request(
                 url=f"{base_url}/api/live/session/control",
@@ -247,7 +318,66 @@ def test_live_app_frontend_server_supports_live_commands_and_session_control(
         pause_payload = json.loads(pause_response.read().decode("utf-8"))
         assert pause_payload["ok"] is True
         assert pause_payload["bundle"]["session_control"]["play_state"] == "paused"
+
+        paused_bundle = _read_live_bundle(base_url)
+        paused_time_s = paused_bundle["simulated_time_s"]
+        paused_history_length = len(paused_bundle["session_history"])
+        time.sleep(0.8)
+        after_pause_bundle = _read_live_bundle(base_url)
+        assert after_pause_bundle["simulated_time_s"] == paused_time_s
+        assert len(after_pause_bundle["session_history"]) == paused_history_length
     finally:
+        server.stop()
+
+
+def test_live_app_playback_loop_falls_back_to_paused_when_tick_fails(tmp_path) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    original_advance_session = server._runtime.advance_session
+
+    def failing_advance_session(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise RuntimeError("boom")
+
+    server._runtime.advance_session = failing_advance_session  # type: ignore[assignment]
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        play_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/session/control",
+                data=json.dumps(
+                    {
+                        "action": "play",
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        play_payload = json.loads(play_response.read().decode("utf-8"))
+        assert play_payload["ok"] is True
+        assert play_payload["bundle"]["session_control"]["play_state"] == "playing"
+
+        paused_bundle = _wait_for_live_time(base_url, 0.0)
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline and paused_bundle["session_control"]["play_state"] != "paused":
+            time.sleep(0.05)
+            paused_bundle = _read_live_bundle(base_url)
+
+        assert paused_bundle["session_control"]["play_state"] == "paused"
+        assert server._runtime.playback_thread is None
+        assert paused_bundle["simulated_time_s"] == 0.0
+    finally:
+        server._runtime.advance_session = original_advance_session  # type: ignore[assignment]
         server.stop()
 
 
