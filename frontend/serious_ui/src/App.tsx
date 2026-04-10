@@ -975,7 +975,6 @@ function App(): JSX.Element {
   );
   const authoring = bootstrap.bundle?.authoring;
   const sessionControl = bootstrap.bundle?.session_control ?? null;
-  const liveSessionPlaying = sessionControl?.play_state === "playing";
   const editCount = draftTransaction.operations.length;
   const hasDraftEdits = editCount > 0;
   const validationBlocked = validationMessages.length > 0;
@@ -987,6 +986,31 @@ function App(): JSX.Element {
   const workingScenarioPath = authoring?.working_scenario_path ?? "unavailable";
   const sourceScenarioPath = authoring?.source_scenario_path ?? "unavailable";
   const authoringModeLabel = authoring?.mode ?? "authoring";
+  const editableNodeCount = formatMaybeNumber(authoring?.editable_node_count ?? null);
+  const editableRoadCount = formatMaybeNumber(authoring?.editable_road_count ?? null);
+  const editableAreaCount = formatMaybeNumber(authoring?.editable_area_count ?? null);
+  const editorSceneContextLabel = editorEnabled ? "Scene handles visible" : "Scene handles hidden";
+  const editorSceneContextCopy = editorEnabled
+    ? "The scene is now the authoring surface. Drag the visible node, road, and zone handles in place to stage geometry changes."
+    : "The scene remains read-only until edit mode is enabled. Turn it on to reveal the authoring handles directly in the map.";
+  const editorPrimaryActionLabel = validationBlocked
+    ? "Resolve the validation issues before saving"
+    : hasDraftEdits
+      ? authoring?.save_endpoint
+        ? "Save the staged geometry into the working scenario"
+        : "Saving is unavailable in this bundle"
+      : editorEnabled
+        ? "Start staging geometry changes in the scene"
+        : "Enable edit mode to begin authoring";
+  const editorPrimaryActionCopy = validationBlocked
+    ? "Clear the messages below first, then use Save Scenario to persist the draft."
+    : hasDraftEdits
+      ? authoring?.save_endpoint
+        ? "Save will persist the staged edits and reload the live bundle."
+        : "The draft is ready, but the current bundle cannot save it yet."
+      : editorEnabled
+        ? "Use the scene handles to build a draft directly on the map."
+        : "Press Edit Scene to switch the scene into authoring mode.";
 
   function applyLoadedBundle(
     bundlePayload: BundlePayload,
@@ -1141,7 +1165,7 @@ function App(): JSX.Element {
     setEditorEnabled((current) => !current);
     setEditorMessage(
       !editorEnabled
-        ? "Edit mode enabled. Drag node, road, or zone handles to stage geometry mutations."
+        ? "Edit mode enabled. The scene handles are visible now, so you can stage geometry changes directly on the map."
         : "Edit mode paused. Draft mutations are preserved until you save or reload.",
     );
   }
@@ -1732,6 +1756,46 @@ function App(): JSX.Element {
       : blockedEdgeIds.length > 0
         ? `${blockedEdgeIds.length} blocked edge${blockedEdgeIds.length === 1 ? "" : "s"}`
         : "No blocked edges";
+  const operateSelectedVehicleSummary =
+    selectedVehicle !== null
+      ? `${selectedVehicle.display_name ?? selectedVehicle.role_label ?? vehiclePresentationBadge(selectedVehicle)} · ${
+          selectedInspection?.operational_state ??
+          selectedVehicle.operational_state ??
+          "state unknown"
+        }`
+      : effectiveSelectedVehicleIds.length > 0
+        ? `Fleet selection active · ${effectiveSelectedVehicleIds.length} vehicle(s)`
+        : "No selected vehicle yet";
+  const operateSelectedContextSummary =
+    selectedInspection !== null
+      ? `Node ${formatMaybeNumber(selectedInspection.current_node_id ?? null)} · ETA ${formatSeconds(selectedInspection.eta_s ?? null)} · ${selectedInspection.current_job_id ?? "no job"}`
+      : "Choose a vehicle on the map or from the roster to populate inspection details.";
+  const operateSelectedTargetSummary = describeSelectedTarget(selectedTarget, selectedVehicleId);
+  const operateRoutePreviewSummary =
+    selectedRoutePreview !== null
+      ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id ?? null)} · Node ${formatMaybeNumber(selectedRoutePreview.destination_node_id ?? null)} · ${
+          selectedRoutePreview.is_actionable ? "actionable" : "held"
+        }`
+      : "No route preview selected yet";
+  const operateRoutePreviewDetail =
+    selectedRoutePreview !== null
+      ? `${selectedRoutePreview.reason ?? "No reason provided"}${
+          selectedRoutePreview.total_distance !== undefined
+            ? ` · ${formatMeters(selectedRoutePreview.total_distance)}`
+            : ""
+        }`
+      : "Preview a route to see the node chain, edge list, and distance here.";
+  const operatePrimaryActionLabel = selectedRoutePreview?.is_actionable
+    ? "Assign Destination"
+    : "Preview Route";
+  const operatePrimaryActionDetail = selectedRoutePreview
+    ? selectedRoutePreview.is_actionable
+      ? "The preview is actionable. Assign the destination to keep the route attached to the selected vehicle."
+      : "Preview the route first to verify the selected vehicle and destination before assigning it."
+    : "Pick a vehicle on the map or from the roster, then preview the route before assigning it.";
+  const operateSessionStateSummary = `Mode ${sessionControl?.play_state ?? "paused"} · step ${formatSeconds(sessionControl?.step_seconds ?? null)} · ${
+    sessionControl?.session_control_endpoint ?? "unbound"
+  }`;
 
   return (
     <div className={`shell shell-tab-${activeTab} ${activeTab === "editor" ? "shell-editor-focused" : ""}`}>
@@ -2391,117 +2455,143 @@ function App(): JSX.Element {
                       Destination node:{" "}
                       {formatMaybeNumber(selectedRoutePreview?.destination_node_id ?? null)}
                     </span>
+                    <span className="selection-pill">Current target: {operateSelectedTargetSummary}</span>
                   </div>
-                  <div className="route-planning-grid">
-                    <label className="form-field">
-                      <span>Vehicle ID</span>
-                      <input
-                        type="number"
-                        value={liveCommandDraft.vehicleId}
-                        onChange={(event) =>
-                          setLiveCommandDraft((current) => ({
-                            ...current,
-                            vehicleId: event.target.value,
-                          }))
-                        }
-                        placeholder={selectedVehicleId !== null ? String(selectedVehicleId) : "77"}
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>Destination Node</span>
-                      <input
-                        type="number"
-                        value={liveCommandDraft.destinationNodeId}
-                        onChange={(event) =>
-                          setLiveCommandDraft((current) => ({
-                            ...current,
-                            destinationNodeId: event.target.value,
-                          }))
-                        }
-                        placeholder={
-                          routePreviews[0]?.destination_node_id !== undefined
-                            ? String(routePreviews[0].destination_node_id)
-                            : "3"
-                        }
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>Reposition Node</span>
-                      <input
-                        type="number"
-                        value={liveCommandDraft.nodeId}
-                        onChange={(event) =>
-                          setLiveCommandDraft((current) => ({
-                            ...current,
-                            nodeId: event.target.value,
-                          }))
-                        }
-                        placeholder={
-                          selectedInspection?.current_node_id !== undefined
-                            ? String(selectedInspection.current_node_id)
-                            : "1"
-                        }
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>Step Seconds</span>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={liveCommandDraft.stepSeconds}
-                        onChange={(event) =>
-                          setLiveCommandDraft((current) => ({
-                            ...current,
-                            stepSeconds: event.target.value,
-                          }))
-                        }
-                        placeholder={String(sessionControl?.step_seconds ?? 0.5)}
-                      />
-                    </label>
-                  </div>
-                  <div className="route-primary-actions action-row">
-                    <button
-                      className="scene-button scene-button-primary"
-                      type="button"
-                      onClick={previewRouteFromDraft}
-                      disabled={!sessionControl?.route_preview_endpoint}
-                    >
-                      Preview Route
-                    </button>
-                    <button
-                      className="scene-button scene-button-primary"
-                      type="button"
-                      onClick={assignDestinationFromDraft}
-                      disabled={!sessionControl?.command_endpoint}
-                    >
-                      Assign Destination
-                    </button>
-                    <button
-                      className="scene-button"
-                      type="button"
-                      onClick={repositionVehicleFromDraft}
-                      disabled={!sessionControl?.command_endpoint}
-                    >
-                      Reposition Vehicle
-                    </button>
-                  </div>
-                  <div className="route-preview-summary">
-                    <div className="preview-badge">
-                      <span className="preview-label">Selected Preview</span>
-                      <strong>
-                        V{formatMaybeNumber(selectedRoutePreview?.vehicle_id ?? null)} · Node{" "}
-                        {formatMaybeNumber(selectedRoutePreview?.destination_node_id ?? null)}
-                      </strong>
+                  <p className="operate-route-hint">
+                    Select a vehicle in the scene, confirm the route preview, then use the
+                    primary action to commit or refine the destination without leaving the map.
+                  </p>
+                  <div className="operate-context-grid">
+                    <section className="operate-context-card">
+                      <p className="operate-card-label">Selected Context</p>
+                      <strong>{operateSelectedVehicleSummary}</strong>
+                      <p>{operateSelectedContextSummary}</p>
+                      <ul className="mini-list">
+                        <li>Current target: {operateSelectedTargetSummary}</li>
+                        <li>
+                          Selection source:{" "}
+                          {effectiveSelectedVehicleIds.length > 1
+                            ? `${effectiveSelectedVehicleIds.length} vehicles`
+                            : "single vehicle focus"}
+                        </li>
+                      </ul>
+                    </section>
+                    <div className="route-preview-summary operate-context-card">
+                      <div className="preview-badge">
+                        <span className="preview-label">Selected Preview</span>
+                        <strong>{operateRoutePreviewSummary}</strong>
+                      </div>
+                      <p className="operate-route-preview-detail">{operateRoutePreviewDetail}</p>
+                      <ul className="mini-list">
+                        <li>Actionable: {selectedRoutePreview?.is_actionable ? "yes" : "no"}</li>
+                        <li>Reason: {selectedRoutePreview?.reason ?? "none"}</li>
+                        <li>
+                          Distance: {formatMeters(selectedRoutePreview?.total_distance ?? null)}
+                        </li>
+                        <li>Edges: {(selectedRoutePreview?.edge_ids ?? []).join(", ") || "none"}</li>
+                        <li>Nodes: {(selectedRoutePreview?.node_ids ?? []).join(" → ") || "none"}</li>
+                      </ul>
                     </div>
-                    <ul className="mini-list">
-                      <li>Actionable: {selectedRoutePreview?.is_actionable ? "yes" : "no"}</li>
-                      <li>Reason: {selectedRoutePreview?.reason ?? "none"}</li>
-                      <li>
-                        Distance: {formatMeters(selectedRoutePreview?.total_distance ?? null)}
-                      </li>
-                      <li>Edges: {(selectedRoutePreview?.edge_ids ?? []).join(", ") || "none"}</li>
-                      <li>Nodes: {(selectedRoutePreview?.node_ids ?? []).join(" → ") || "none"}</li>
-                    </ul>
+                  </div>
+                  <div className="operate-workflow-actions">
+                    <div className="operate-next-action">
+                      <span className="operate-card-label">Primary next action</span>
+                      <strong>{operatePrimaryActionLabel}</strong>
+                      <p>{operatePrimaryActionDetail}</p>
+                    </div>
+                    <div className="route-planning-grid">
+                      <label className="form-field">
+                        <span>Vehicle ID</span>
+                        <input
+                          type="number"
+                          value={liveCommandDraft.vehicleId}
+                          onChange={(event) =>
+                            setLiveCommandDraft((current) => ({
+                              ...current,
+                              vehicleId: event.target.value,
+                            }))
+                          }
+                          placeholder={selectedVehicleId !== null ? String(selectedVehicleId) : "77"}
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>Destination Node</span>
+                        <input
+                          type="number"
+                          value={liveCommandDraft.destinationNodeId}
+                          onChange={(event) =>
+                            setLiveCommandDraft((current) => ({
+                              ...current,
+                              destinationNodeId: event.target.value,
+                            }))
+                          }
+                          placeholder={
+                            routePreviews[0]?.destination_node_id !== undefined
+                              ? String(routePreviews[0].destination_node_id)
+                              : "3"
+                          }
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>Reposition Node</span>
+                        <input
+                          type="number"
+                          value={liveCommandDraft.nodeId}
+                          onChange={(event) =>
+                            setLiveCommandDraft((current) => ({
+                              ...current,
+                              nodeId: event.target.value,
+                            }))
+                          }
+                          placeholder={
+                            selectedInspection?.current_node_id !== undefined
+                              ? String(selectedInspection.current_node_id)
+                              : "1"
+                          }
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>Step Seconds</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={liveCommandDraft.stepSeconds}
+                          onChange={(event) =>
+                            setLiveCommandDraft((current) => ({
+                              ...current,
+                              stepSeconds: event.target.value,
+                            }))
+                          }
+                          placeholder={String(sessionControl?.step_seconds ?? 0.5)}
+                        />
+                      </label>
+                    </div>
+                    <div className="route-primary-actions action-row">
+                      <button
+                        className="scene-button scene-button-primary"
+                        type="button"
+                        onClick={previewRouteFromDraft}
+                        disabled={!sessionControl?.route_preview_endpoint}
+                      >
+                        Preview Route
+                      </button>
+                      <button
+                        className="scene-button scene-button-primary"
+                        type="button"
+                        onClick={assignDestinationFromDraft}
+                        disabled={!sessionControl?.command_endpoint}
+                      >
+                        Assign Destination
+                      </button>
+                      <button
+                        className="scene-button"
+                        type="button"
+                        onClick={repositionVehicleFromDraft}
+                        disabled={!sessionControl?.command_endpoint}
+                      >
+                        Reposition Vehicle
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="overview-card overview-card-minimap">
@@ -2678,16 +2768,13 @@ function App(): JSX.Element {
                 lede:
                   "The live session controls stay compact so play-state changes remain easy to scan.",
                 className: "compact",
-                meta: (
-                  <span className="status-pill secondary">
-                    {liveSessionPlaying ? "playing" : "paused"} · step{" "}
-                    {formatSeconds(sessionControl?.step_seconds ?? null)}
-                  </span>
-                ),
-              })}
-              <div className="section-stack">
-                <div className="subsection">
-                  <div className="action-row">
+              meta: (
+                <span className="status-pill secondary">{operateSessionStateSummary}</span>
+              ),
+            })}
+            <div className="section-stack">
+              <div className="subsection">
+                <div className="action-row">
                     <button
                       className="scene-button scene-button-primary"
                       type="button"
@@ -2712,12 +2799,14 @@ function App(): JSX.Element {
                     >
                       Single-Step
                     </button>
+                </div>
+                  <div className="selection-strip operate-session-strip">
+                    <span className="selection-pill">Mode: {sessionControl?.play_state ?? "paused"}</span>
+                    <span className="selection-pill">Step: {formatSeconds(sessionControl?.step_seconds ?? null)}</span>
+                    <span className="selection-pill">
+                      Channel: {sessionControl?.session_control_endpoint ?? "unbound"}
+                    </span>
                   </div>
-                  <ul className="mini-list">
-                    <li>Mode: {sessionControl?.play_state ?? "paused"}</li>
-                    <li>Step size: {formatSeconds(sessionControl?.step_seconds ?? null)}</li>
-                    <li>Session channel: {sessionControl?.session_control_endpoint ?? "unbound"}</li>
-                  </ul>
                   <p className="status-copy">{liveCommandMessage}</p>
                 </div>
               </div>
@@ -2795,6 +2884,11 @@ function App(): JSX.Element {
                     Source: {sourceScenarioPath} · Mode: {authoringModeLabel} · Save endpoint{" "}
                     {authoring?.save_endpoint ? "ready" : "unavailable"}
                   </p>
+                  <div className="editor-next-action">
+                    <span className="editor-next-action-label">Primary next action</span>
+                    <strong>{editorPrimaryActionLabel}</strong>
+                    <p>{editorPrimaryActionCopy}</p>
+                  </div>
                 </div>
                 <div className="editor-status-grid">
                   <div className="editor-status-card">
@@ -2824,6 +2918,17 @@ function App(): JSX.Element {
                         : "Draft validation is clean and the working scenario is ready."}
                     </p>
                   </div>
+                  <div className="editor-status-card editor-status-card-context">
+                    <span>Editable scene</span>
+                    <strong>
+                      {editableNodeCount} nodes · {editableRoadCount} roads · {editableAreaCount} zones
+                    </strong>
+                    <p>
+                      {editorEnabled
+                        ? "The scene is open for authoring, with node, road, and zone handles active in place."
+                        : "Enable edit mode to reveal the editable handles directly in the scene."}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -2835,7 +2940,11 @@ function App(): JSX.Element {
                   </span>
                 </div>
                 <div className="action-row editor-action-row">
-                  <button className="scene-button scene-button-primary" type="button" onClick={toggleEditMode}>
+                  <button
+                    className="scene-button scene-button-primary editor-primary-action"
+                    type="button"
+                    onClick={toggleEditMode}
+                  >
                     {editorEnabled ? "Pause Edit Mode" : "Edit Scene"}
                   </button>
                   <button
@@ -2861,15 +2970,21 @@ function App(): JSX.Element {
               <div className="editor-detail-grid">
                 <div className="overview-card editor-state-card">
                   <div className="subsection-header">
-                    <p className="eyebrow">Authoring State</p>
-                    <span className={`status-pill ${validationBlocked ? "secondary" : "accent"}`}>
-                      {validationStatusLabel}
+                    <p className="eyebrow">Scene Editing Context</p>
+                    <span className={`status-pill ${editorEnabled ? "accent" : "secondary"}`}>
+                      {editorSceneContextLabel}
                     </span>
                   </div>
+                  <p className="editor-scene-context-copy">{editorSceneContextCopy}</p>
+                  <div className="editor-target-strip" aria-label="Editable targets">
+                    <span className="editor-target-pill">Nodes {editableNodeCount}</span>
+                    <span className="editor-target-pill">Roads {editableRoadCount}</span>
+                    <span className="editor-target-pill">Zones {editableAreaCount}</span>
+                  </div>
                   <ul className="mini-list editor-state-list">
-                    <li>{editorEnabled ? "Edit mode is active" : "Edit mode is paused"}</li>
                     <li>Working copy: {workingScenarioPath}</li>
                     <li>Source scenario: {sourceScenarioPath}</li>
+                    <li>Save endpoint: {authoring?.save_endpoint ? "ready" : "unavailable"}</li>
                     <li>
                       Geometry: {formatMaybeNumber(authoring?.editable_node_count ?? null)} nodes ·{" "}
                       {formatMaybeNumber(authoring?.editable_road_count ?? null)} roads ·{" "}
