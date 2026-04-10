@@ -423,17 +423,29 @@ type DragState =
   | { kind: "road-point"; roadId: string; pointIndex: number; z: number }
   | { kind: "area-point"; areaId: string; pointIndex: number; z: number };
 
+type WorkspaceTab = "operate" | "traffic" | "fleet" | "editor" | "analyze";
+
 const architecture = {
   primaryStack: "React + TypeScript + Vite",
   authority: "Python simulator remains authoritative",
   launchMode: "Live session + live authoring through versioned bundle surfaces",
 };
 
+const workspaceTabs: Array<{
+  id: WorkspaceTab;
+  label: string;
+  summary: string;
+}> = [
+  { id: "operate", label: "Operate", summary: "Map, session, and scene control" },
+  { id: "traffic", label: "Traffic", summary: "Queues, heatmaps, and bottlenecks" },
+  { id: "fleet", label: "Fleet", summary: "Commanding and selection" },
+  { id: "editor", label: "Editor", summary: "Scenario authoring" },
+  { id: "analyze", label: "Analyze", summary: "Inspection and AI feedback" },
+];
+
 const sessionActions = [
   "Launch Live Run",
   "Reconnect Bundle",
-  "Edit Scene",
-  "Save Scenario",
 ];
 
 const defaultLayers: LayerState = {
@@ -455,6 +467,7 @@ function App(): JSX.Element {
   const minimapRef = useRef<SVGSVGElement | null>(null);
   const sceneRef = useRef<SVGSVGElement | null>(null);
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("operate");
   const [selectedTarget, setSelectedTarget] = useState<SelectedTarget | null>(null);
   const [hoverTarget, setHoverTarget] = useState<HoverTarget | null>(null);
   const [editorEnabled, setEditorEnabled] = useState(false);
@@ -1504,12 +1517,12 @@ function App(): JSX.Element {
   };
 
   return (
-    <div className="shell">
+    <div className={`shell shell-tab-${activeTab}`}>
       <div className="shell-accent shell-accent-left" aria-hidden="true" />
       <div className="shell-accent shell-accent-right" aria-hidden="true" />
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 57 Stop Lines, Yielding, and Traffic-Control Logic</p>
+          <p className="eyebrow">Step 64 Task/resource realism expansion</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
             Stop lines, yield controls, and protected conflict areas are now
@@ -1579,8 +1592,23 @@ function App(): JSX.Element {
         </div>
       </section>
 
+      <nav className="workspace-tabs panel" aria-label="Workspace tabs">
+        {workspaceTabs.map((tab) => (
+          <button
+            key={tab.id}
+            className={`workspace-tab ${activeTab === tab.id ? "workspace-tab-active" : ""}`}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            aria-pressed={activeTab === tab.id}
+          >
+            <strong>{tab.label}</strong>
+            <span>{tab.summary}</span>
+          </button>
+        ))}
+      </nav>
+
       <main className="workspace">
-        <section className="main-column">
+        <section className="main-column operate-pane">
           <section className="stage panel" aria-labelledby="scene-title">
             <div className="panel-header">
               <div>
@@ -1590,9 +1618,7 @@ function App(): JSX.Element {
               <div className="status-stack">
                 <span className="status-pill">Camera controls active</span>
                 <span className="status-pill secondary">Selection active</span>
-                <span className="status-pill accent">
-                  {editorEnabled ? "Edit handles active" : "Edit handles armed"}
-                </span>
+                <span className="status-pill accent">Layer toggles active</span>
               </div>
             </div>
 
@@ -1628,27 +1654,6 @@ function App(): JSX.Element {
                   disabled={selectedVehicle === null}
                 >
                   Focus Selected
-                </button>
-              </div>
-              <div className="tool-group">
-                <button className="scene-button" type="button" onClick={toggleEditMode}>
-                  {editorEnabled ? "Pause Edit Mode" : "Edit Scene"}
-                </button>
-                <button
-                  className="scene-button"
-                  type="button"
-                  onClick={saveScenario}
-                  disabled={!authoring?.save_endpoint || editCount === 0}
-                >
-                  Save Scenario
-                </button>
-                <button
-                  className="scene-button"
-                  type="button"
-                  onClick={reloadScenario}
-                  disabled={!authoring?.reload_endpoint}
-                >
-                  Reload Scenario
                 </button>
               </div>
             </div>
@@ -2141,18 +2146,55 @@ function App(): JSX.Element {
                   </ul>
                 </div>
 
-                <div className="overview-card">
-                  <p className="eyebrow">Authoring State</p>
-                  <ul className="mini-list">
-                    <li>{editorEnabled ? "Edit mode is active" : "Edit mode is paused"}</li>
-                    <li>Working copy: {authoring?.working_scenario_path ?? "unavailable"}</li>
-                    <li>Nodes: {formatMaybeNumber(authoring?.editable_node_count ?? null)}</li>
-                    <li>Roads: {formatMaybeNumber(authoring?.editable_road_count ?? null)}</li>
-                    <li>Zones: {formatMaybeNumber(authoring?.editable_area_count ?? null)}</li>
-                  </ul>
-                </div>
               </aside>
             </div>
+            <section className="panel info-panel operate-session-controls" aria-labelledby="session-control-title">
+              <div className="panel-header compact">
+                <div>
+                  <p className="eyebrow">Operate Region</p>
+                  <h2 id="session-control-title">Session Control</h2>
+                </div>
+                <span className="status-pill secondary">
+                  {liveSessionPlaying ? "playing" : "paused"} · step{" "}
+                  {formatSeconds(sessionControl?.step_seconds ?? null)}
+                </span>
+              </div>
+              <div className="section-stack">
+                <div className="subsection">
+                  <div className="action-row">
+                    <button
+                      className="scene-button"
+                      type="button"
+                      onClick={() => controlLiveSession("play")}
+                      disabled={!sessionControl?.session_control_endpoint}
+                    >
+                      Play
+                    </button>
+                    <button
+                      className="scene-button"
+                      type="button"
+                      onClick={() => controlLiveSession("pause")}
+                      disabled={!sessionControl?.session_control_endpoint}
+                    >
+                      Pause
+                    </button>
+                    <button
+                      className="scene-button"
+                      type="button"
+                      onClick={() => controlLiveSession("step")}
+                      disabled={!sessionControl?.session_control_endpoint}
+                    >
+                      Single-Step
+                    </button>
+                  </div>
+                  <ul className="mini-list">
+                    <li>Mode: {sessionControl?.play_state ?? "paused"}</li>
+                    <li>Step size: {formatSeconds(sessionControl?.step_seconds ?? null)}</li>
+                  </ul>
+                  <p className="status-copy">{liveCommandMessage}</p>
+                </div>
+              </div>
+            </section>
           </section>
 
           <section className="timeline-region panel" aria-labelledby="timeline-title">
@@ -2194,7 +2236,7 @@ function App(): JSX.Element {
         </section>
 
         <aside className="sidebar">
-          <section className="panel info-panel" aria-labelledby="editor-title">
+          <section className="panel info-panel editor-pane" aria-labelledby="editor-title">
             <div className="panel-header compact">
               <div>
                 <p className="eyebrow">Authoring Region</p>
@@ -2227,6 +2269,17 @@ function App(): JSX.Element {
                   </button>
                 </div>
                 <p className="status-copy">{editorMessage}</p>
+              </div>
+
+              <div className="overview-card">
+                <p className="eyebrow">Authoring State</p>
+                <ul className="mini-list">
+                  <li>{editorEnabled ? "Edit mode is active" : "Edit mode is paused"}</li>
+                  <li>Working copy: {authoring?.working_scenario_path ?? "unavailable"}</li>
+                  <li>Nodes: {formatMaybeNumber(authoring?.editable_node_count ?? null)}</li>
+                  <li>Roads: {formatMaybeNumber(authoring?.editable_road_count ?? null)}</li>
+                  <li>Zones: {formatMaybeNumber(authoring?.editable_area_count ?? null)}</li>
+                </ul>
               </div>
 
               <div className="subsection">
@@ -2262,7 +2315,7 @@ function App(): JSX.Element {
             </div>
           </section>
 
-          <section className="panel info-panel" aria-labelledby="command-center-title">
+          <section className="panel info-panel fleet-pane" aria-labelledby="command-center-title">
             <div className="panel-header compact">
               <div>
                 <p className="eyebrow">Command-Center Region</p>
@@ -2594,7 +2647,7 @@ function App(): JSX.Element {
                 ) : null}
               </div>
 
-              <div className="subsection">
+              <div className="subsection fleet-session-controls">
                 <h3>Session Control</h3>
                 <div className="action-row">
                   <button
@@ -2679,7 +2732,7 @@ function App(): JSX.Element {
                 </div>
               </div>
 
-              <div className="subsection">
+              <div className="subsection traffic-reservation-inspection">
                 <h3>Reservation & Conflict Inspection</h3>
                 <ul className="data-list">
                   {(bundle?.traffic_baseline?.queue_records ?? []).length > 0 ? (
@@ -2720,7 +2773,7 @@ function App(): JSX.Element {
             </div>
           </section>
 
-          <section className="panel info-panel" aria-labelledby="inspector-title">
+          <section className="panel info-panel analyze-pane" aria-labelledby="inspector-title">
             <div className="panel-header compact">
               <div>
                 <p className="eyebrow">Inspector Region</p>
@@ -2941,7 +2994,7 @@ function App(): JSX.Element {
             </div>
           </section>
 
-          <section className="panel info-panel" aria-labelledby="alerts-title">
+          <section className="panel info-panel alerts-pane" aria-labelledby="alerts-title">
             <div className="panel-header compact">
               <div>
                 <p className="eyebrow">Alerts Region</p>
@@ -2952,7 +3005,7 @@ function App(): JSX.Element {
               </span>
             </div>
             <div className="section-stack">
-              <div className="subsection">
+              <div className="subsection traffic-heatmap-pane">
                 <h3>Traffic Heatmap</h3>
                 <div className="traffic-summary-row">
                   <span className="traffic-summary-chip">
@@ -3009,7 +3062,7 @@ function App(): JSX.Element {
                   )}
                 </ul>
               </div>
-              <div className="subsection">
+              <div className="subsection analyze-ai-feedback">
                 <h3>Suggestions</h3>
                 <ul className="data-list">
                   {suggestions.length > 0 ? (
@@ -3023,7 +3076,7 @@ function App(): JSX.Element {
                   )}
                 </ul>
               </div>
-              <div className="subsection">
+              <div className="subsection analyze-ai-feedback">
                 <h3>Anomalies</h3>
                 <ul className="data-list">
                   {anomalies.length > 0 ? (
@@ -3038,7 +3091,7 @@ function App(): JSX.Element {
                   )}
                 </ul>
               </div>
-              <div className="subsection">
+              <div className="subsection analyze-ai-feedback">
                 <h3>Explanations</h3>
                 <ul className="data-list">
                   {explanations.length > 0 ? (

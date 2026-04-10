@@ -9,7 +9,12 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
         REPO_ROOT / "frontend" / "serious_ui" / "src" / "App.tsx"
     ).read_text(encoding="utf-8")
 
-    assert "Step 57 Stop Lines, Yielding, and Traffic-Control Logic" in app_source
+    assert "Step 64 Task/resource realism expansion" in app_source
+    assert "Operate" in app_source
+    assert "Traffic" in app_source
+    assert "Fleet" in app_source
+    assert "Editor" in app_source
+    assert "Analyze" in app_source
     assert "Command-Center Region" in app_source
     assert "Inspector Region" in app_source
     assert "Alerts Region" in app_source
@@ -54,6 +59,17 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "Lane note" in app_source
     assert "traffic_control_state" in app_source
     assert "protected_conflict_zone_ids" in app_source
+    assert "operate-session-controls" in app_source
+    assert "fleet-pane" in app_source
+    assert "editor-pane" in app_source
+    assert "analyze-pane" in app_source
+    assert "alerts-pane" in app_source
+    assert "traffic-heatmap-pane" in app_source
+    assert "traffic-reservation-inspection" in app_source
+    assert "fleet-session-controls" in app_source
+    assert "analyze-ai-feedback" in app_source
+    assert "workspace-tabs" in app_source
+    assert "workspace-tab-active" in app_source
     assert "scene-road-heatmap" in app_source
     assert "traffic-summary-chip" in app_source
     assert "scene-legend" in app_source
@@ -71,6 +87,9 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     ).read_text(encoding="utf-8")
 
     assert ".session-bar" in css_source
+    assert ".workspace-tabs" in css_source
+    assert ".workspace-tab" in css_source
+    assert ".workspace-tab-active" in css_source
     assert ".workspace" in css_source
     assert ".stage-grid" in css_source
     assert ".timeline-region" in css_source
@@ -103,5 +122,15 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".selection-strip" in css_source
     assert ".selection-pill" in css_source
     assert ".scene-hazard.selected" in css_source
+    assert ".operate-pane" in css_source
+    assert ".editor-pane" in css_source
+    assert ".fleet-pane" in css_source
+    assert ".alerts-pane" in css_source
+    assert ".analyze-pane" in css_source
+    assert ".operate-session-controls" in css_source
+    assert ".fleet-session-controls" in css_source
+    assert ".traffic-reservation-inspection" in css_source
+    assert ".traffic-heatmap-pane" in css_source
+    assert ".analyze-ai-feedback" in css_source
     assert "@keyframes traffic-flow" in css_source
     assert "@media (max-width: 980px)" in css_source
