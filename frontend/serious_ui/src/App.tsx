@@ -185,12 +185,19 @@ type VehicleSnapshotPayload = {
   spacing_envelope_m?: number;
   primary_color?: string;
   accent_color?: string;
+  road_id?: string | null;
+  lane_id?: string | null;
+  lane_index?: number | null;
+  lane_role?: string | null;
+  lane_directionality?: string | null;
+  lane_selection_reason?: string | null;
 };
 
 type MotionSegmentPayload = {
   vehicle_id?: number;
   segment_index?: number;
   edge_id?: number;
+  road_id?: string | null;
   start_node_id?: number;
   end_node_id?: number;
   start_time_s?: number;
@@ -209,6 +216,11 @@ type MotionSegmentPayload = {
   acceleration_mps2?: number;
   deceleration_mps2?: number;
   profile_kind?: string;
+  lane_id?: string | null;
+  lane_index?: number | null;
+  lane_role?: string | null;
+  lane_directionality?: string | null;
+  lane_selection_reason?: string | null;
 };
 
 type TrafficBaselinePayload = {
@@ -1423,16 +1435,16 @@ function App(): JSX.Element {
                       const position = vehicle.position ?? [0, 0, 0];
                       const isSelected = vehicle.vehicle_id === selectedVehicleId;
                       return (
-                        <g
+                          <g
                           key={vehicle.vehicle_id ?? `vehicle-${vehicleIndex}`}
                           className={isSelected ? "scene-vehicle selected" : "scene-vehicle"}
                           onClick={() => selectVehicle(vehicle.vehicle_id)}
                           onMouseEnter={() =>
                             setHoverTarget({
                               label: `Vehicle ${vehicle.vehicle_id ?? vehicleIndex}`,
-                              detail: `${vehicle.operational_state ?? "unknown_state"} · ${formatMeters(
-                                vehicle.spacing_envelope_m ?? null,
-                              )} envelope`,
+                              detail: `${vehicle.operational_state ?? "unknown_state"} · ${
+                                vehicle.lane_id ?? "lane-unassigned"
+                              } · ${formatMeters(vehicle.spacing_envelope_m ?? null)} envelope`,
                             })
                           }
                         >
@@ -1829,6 +1841,20 @@ function App(): JSX.Element {
                     <li>Job: {selectedInspection.current_job_id ?? "none"}</li>
                     <li>Wait: {selectedInspection.wait_reason ?? "none"}</li>
                     <li>Type: {displayedSelectedVehicle?.vehicle_type ?? "GENERIC"}</li>
+                    <li>
+                      Lane:{" "}
+                      {displayedSelectedVehicle?.lane_id
+                        ? `${displayedSelectedVehicle.lane_id} · ${
+                            displayedSelectedVehicle.lane_role ?? "travel"
+                          }`
+                        : "unassigned"}
+                    </li>
+                    <li>
+                      Lane direction: {displayedSelectedVehicle?.lane_directionality ?? "unknown"}
+                    </li>
+                    <li>
+                      Lane note: {displayedSelectedVehicle?.lane_selection_reason ?? "none"}
+                    </li>
                     <li>Spacing: {formatMeters(displayedSelectedVehicle?.spacing_envelope_m ?? null)}</li>
                     <li>Heading: {formatHeadingDegrees(displayedSelectedVehicle?.heading_rad ?? null)}</li>
                     <li>Control: {selectedInspection.traffic_control_state ?? "none"}</li>
@@ -1871,6 +1897,9 @@ function App(): JSX.Element {
                       <li>Job: {inspection.current_job_id ?? "none"}</li>
                       <li>Wait: {inspection.wait_reason ?? "none"}</li>
                       <li>Type: {findVehicleById(bundle, inspection.vehicle_id ?? null)?.vehicle_type ?? "GENERIC"}</li>
+                      <li>
+                        Lane: {findDisplayedVehicleById(displayedVehicles, inspection.vehicle_id ?? null)?.lane_id ?? "unassigned"}
+                      </li>
                       <li>
                         Spacing: {formatMeters(
                           findDisplayedVehicleById(displayedVehicles, inspection.vehicle_id ?? null)?.spacing_envelope_m ?? null,
@@ -2318,6 +2347,12 @@ function sampleDisplayedVehicles(
     headingRad: number;
     speed: number;
     spacingEnvelopeM: number;
+    roadId?: string | null;
+    laneId?: string | null;
+    laneIndex?: number | null;
+    laneRole?: string | null;
+    laneDirectionality?: string | null;
+    laneSelectionReason?: string | null;
     segment: MotionSegmentPayload;
   }> = [];
 
@@ -2373,6 +2408,12 @@ function sampleDisplayedVehicles(
       headingRad: sampled.headingRad,
       speed: sampled.speed,
       spacingEnvelopeM: segment.spacing_envelope_m ?? spacingEnvelopeFromVehicle(segment),
+      roadId: segment.road_id ?? null,
+      laneId: segment.lane_id ?? null,
+      laneIndex: segment.lane_index ?? null,
+      laneRole: segment.lane_role ?? null,
+      laneDirectionality: segment.lane_directionality ?? null,
+      laneSelectionReason: segment.lane_selection_reason ?? null,
       segment,
     });
     if (motionClockS > segment.end_time_s) {
@@ -2393,16 +2434,23 @@ function sampleDisplayedVehicles(
     if (!vehicle) {
       continue;
     }
-    vehicle.position = entry.position;
-    vehicle.node_id = entry.segment.start_node_id ?? vehicle.node_id;
-    vehicle.operational_state = entry.operationalState;
-    vehicle.heading_rad = entry.headingRad;
-    vehicle.speed = entry.speed;
-    vehicle.spacing_envelope_m = entry.spacingEnvelopeM;
-    vehicle.body_length_m = entry.segment.body_length_m ?? vehicle.body_length_m;
-    vehicle.body_width_m = entry.segment.body_width_m ?? vehicle.body_width_m;
-    vehicle.presentation_key = vehicle.presentation_key ?? "generic";
-  }
+      vehicle.position = entry.position;
+      vehicle.node_id = entry.segment.start_node_id ?? vehicle.node_id;
+      vehicle.operational_state = entry.operationalState;
+      vehicle.heading_rad = entry.headingRad;
+      vehicle.speed = entry.speed;
+      vehicle.spacing_envelope_m = entry.spacingEnvelopeM;
+      vehicle.body_length_m = entry.segment.body_length_m ?? vehicle.body_length_m;
+      vehicle.body_width_m = entry.segment.body_width_m ?? vehicle.body_width_m;
+      vehicle.presentation_key = vehicle.presentation_key ?? "generic";
+      vehicle.road_id = entry.roadId ?? vehicle.road_id;
+      vehicle.lane_id = entry.laneId ?? vehicle.lane_id;
+      vehicle.lane_index = entry.laneIndex ?? vehicle.lane_index;
+      vehicle.lane_role = entry.laneRole ?? vehicle.lane_role;
+      vehicle.lane_directionality = entry.laneDirectionality ?? vehicle.lane_directionality;
+      vehicle.lane_selection_reason =
+        entry.laneSelectionReason ?? vehicle.lane_selection_reason;
+    }
 
   return [...sampledVehicles.values()].sort(
     (left, right) => (left.vehicle_id ?? 0) - (right.vehicle_id ?? 0),

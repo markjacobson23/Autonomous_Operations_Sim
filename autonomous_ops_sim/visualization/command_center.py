@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -52,6 +53,17 @@ class VehicleDiagnosticSurface:
     code: str
     severity: str
     message: str
+
+
+@dataclass(frozen=True)
+class _DeadlockRisk:
+    """Internal deadlock-risk summary reused across diagnostics and AI surfaces."""
+
+    code: str
+    severity: str
+    summary: str
+    mitigation: str
+    vehicle_id: int
 
 
 @dataclass(frozen=True)
@@ -252,6 +264,7 @@ def build_live_command_center_surface(
         vehicle_inspections=vehicle_inspections,
         ai_assist=build_ai_assist_surface(
             session,
+            render_geometry=render_geometry,
             vehicle_inspections=vehicle_inspections,
             route_previews=route_previews,
         ),
@@ -312,12 +325,23 @@ def build_vehicle_inspection_surface(
         route_ahead_edge_ids=route_preview.edge_ids if route_preview is not None else (),
         recent_commands=recent_commands,
         recent_trace_events=recent_trace_events,
-        diagnostics=_build_vehicle_diagnostics(
-            vehicle_id=vehicle_id,
-            vehicle=vehicle,
-            route_preview=route_preview,
-            wait_reason=wait_reason,
-            current_job_id=context["current_job_id"],
+        diagnostics=(
+            _build_vehicle_diagnostics(
+                vehicle_id=vehicle_id,
+                vehicle=vehicle,
+                route_preview=route_preview,
+                wait_reason=wait_reason,
+                current_job_id=context["current_job_id"],
+            )
+            + _build_deadlock_diagnostics(
+                session,
+                vehicle_id=vehicle_id,
+                current_node_id=vehicle.current_node_id,
+                current_position=vehicle.position,
+                render_geometry=render_geometry,
+                route_preview=route_preview,
+                wait_reason=wait_reason,
+            )
         ),
     )
 
@@ -726,6 +750,7 @@ def _point_in_bounds(point: tuple[float, float, float], polygon: tuple[tuple[flo
 def build_ai_assist_surface(
     session: LiveSimulationSession,
     *,
+    render_geometry: RenderGeometrySurface | None,
     vehicle_inspections: tuple[VehicleInspectionSurface, ...],
     route_previews: tuple[RoutePreviewSurface, ...],
 ) -> AIAssistSurface:
@@ -739,6 +764,11 @@ def build_ai_assist_surface(
         for inspection in vehicle_inspections
         for anomaly in _build_ai_anomalies(inspection)
     )
+    anomalies += _build_deadlock_anomalies(
+        session,
+        render_geometry=render_geometry,
+        skipped_vehicle_ids=tuple(inspection.vehicle_id for inspection in vehicle_inspections),
+    )
     suggestions = tuple(
         suggestion
         for inspection in vehicle_inspections
@@ -750,6 +780,11 @@ def build_ai_assist_surface(
                 route_previews=route_previews,
             ),
         )
+    )
+    suggestions += _build_deadlock_suggestions(
+        session,
+        render_geometry=render_geometry,
+        skipped_vehicle_ids=tuple(inspection.vehicle_id for inspection in vehicle_inspections),
     )
     return AIAssistSurface(
         explanations=explanations,
@@ -891,6 +926,320 @@ def _build_ai_suggestions(
             )
         )
     return tuple(suggestions)
+
+
+def _build_deadlock_diagnostics(
+    session: LiveSimulationSession,
+    *,
+    vehicle_id: int,
+    current_node_id: int,
+    current_position: tuple[float, float, float],
+    render_geometry: RenderGeometrySurface | None,
+    route_preview: RoutePreviewSurface | None,
+    wait_reason: str | None,
+) -> tuple[VehicleDiagnosticSurface, ...]:
+    risks = _deadlock_risks_for_vehicle(
+        session,
+        vehicle_id=vehicle_id,
+        current_node_id=current_node_id,
+        current_position=current_position,
+        render_geometry=render_geometry,
+        route_preview=route_preview,
+        wait_reason=wait_reason,
+    )
+    return tuple(
+        VehicleDiagnosticSurface(
+            code=risk.code,
+            severity=risk.severity,
+            message=risk.summary,
+        )
+        for risk in risks
+    )
+
+
+def _build_deadlock_anomalies(
+    session: LiveSimulationSession,
+    *,
+    render_geometry: RenderGeometrySurface | None,
+    skipped_vehicle_ids: tuple[int, ...],
+) -> tuple[AIAssistAnomaly, ...]:
+    skipped_ids = set(skipped_vehicle_ids)
+    anomalies: list[AIAssistAnomaly] = []
+    for vehicle in sorted(session.engine.vehicles, key=lambda vehicle: vehicle.id):
+        if vehicle.id in skipped_ids:
+            continue
+        context = _active_execution_context(session, vehicle_id=vehicle.id)
+        if context["wait_reason"] is None:
+            continue
+        risks = _deadlock_risks_for_vehicle(
+            session,
+            vehicle_id=vehicle.id,
+            current_node_id=vehicle.current_node_id,
+            current_position=vehicle.position,
+            render_geometry=render_geometry,
+            route_preview=None,
+            wait_reason=context["wait_reason"],
+        )
+        anomalies.extend(
+            AIAssistAnomaly(
+                anomaly_id=f"vehicle-{vehicle.id}-{risk.code}",
+                severity=risk.severity,
+                summary=risk.summary,
+                vehicle_id=vehicle.id,
+            )
+            for risk in risks
+        )
+    return tuple(anomalies)
+
+
+def _build_deadlock_suggestions(
+    session: LiveSimulationSession,
+    *,
+    render_geometry: RenderGeometrySurface | None,
+    skipped_vehicle_ids: tuple[int, ...],
+) -> tuple[AIAssistSuggestion, ...]:
+    skipped_ids = set(skipped_vehicle_ids)
+    suggestions: list[AIAssistSuggestion] = []
+    for vehicle in sorted(session.engine.vehicles, key=lambda vehicle: vehicle.id):
+        if vehicle.id in skipped_ids:
+            continue
+        context = _active_execution_context(session, vehicle_id=vehicle.id)
+        if context["wait_reason"] is None:
+            continue
+        risks = _deadlock_risks_for_vehicle(
+            session,
+            vehicle_id=vehicle.id,
+            current_node_id=vehicle.current_node_id,
+            current_position=vehicle.position,
+            render_geometry=render_geometry,
+            route_preview=None,
+            wait_reason=context["wait_reason"],
+        )
+        suggestions.extend(
+            AIAssistSuggestion(
+                suggestion_id=f"{risk.code}-{vehicle.id}",
+                kind="avoid_deadlock",
+                priority="high" if risk.severity == "critical" else "medium",
+                summary=risk.mitigation,
+                target_vehicle_id=vehicle.id,
+            )
+            for risk in risks
+        )
+    return tuple(suggestions)
+
+
+def _deadlock_risks_for_vehicle(
+    session: LiveSimulationSession,
+    *,
+    vehicle_id: int,
+    current_node_id: int,
+    current_position: tuple[float, float, float],
+    render_geometry: RenderGeometrySurface | None,
+    route_preview: RoutePreviewSurface | None,
+    wait_reason: str | None,
+) -> tuple[_DeadlockRisk, ...]:
+    if wait_reason is None or render_geometry is None:
+        return ()
+
+    waiting_vehicle_states = _waiting_vehicle_states(session)
+    waiting_vehicle_ids_at_node = tuple(
+        waiting_vehicle_id
+        for waiting_vehicle_id, node_id, _position in waiting_vehicle_states
+        if node_id == current_node_id
+    )
+    current_roads = _roads_for_position(render_geometry, current_position)
+    current_road_ids = {road.road_id for road in current_roads}
+    waiting_vehicle_ids_on_roads = tuple(
+        waiting_vehicle_id
+        for waiting_vehicle_id, _node_id, position in waiting_vehicle_states
+        if {road.road_id for road in _roads_for_position(render_geometry, position)}
+        & current_road_ids
+    )
+    current_areas = _areas_for_position(render_geometry, current_position)
+    current_area_ids = {area.area_id for area in current_areas}
+    waiting_vehicle_ids_in_areas = tuple(
+        waiting_vehicle_id
+        for waiting_vehicle_id, _node_id, position in waiting_vehicle_states
+        if {area.area_id for area in _areas_for_position(render_geometry, position)}
+        & current_area_ids
+    )
+
+    risks: list[_DeadlockRisk] = []
+    intersection = next(
+        (
+            intersection
+            for intersection in render_geometry.intersections
+            if intersection.node_id == current_node_id
+        ),
+        None,
+    )
+    if intersection is not None and len(waiting_vehicle_ids_at_node) >= 2:
+        risks.append(
+            _DeadlockRisk(
+                code="deadlock_risk_intersection",
+                severity="warning",
+                summary=(
+                    f"Intersection {intersection.intersection_id} has "
+                    f"{len(waiting_vehicle_ids_at_node)} waiting vehicles and may gridlock."
+                ),
+                mitigation=(
+                    f"Sequence departures through {intersection.intersection_id} and "
+                    "let one vehicle clear before releasing the next."
+                ),
+                vehicle_id=vehicle_id,
+            )
+        )
+        return tuple(risks)
+
+    depot_area = next(
+        (
+            area
+            for area in current_areas
+            if area.kind in {
+                "depot",
+                "yard",
+                "loading_bay",
+                "service_yard",
+                "staging_area",
+            }
+        ),
+        None,
+    )
+    if depot_area is not None and len(waiting_vehicle_ids_in_areas) >= 2:
+        risks.append(
+            _DeadlockRisk(
+                code="deadlock_risk_depot",
+                severity="warning",
+                summary=(
+                    f"Depot area {depot_area.area_id} is holding "
+                    f"{len(waiting_vehicle_ids_in_areas)} waiting vehicles and may spill back."
+                ),
+                mitigation=(
+                    f"Pause new departures from {depot_area.area_id} until the lead vehicle clears the exit."
+                ),
+                vehicle_id=vehicle_id,
+            )
+        )
+        return tuple(risks)
+
+    narrow_roads = tuple(
+        road
+        for road in current_roads
+        if road.lane_count <= 1
+    )
+    if narrow_roads and len(waiting_vehicle_ids_on_roads) >= 2:
+        narrow_road = narrow_roads[0]
+        risks.append(
+            _DeadlockRisk(
+                code="deadlock_risk_corridor",
+                severity="warning",
+                summary=(
+                    f"Narrow corridor {narrow_road.road_id} has "
+                    f"{len(waiting_vehicle_ids_on_roads)} waiting vehicles and may spill back."
+                ),
+                mitigation=(
+                    f"Hold upstream departures on {narrow_road.road_id} until the corridor clears."
+                ),
+                vehicle_id=vehicle_id,
+            )
+        )
+        return tuple(risks)
+
+    if len(waiting_vehicle_ids_at_node) >= 3 or (
+        route_preview is not None and route_preview.reason == "no_route"
+    ):
+        risks.append(
+            _DeadlockRisk(
+                code="deadlock_risk_queue_spillback",
+                severity="critical" if len(waiting_vehicle_ids_at_node) >= 3 else "warning",
+                summary=(
+                    f"Queue spillback is building around node {current_node_id} and may trap the waiting line."
+                ),
+                mitigation=(
+                    f"Clear the downstream path from node {current_node_id} before dispatching more vehicles."
+                ),
+                vehicle_id=vehicle_id,
+            )
+        )
+    return tuple(risks)
+
+
+def _waiting_vehicle_states(
+    session: LiveSimulationSession,
+) -> tuple[tuple[int, int, tuple[float, float, float]], ...]:
+    waiting_states: list[tuple[int, int, tuple[float, float, float]]] = []
+    for vehicle in sorted(session.engine.vehicles, key=lambda vehicle: vehicle.id):
+        context = _active_execution_context(session, vehicle_id=vehicle.id)
+        if context["wait_reason"] is None:
+            continue
+        waiting_states.append((vehicle.id, vehicle.current_node_id, vehicle.position))
+    return tuple(waiting_states)
+
+
+def _roads_for_position(
+    render_geometry: RenderGeometrySurface,
+    position: tuple[float, float, float],
+) -> tuple[Any, ...]:
+    roads = [
+        road
+        for road in render_geometry.roads
+        if _road_touches_position(road.centerline, position)
+    ]
+    return tuple(sorted(roads, key=lambda road: road.road_id))
+
+
+def _areas_for_position(
+    render_geometry: RenderGeometrySurface,
+    position: tuple[float, float, float],
+) -> tuple[Any, ...]:
+    areas = [
+        area
+        for area in render_geometry.areas
+        if _point_in_bounds(position, area.polygon)
+    ]
+    return tuple(sorted(areas, key=lambda area: area.area_id))
+
+
+def _road_touches_position(
+    centerline: tuple[tuple[float, float, float], ...],
+    position: tuple[float, float, float],
+) -> bool:
+    if not centerline:
+        return False
+    if len(centerline) == 1:
+        return _distance_xy(centerline[0], position) <= 0.35
+    for start, end in zip(centerline, centerline[1:]):
+        if _point_distance_to_segment(position, start, end) <= 0.35:
+            return True
+    return False
+
+
+def _distance_xy(
+    left: tuple[float, float, float],
+    right: tuple[float, float, float],
+) -> float:
+    return math.hypot(left[0] - right[0], left[1] - right[1])
+
+
+def _point_distance_to_segment(
+    point: tuple[float, float, float],
+    start: tuple[float, float, float],
+    end: tuple[float, float, float],
+) -> float:
+    segment_dx = end[0] - start[0]
+    segment_dy = end[1] - start[1]
+    if segment_dx == 0.0 and segment_dy == 0.0:
+        return _distance_xy(point, start)
+    projection = (
+        (point[0] - start[0]) * segment_dx + (point[1] - start[1]) * segment_dy
+    ) / (segment_dx * segment_dx + segment_dy * segment_dy)
+    clamped = max(0.0, min(1.0, projection))
+    closest_point = (
+        start[0] + clamped * segment_dx,
+        start[1] + clamped * segment_dy,
+        start[2] + clamped * (end[2] - start[2]),
+    )
+    return _distance_xy(point, closest_point)
 
 
 __all__ = [

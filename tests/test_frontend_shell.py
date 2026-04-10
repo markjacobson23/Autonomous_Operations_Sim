@@ -34,6 +34,9 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "sampleTrafficSnapshot" in app_source
     assert "trafficCongestionIntensity" in app_source
     assert "trafficCongestionLevel" in app_source
+    assert "lane_selection_reason" in app_source
+    assert "Lane direction" in app_source
+    assert "Lane note" in app_source
     assert "traffic_control_state" in app_source
     assert "protected_conflict_zone_ids" in app_source
     assert "scene-road-heatmap" in app_source

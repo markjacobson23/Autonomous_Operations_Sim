@@ -51,6 +51,12 @@ class VehicleMotionSegment:
     acceleration_mps2: float
     deceleration_mps2: float
     profile_kind: str
+    road_id: str | None = None
+    lane_id: str | None = None
+    lane_index: int | None = None
+    lane_role: str | None = None
+    lane_directionality: str | None = None
+    lane_selection_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -98,6 +104,13 @@ class _SampledVehicleState:
     path_points: tuple[Position, ...]
 
 
+@dataclass(frozen=True)
+class _LaneUsage:
+    lane_id: str
+    start_time_s: float
+    end_time_s: float
+
+
 def build_vehicle_motion_segments(
     state: VisualizationState,
     *,
@@ -109,6 +122,7 @@ def build_vehicle_motion_segments(
     edge_lookup = {edge.edge_id: edge for edge in state.map_surface.edges}
     segments: list[VehicleMotionSegment] = []
     segment_count_by_vehicle: dict[int, int] = {}
+    lane_usage_by_road_id: dict[str, list[_LaneUsage]] = {}
 
     for index, frame in enumerate(state.frames):
         trigger = frame.trigger
@@ -139,11 +153,21 @@ def build_vehicle_motion_segments(
         duration_s = max(0.0, arrival_frame.timestamp_s - frame.timestamp_s)
         edge = edge_lookup.get(edge_id)
         distance = edge.distance if edge is not None else _distance(start_position, end_position)
-        path_points = _resolve_segment_path_points(
+        road = _road_for_edge(render_geometry.roads if render_geometry else (), edge_id)
+        vehicle_presentation = _vehicle_presentation_for_segment(
+            vehicle_presentations=vehicle_presentations,
+            vehicle_id=vehicle_id,
+        )
+        lane, path_points, lane_selection_reason = _resolve_segment_path_points(
             render_geometry=render_geometry,
+            road=road,
             edge_id=edge_id,
             start_position=start_position,
             end_position=end_position,
+            vehicle_presentation=vehicle_presentation,
+            start_time_s=frame.timestamp_s,
+            end_time_s=arrival_frame.timestamp_s,
+            lane_usage_by_road_id=lane_usage_by_road_id,
         )
         heading_rad = _heading_along_path(path_points, distance_along_path=0.0)
         nominal_speed = distance / duration_s if duration_s > 0.0 else 0.0
@@ -154,10 +178,7 @@ def build_vehicle_motion_segments(
         )
         segment_index = segment_count_by_vehicle.get(vehicle_id, 0)
         segment_count_by_vehicle[vehicle_id] = segment_index + 1
-        profile_surface = _vehicle_presentation_for_segment(
-            vehicle_presentations=vehicle_presentations,
-            vehicle_id=vehicle_id,
-        )
+        profile_surface = vehicle_presentation
         segments.append(
             VehicleMotionSegment(
                 vehicle_id=vehicle_id,
@@ -184,8 +205,22 @@ def build_vehicle_motion_segments(
                 acceleration_mps2=profile.acceleration_mps2,
                 deceleration_mps2=profile.deceleration_mps2,
                 profile_kind=profile.profile_kind,
+                road_id=road.road_id if road is not None else None,
+                lane_id=lane.lane_id if lane is not None else None,
+                lane_index=lane.lane_index if lane is not None else None,
+                lane_role=lane.lane_role if lane is not None else None,
+                lane_directionality=lane.directionality if lane is not None else None,
+                lane_selection_reason=lane_selection_reason,
             )
         )
+        if road is not None and lane is not None:
+            lane_usage_by_road_id.setdefault(road.road_id, []).append(
+                _LaneUsage(
+                    lane_id=lane.lane_id,
+                    start_time_s=frame.timestamp_s,
+                    end_time_s=arrival_frame.timestamp_s,
+                )
+            )
 
     return tuple(segments)
 
@@ -256,6 +291,7 @@ def motion_segment_to_dict(segment: VehicleMotionSegment) -> dict[str, Any]:
         "vehicle_id": segment.vehicle_id,
         "segment_index": segment.segment_index,
         "edge_id": segment.edge_id,
+        "road_id": segment.road_id,
         "start_node_id": segment.start_node_id,
         "end_node_id": segment.end_node_id,
         "start_time_s": segment.start_time_s,
@@ -274,6 +310,11 @@ def motion_segment_to_dict(segment: VehicleMotionSegment) -> dict[str, Any]:
         "acceleration_mps2": segment.acceleration_mps2,
         "deceleration_mps2": segment.deceleration_mps2,
         "profile_kind": segment.profile_kind,
+        "lane_id": segment.lane_id,
+        "lane_index": segment.lane_index,
+        "lane_role": segment.lane_role,
+        "lane_directionality": segment.lane_directionality,
+        "lane_selection_reason": segment.lane_selection_reason,
     }
 
 
@@ -503,26 +544,34 @@ def _sample_active_vehicle_states(
 def _resolve_segment_path_points(
     *,
     render_geometry: RenderGeometrySurface | None,
+    road: RoadGeometrySurface | None,
     edge_id: int,
     start_position: Position,
     end_position: Position,
-) -> tuple[Position, ...]:
+    vehicle_presentation: VehiclePresentationSurface,
+    start_time_s: float,
+    end_time_s: float,
+    lane_usage_by_road_id: dict[str, list[_LaneUsage]],
+) -> tuple[LaneGeometrySurface | None, tuple[Position, ...], str]:
     if render_geometry is None:
-        return (start_position, end_position)
+        return None, (start_position, end_position), "road geometry unavailable"
 
-    road = _road_for_edge(render_geometry.roads, edge_id)
     if road is None:
-        return (start_position, end_position)
+        return None, (start_position, end_position), "road geometry unavailable"
 
-    lane = _lane_for_road_segment(render_geometry.lanes, road, start_position, end_position)
-    candidate_points = lane.centerline if lane is not None else road.centerline
-    if _distance(candidate_points[0], start_position) + _distance(
-        candidate_points[-1], end_position
-    ) <= _distance(candidate_points[0], end_position) + _distance(
-        candidate_points[-1], start_position
-    ):
-        return candidate_points
-    return tuple(reversed(candidate_points))
+    lane, candidate_points, reason = _select_lane_for_road_segment(
+        render_geometry=render_geometry,
+        road=road,
+        start_position=start_position,
+        end_position=end_position,
+        vehicle_presentation=vehicle_presentation,
+        start_time_s=start_time_s,
+        end_time_s=end_time_s,
+        lane_usage_by_road_id=lane_usage_by_road_id,
+    )
+    if lane is not None:
+        return lane, candidate_points, reason
+    return None, candidate_points, reason
 
 
 def _road_for_edge(
@@ -533,6 +582,178 @@ def _road_for_edge(
         if edge_id in road.edge_ids:
             return road
     return None
+
+
+def _select_lane_for_road_segment(
+    *,
+    render_geometry: RenderGeometrySurface,
+    road: RoadGeometrySurface,
+    start_position: Position,
+    end_position: Position,
+    vehicle_presentation: VehiclePresentationSurface,
+    start_time_s: float,
+    end_time_s: float,
+    lane_usage_by_road_id: dict[str, list[_LaneUsage]],
+) -> tuple[LaneGeometrySurface | None, tuple[Position, ...], str]:
+    candidates = [lane for lane in render_geometry.lanes if lane.road_id == road.road_id]
+    if not candidates:
+        return None, road.centerline, "road centerline"
+
+    travel_direction = _travel_direction_for_segment(
+        road=road,
+        start_position=start_position,
+        end_position=end_position,
+    )
+    directional_candidates = [
+        lane for lane in candidates if lane.directionality == travel_direction
+    ]
+    if directional_candidates:
+        candidates = directional_candidates
+
+    scored_candidates: list[
+        tuple[float, str, LaneGeometrySurface, tuple[Position, ...], str]
+    ] = []
+    for lane in sorted(candidates, key=lambda lane: lane.lane_id):
+        candidate_points, alignment_reason = _lane_path_for_travel(
+            lane=lane,
+            start_position=start_position,
+            end_position=end_position,
+        )
+        score = _distance(candidate_points[0], start_position) + _distance(
+            candidate_points[-1], end_position
+        )
+        score += _lane_role_bias(
+            lane=lane,
+            road=road,
+            vehicle_presentation=vehicle_presentation,
+        )
+        score += _lane_occupancy_penalty(
+            lane_id=lane.lane_id,
+            lane_usage_by_road_id=lane_usage_by_road_id,
+            road_id=road.road_id,
+            start_time_s=start_time_s,
+            end_time_s=end_time_s,
+        )
+        scored_candidates.append(
+            (
+                score,
+                lane.lane_id,
+                lane,
+                candidate_points,
+                alignment_reason,
+            )
+        )
+
+    if not scored_candidates:
+        return None, road.centerline, "road centerline"
+
+    score, _, lane, candidate_points, alignment_reason = min(
+        scored_candidates,
+        key=lambda candidate: (candidate[0], candidate[1]),
+    )
+    selection_reason = (
+        f"{road.road_class} · {travel_direction} · {lane.lane_role} · {alignment_reason}"
+    )
+    if score > 0.0:
+        selection_reason = f"{selection_reason} · score={score:.2f}"
+    return lane, candidate_points, selection_reason
+
+
+def _lane_path_for_travel(
+    *,
+    lane: LaneGeometrySurface,
+    start_position: Position,
+    end_position: Position,
+) -> tuple[tuple[Position, ...], str]:
+    forward_points = lane.centerline
+    reverse_points = tuple(reversed(lane.centerline))
+    forward_score = _distance(forward_points[0], start_position) + _distance(
+        forward_points[-1], end_position
+    )
+    reverse_score = _distance(reverse_points[0], start_position) + _distance(
+        reverse_points[-1], end_position
+    )
+    if forward_score <= reverse_score:
+        return forward_points, "forward"
+    return reverse_points, "reverse"
+
+
+def _lane_role_bias(
+    *,
+    lane: LaneGeometrySurface,
+    road: RoadGeometrySurface,
+    vehicle_presentation: VehiclePresentationSurface,
+) -> float:
+    lane_role = lane.lane_role
+    if lane_role in {"merge", "loading_approach"}:
+        return -0.35
+    if lane_role == "passing":
+        if vehicle_presentation.presentation_key == "haul_truck":
+            return 0.25
+        return -0.25 if road.lane_count > 1 else 0.1
+    if lane_role == "keep_lane":
+        if vehicle_presentation.presentation_key == "haul_truck":
+            return -0.2
+        return 0.1
+    if road.lane_count > 1:
+        if vehicle_presentation.presentation_key == "haul_truck":
+            return 0.06 * (road.lane_count - lane.lane_index - 1)
+        if vehicle_presentation.presentation_key == "car":
+            return 0.06 * lane.lane_index
+        if vehicle_presentation.presentation_key == "forklift":
+            return 0.02 * abs(lane.lane_index - min(1, road.lane_count - 1))
+    return 0.0
+
+
+def _travel_direction_for_segment(
+    *,
+    road: RoadGeometrySurface,
+    start_position: Position,
+    end_position: Position,
+) -> str:
+    if road.directionality != "two_way" or len(road.centerline) < 2:
+        return "forward"
+    forward_score = _distance(road.centerline[0], start_position) + _distance(
+        road.centerline[-1], end_position
+    )
+    reverse_score = _distance(road.centerline[-1], start_position) + _distance(
+        road.centerline[0], end_position
+    )
+    return "forward" if forward_score <= reverse_score else "reverse"
+
+
+def _lane_occupancy_penalty(
+    *,
+    lane_id: str,
+    lane_usage_by_road_id: dict[str, list[_LaneUsage]],
+    road_id: str,
+    start_time_s: float,
+    end_time_s: float,
+) -> float:
+    usage_penalty = 0.0
+    for usage in lane_usage_by_road_id.get(road_id, []):
+        if not _windows_overlap(
+            start_a=start_time_s,
+            end_a=end_time_s,
+            start_b=usage.start_time_s,
+            end_b=usage.end_time_s,
+        ):
+            continue
+        if usage.lane_id == lane_id:
+            usage_penalty += 0.8
+        else:
+            usage_penalty += 0.15
+    return usage_penalty
+
+
+def _windows_overlap(
+    *,
+    start_a: float,
+    end_a: float,
+    start_b: float,
+    end_b: float,
+) -> bool:
+    return start_a < end_b and start_b < end_a
 
 
 def _lane_for_road_segment(

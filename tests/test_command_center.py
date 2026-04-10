@@ -1,4 +1,5 @@
 import math
+from typing import Any
 
 from autonomous_ops_sim.core.edge import Edge
 from autonomous_ops_sim.core.graph import Graph
@@ -40,15 +41,6 @@ def build_command_center_engine() -> SimulationEngine:
     graph.add_edge(Edge(4, node_4, node_3, 1.0, 10.0))
     graph.add_edge(Edge(5, node_2, node_4, 1.5, 10.0))
 
-    simulation_map = Map(
-        graph,
-        coord_to_id={
-            (0.0, 0.0, 0.0): 1,
-            (1.0, 0.0, 0.0): 2,
-            (2.0, 0.0, 0.0): 3,
-            (1.0, 1.0, 0.0): 4,
-        },
-    )
     vehicle = Vehicle(
         id=77,
         current_node_id=1,
@@ -58,12 +50,124 @@ def build_command_center_engine() -> SimulationEngine:
         max_payload=10.0,
         max_speed=5.0,
     )
+    return build_command_center_engine_from_graph(
+        graph=graph,
+        coord_to_id={
+            (0.0, 0.0, 0.0): 1,
+            (1.0, 0.0, 0.0): 2,
+            (2.0, 0.0, 0.0): 3,
+            (1.0, 1.0, 0.0): 4,
+        },
+        vehicles=(vehicle,),
+    )
+
+
+def build_intersection_deadlock_engine() -> SimulationEngine:
+    graph = Graph()
+
+    node_1 = Node(1, (0.0, 0.0, 0.0))
+    node_2 = Node(2, (1.0, 0.0, 0.0))
+    node_3 = Node(3, (2.0, 0.0, 0.0))
+    node_4 = Node(4, (1.0, 1.0, 0.0))
+
+    for node in (node_1, node_2, node_3, node_4):
+        graph.add_node(node)
+
+    graph.add_edge(Edge(1, node_1, node_2, 1.0, 10.0))
+    graph.add_edge(Edge(2, node_2, node_3, 1.0, 10.0))
+    graph.add_edge(Edge(3, node_1, node_4, 1.0, 10.0))
+    graph.add_edge(Edge(4, node_4, node_3, 1.0, 10.0))
+    graph.add_edge(Edge(5, node_2, node_4, 1.5, 10.0))
+
+    return build_command_center_engine_from_graph(
+        graph=graph,
+        coord_to_id={
+            (0.0, 0.0, 0.0): 1,
+            (1.0, 0.0, 0.0): 2,
+            (2.0, 0.0, 0.0): 3,
+            (1.0, 1.0, 0.0): 4,
+        },
+        vehicles=(
+            Vehicle(
+                id=77,
+                current_node_id=2,
+                position=(1.0, 0.0, 0.0),
+                velocity=0.0,
+                payload=0.0,
+                max_payload=10.0,
+                max_speed=5.0,
+            ),
+            Vehicle(
+                id=78,
+                current_node_id=2,
+                position=(1.0, 0.0, 0.0),
+                velocity=0.0,
+                payload=0.0,
+                max_payload=10.0,
+                max_speed=5.0,
+            ),
+        ),
+    )
+
+
+def build_command_center_engine_from_graph(
+    *,
+    graph: Graph,
+    coord_to_id: dict[tuple[float, float, float], int],
+    vehicles: tuple[Vehicle, ...],
+) -> SimulationEngine:
     return SimulationEngine(
-        simulation_map=simulation_map,
+        simulation_map=Map(
+            graph,
+            coord_to_id=coord_to_id,
+        ),
         world_state=WorldState(graph),
         router=Router(),
         seed=180,
-        vehicles=(vehicle,),
+        vehicles=vehicles,
+    )
+
+
+def build_corridor_deadlock_engine() -> SimulationEngine:
+    graph = Graph()
+
+    node_1 = Node(1, (0.0, 0.0, 0.0))
+    node_2 = Node(2, (1.0, 0.0, 0.0))
+    node_3 = Node(3, (2.0, 0.0, 0.0))
+
+    for node in (node_1, node_2, node_3):
+        graph.add_node(node)
+
+    graph.add_edge(Edge(1, node_1, node_2, 1.0, 10.0))
+    graph.add_edge(Edge(2, node_2, node_3, 1.0, 10.0))
+
+    return build_command_center_engine_from_graph(
+        graph=graph,
+        coord_to_id={
+            (0.0, 0.0, 0.0): 1,
+            (1.0, 0.0, 0.0): 2,
+            (2.0, 0.0, 0.0): 3,
+        },
+        vehicles=(
+            Vehicle(
+                id=77,
+                current_node_id=2,
+                position=(1.0, 0.0, 0.0),
+                velocity=0.0,
+                payload=0.0,
+                max_payload=10.0,
+                max_speed=5.0,
+            ),
+            Vehicle(
+                id=78,
+                current_node_id=1,
+                position=(0.0, 0.0, 0.0),
+                velocity=0.0,
+                payload=0.0,
+                max_payload=10.0,
+                max_speed=5.0,
+            ),
+        ),
     )
 
 
@@ -231,3 +335,83 @@ def test_ai_assist_surface_explains_blocked_route_anomaly_and_reopen_suggestion(
         "edge_id": 2,
     }
     assert surface.ai_assist.anomalies == ()
+
+
+def test_command_center_surface_flags_intersection_deadlock_risk() -> None:
+    session = LiveSimulationSession(build_intersection_deadlock_engine())
+
+    monkeypatch_context: dict[str, Any] = {
+        "current_job_id": None,
+        "current_task_index": None,
+        "current_task_type": None,
+        "assigned_resource_id": None,
+        "wait_reason": "conflict_wait",
+    }
+
+    original_context = command_center_module._active_execution_context
+    def fake_active_execution_context(
+        _session: LiveSimulationSession,
+        *,
+        vehicle_id: int,
+    ) -> dict[str, Any]:
+        return monkeypatch_context
+
+    command_center_module._active_execution_context = fake_active_execution_context  # type: ignore[assignment]
+    try:
+        surface = build_live_command_center_surface(
+            session,
+            selected_vehicle_ids=(77,),
+            route_preview_requests=(RoutePreviewRequest(vehicle_id=77, destination_node_id=3),),
+        )
+    finally:
+        command_center_module._active_execution_context = original_context
+
+    assert any(
+        diagnostic.code == "deadlock_risk_intersection"
+        for diagnostic in surface.vehicle_inspections[0].diagnostics
+    )
+    assert any(
+        anomaly.vehicle_id == 78 and "intersection" in (anomaly.summary or "")
+        for anomaly in surface.ai_assist.anomalies
+    )
+    assert any(suggestion.kind == "avoid_deadlock" for suggestion in surface.ai_assist.suggestions)
+
+
+def test_command_center_surface_flags_narrow_corridor_spillback_risk() -> None:
+    session = LiveSimulationSession(build_corridor_deadlock_engine())
+
+    monkeypatch_context: dict[str, Any] = {
+        "current_job_id": None,
+        "current_task_index": None,
+        "current_task_type": None,
+        "assigned_resource_id": None,
+        "wait_reason": "conflict_wait",
+    }
+
+    original_context = command_center_module._active_execution_context
+    def fake_active_execution_context(
+        _session: LiveSimulationSession,
+        *,
+        vehicle_id: int,
+    ) -> dict[str, Any]:
+        return monkeypatch_context
+
+    command_center_module._active_execution_context = fake_active_execution_context  # type: ignore[assignment]
+    try:
+        surface = build_live_command_center_surface(
+            session,
+            selected_vehicle_ids=(77,),
+            route_preview_requests=(RoutePreviewRequest(vehicle_id=77, destination_node_id=3),),
+        )
+    finally:
+        command_center_module._active_execution_context = original_context
+
+    assert any(
+        diagnostic.code == "deadlock_risk_corridor"
+        for diagnostic in surface.vehicle_inspections[0].diagnostics
+    )
+    assert any(
+        anomaly.vehicle_id == 78 and "spill" in (anomaly.summary or "").lower()
+        for anomaly in surface.ai_assist.anomalies
+    )
+    assert any(suggestion.kind == "avoid_deadlock" for suggestion in surface.ai_assist.suggestions)

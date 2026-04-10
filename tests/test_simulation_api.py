@@ -132,6 +132,8 @@ def test_replay_bundle_is_versioned_and_matches_existing_replay_surface() -> Non
     assert [result.sequence for result in bundle.command_results] == [0, 1, 2, 3]
     assert bundle.command_results[0].blocked_edge_ids == (2,)
     assert [segment.edge_id for segment in bundle.motion_segments] == [3, 4, 5, 4]
+    assert bundle.motion_segments[0].lane_id is not None
+    assert bundle.motion_segments[0].lane_selection_reason is not None
     assert bundle.traffic_baseline.control_points != ()
     assert bundle.traffic_baseline.queue_records == ()
     assert [
