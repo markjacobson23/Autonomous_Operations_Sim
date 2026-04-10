@@ -249,3 +249,50 @@ def test_live_app_frontend_server_supports_live_commands_and_session_control(
         assert pause_payload["bundle"]["session_control"]["play_state"] == "paused"
     finally:
         server.stop()
+
+
+def test_live_app_frontend_server_supports_route_preview_endpoint(tmp_path) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
+    vehicle_id = bundle["command_center"]["vehicles"][0]["vehicle_id"]
+    destination_node_id = bundle["map_surface"]["edges"][0]["end_node_id"]
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        preview_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/preview",
+                data=json.dumps(
+                    {
+                        "vehicle_id": vehicle_id,
+                        "destination_node_id": destination_node_id,
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        preview_payload = json.loads(preview_response.read().decode("utf-8"))
+        assert preview_payload["ok"] is True
+        assert preview_payload["bundle"]["command_center"]["route_previews"][0][
+            "vehicle_id"
+        ] == vehicle_id
+        assert preview_payload["bundle"]["command_center"]["route_previews"][0][
+            "destination_node_id"
+        ] == destination_node_id
+        assert preview_payload["bundle"]["command_center"]["vehicle_inspections"][0][
+            "route_ahead_node_ids"
+        ]
+        assert preview_payload["bundle"]["session_control"]["route_preview_endpoint"] == "/api/live/preview"
+    finally:
+        server.stop()

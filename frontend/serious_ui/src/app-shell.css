@@ -773,6 +773,12 @@ h3 {
   filter: drop-shadow(0 0 0.18px rgba(10, 118, 108, 0.42));
 }
 
+.scene-route-preview.selected {
+  stroke: rgba(201, 106, 24, 0.98);
+  stroke-width: 0.46;
+  stroke-dasharray: 0.6 0.4;
+}
+
 .scene-reservation {
   stroke: rgba(29, 78, 216, 0.55);
   stroke-width: 0.22;
@@ -782,6 +788,11 @@ h3 {
 
 .scene-queue-overlay {
   animation-duration: 1.8s;
+}
+
+.scene-queue-overlay.preview {
+  stroke: rgba(201, 106, 24, 0.9);
+  stroke-dasharray: 0.35 0.22;
 }
 
 .scene-hazard {
@@ -970,6 +981,28 @@ h3 {
   background: linear-gradient(90deg, rgba(10, 118, 108, 0.9), rgba(187, 101, 30, 0.95), rgba(178, 74, 59, 0.98));
   box-shadow: 0 0 16px rgba(178, 74, 59, 0.15);
   animation: traffic-fill 2.8s ease-in-out infinite alternate;
+}
+
+.preview-summary {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 246, 247, 0.82));
+}
+
+.preview-badge {
+  display: grid;
+  gap: 4px;
+}
+
+.preview-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 800;
 }
 
 @keyframes traffic-flow {

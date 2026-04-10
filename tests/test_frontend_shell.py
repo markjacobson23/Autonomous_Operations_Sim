@@ -24,8 +24,12 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "Reload Scenario" in app_source
     assert "Live Command Console" in app_source
     assert "Session Control" in app_source
+    assert "Preview Route" in app_source
     assert "Assign Destination" in app_source
     assert "Single-Step" in app_source
+    assert "Reservation & Conflict Inspection" in app_source
+    assert "Selected Preview" in app_source
+    assert "route_preview_endpoint" in app_source
     assert "command_endpoint" in app_source
     assert "session_control_endpoint" in app_source
     assert "play_state" in app_source
@@ -90,6 +94,8 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".scene-area.selected" in css_source
     assert ".scene-road.selected" in css_source
     assert ".scene-reservation.selected" in css_source
+    assert ".scene-route-preview.selected" in css_source
+    assert ".scene-queue-overlay.preview" in css_source
     assert ".scene-hazard.selected" in css_source
     assert "@keyframes traffic-flow" in css_source
     assert "@media (max-width: 980px)" in css_source

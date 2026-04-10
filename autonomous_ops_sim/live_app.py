@@ -269,6 +269,7 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
         if parsed.path not in {
             "/api/authoring/validate",
             "/api/authoring/save",
+            "/api/live/preview",
             "/api/live/command",
             "/api/live/session/control",
         }:
@@ -299,6 +300,9 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/authoring/save":
             self._handle_authoring_save(payload)
+            return
+        if parsed.path == "/api/live/preview":
+            self._handle_live_route_preview(payload)
             return
         if parsed.path == "/api/live/command":
             self._handle_live_command(payload)
@@ -433,6 +437,53 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
                 "ok": command_result["status"] == "accepted",
                 "command_result": command_result,
                 "bundle": bundle,
+                "working_scenario_path": str(self._artifacts.working_scenario_path),
+            },
+        )
+
+    def _handle_live_route_preview(self, payload: dict[str, object]) -> None:
+        selected_vehicle_ids, route_preview_requests = _selection_requests_from_payload(
+            payload
+        )
+        try:
+            if not route_preview_requests:
+                vehicle_id = _payload_int(payload, "vehicle_id")
+                destination_node_id = _payload_int(payload, "destination_node_id")
+                route_preview_requests = (
+                    RoutePreviewRequest(
+                        vehicle_id=vehicle_id,
+                        destination_node_id=destination_node_id,
+                    ),
+                )
+                if not selected_vehicle_ids:
+                    selected_vehicle_ids = (vehicle_id,)
+        except (KeyError, TypeError, ValueError) as exc:
+            self._write_json_response(
+                400,
+                {
+                    "ok": False,
+                    "message": str(exc),
+                    "validation_messages": [],
+                },
+            )
+            return
+
+        bundle = self._runtime.refresh_bundle(
+            selected_vehicle_ids=selected_vehicle_ids,
+            route_preview_requests=route_preview_requests,
+        )
+        route_previews: list[object] = []
+        command_center = bundle.get("command_center")
+        if isinstance(command_center, dict):
+            maybe_route_previews = command_center.get("route_previews", [])
+            if isinstance(maybe_route_previews, list):
+                route_previews = maybe_route_previews
+        self._write_json_response(
+            200,
+            {
+                "ok": True,
+                "bundle": bundle,
+                "route_previews": route_previews,
                 "working_scenario_path": str(self._artifacts.working_scenario_path),
             },
         )
@@ -669,6 +720,7 @@ def _build_live_bundle_record(
     bundle["session_control"] = {
         "play_state": play_state,
         "step_seconds": DEFAULT_LIVE_SESSION_STEP_SECONDS,
+        "route_preview_endpoint": "/api/live/preview",
         "command_endpoint": "/api/live/command",
         "session_control_endpoint": "/api/live/session/control",
     }

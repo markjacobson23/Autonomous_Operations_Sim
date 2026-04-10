@@ -291,6 +291,7 @@ type AuthoringPayload = {
 type SessionControlPayload = {
   play_state?: "paused" | "playing" | string;
   step_seconds?: number;
+  route_preview_endpoint?: string;
   command_endpoint?: string;
   session_control_endpoint?: string;
 };
@@ -672,6 +673,20 @@ function App(): JSX.Element {
   const suggestions = bootstrap.commandCenter.ai_assist?.suggestions ?? [];
   const anomalies = bootstrap.commandCenter.ai_assist?.anomalies ?? [];
   const explanations = bootstrap.commandCenter.ai_assist?.explanations ?? [];
+  const selectedRoutePreview =
+    routePreviews.find((preview) => preview.vehicle_id === selectedVehicleId) ??
+    routePreviews[0] ??
+    null;
+  const selectedRoutePreviewRoadIds = new Set(
+    (bundle?.render_geometry?.roads ?? [])
+      .filter((road) =>
+        (selectedRoutePreview?.edge_ids ?? []).some((edgeId) =>
+          (road.edge_ids ?? []).includes(edgeId),
+        ),
+      )
+      .map((road) => road.road_id)
+      .filter((roadId): roadId is string => Boolean(roadId)),
+  );
   const defaultVehicleId =
     bootstrap.commandCenter.selected_vehicle_ids?.[0] ?? inspections[0]?.vehicle_id ?? null;
   const selectedVehicleId =
@@ -1001,6 +1016,42 @@ function App(): JSX.Element {
       });
   }
 
+  function submitRoutePreview(previewPayload: Record<string, unknown>): void {
+    const endpoint = sessionControl?.route_preview_endpoint ?? "/api/live/preview";
+    setLiveCommandMessage("Requesting a route preview from the Python session...");
+    void fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...previewPayload,
+        selected_vehicle_ids: selectedVehicleId !== null ? [selectedVehicleId] : [],
+      }),
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          bundle?: BundlePayload;
+          message?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.message ?? `Preview request failed with ${response.status}`);
+        }
+        return payload;
+      })
+      .then((payload) => {
+        if (payload.bundle) {
+          refreshLiveBundle(payload.bundle, "Route preview refreshed.");
+        }
+        setLiveCommandMessage(payload.ok ? "Route preview loaded." : "Route preview response returned.");
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "Route preview request failed";
+        setLiveCommandMessage(message);
+      });
+  }
+
   function controlLiveSession(action: "play" | "pause" | "step"): void {
     const endpoint = sessionControl?.session_control_endpoint ?? "/api/live/session/control";
     const stepSeconds = parseDraftFloat(liveCommandDraft.stepSeconds) ?? sessionControl?.step_seconds ?? 0.5;
@@ -1063,6 +1114,19 @@ function App(): JSX.Element {
     }
     submitLiveCommand({
       command_type: "assign_vehicle_destination",
+      vehicle_id: vehicleId,
+      destination_node_id: destinationNodeId,
+    });
+  }
+
+  function previewRouteFromDraft(): void {
+    const vehicleId = parseDraftInteger(liveCommandDraft.vehicleId);
+    const destinationNodeId = parseDraftInteger(liveCommandDraft.destinationNodeId);
+    if (vehicleId === null || destinationNodeId === null) {
+      setLiveCommandMessage("Enter a valid vehicle id and destination node id first.");
+      return;
+    }
+    submitRoutePreview({
       vehicle_id: vehicleId,
       destination_node_id: destinationNodeId,
     });
@@ -1596,7 +1660,9 @@ function App(): JSX.Element {
                         <polyline
                           key={`route-preview-${previewIndex}`}
                           points={toPointString(routePoints)}
-                          className="scene-route-preview"
+                          className={`scene-route-preview ${
+                            preview.vehicle_id === selectedVehicleId ? "selected" : ""
+                          }`}
                           onMouseEnter={() =>
                             setHoverTarget({
                               label: `Route preview V${preview.vehicle_id ?? "?"}`,
@@ -1627,6 +1693,8 @@ function App(): JSX.Element {
                             selectedTarget?.kind === "queue" &&
                             selectedTarget.roadId === record.road_id
                               ? "selected"
+                              : selectedRoutePreviewRoadIds.has(record.road_id ?? "")
+                                ? "selected preview"
                               : ""
                           }`}
                           strokeWidth={Math.max(road.width_m ?? 1.4, 0.9) + 2}
@@ -2096,6 +2164,14 @@ function App(): JSX.Element {
                   <button
                     className="scene-button"
                     type="button"
+                    onClick={previewRouteFromDraft}
+                    disabled={!sessionControl?.route_preview_endpoint}
+                  >
+                    Preview Route
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
                     onClick={assignDestinationFromDraft}
                     disabled={!sessionControl?.command_endpoint}
                   >
@@ -2192,6 +2268,61 @@ function App(): JSX.Element {
                   ) : (
                     <li>No route previews are currently attached.</li>
                   )}
+                </ul>
+                <div className="preview-summary">
+                  <div className="preview-badge">
+                    <span className="preview-label">Selected Preview</span>
+                    <strong>
+                      V{formatMaybeNumber(selectedRoutePreview?.vehicle_id ?? null)} · Node{" "}
+                      {formatMaybeNumber(selectedRoutePreview?.destination_node_id ?? null)}
+                    </strong>
+                  </div>
+                  <ul className="mini-list">
+                    <li>Actionable: {selectedRoutePreview?.is_actionable ? "yes" : "no"}</li>
+                    <li>Reason: {selectedRoutePreview?.reason ?? "none"}</li>
+                    <li>
+                      Distance: {formatMeters(selectedRoutePreview?.total_distance ?? null)}
+                    </li>
+                    <li>Edges: {(selectedRoutePreview?.edge_ids ?? []).join(", ") || "none"}</li>
+                    <li>Nodes: {(selectedRoutePreview?.node_ids ?? []).join(" → ") || "none"}</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="subsection">
+                <h3>Reservation & Conflict Inspection</h3>
+                <ul className="data-list">
+                  {(bundle?.traffic_baseline?.queue_records ?? []).length > 0 ? (
+                    (bundle?.traffic_baseline?.queue_records ?? []).slice(0, 5).map((record, index) => {
+                      const roadTraffic =
+                        record.road_id !== undefined
+                          ? trafficRoadById.get(record.road_id) ?? null
+                          : null;
+                      return (
+                        <li key={`${record.road_id ?? "queue"}-${index}`}>
+                          Road {record.road_id ?? "unknown"} · {record.vehicle_ids?.length ?? 0} vehicle(s)
+                          · {roadTraffic?.control_state ?? "yield"} ·{" "}
+                          {roadTraffic?.congestion_level ?? "free"} · {record.reason ?? "queued"}
+                        </li>
+                      );
+                    })
+                  ) : (
+                    <li>No queue reservations are currently active.</li>
+                  )}
+                </ul>
+                <ul className="mini-list">
+                  <li>
+                    Selected route conflicts: {selectedRoutePreview?.reason ?? "none"}
+                  </li>
+                  <li>
+                    Route preview roads:{" "}
+                    {selectedRoutePreviewRoadIds.size > 0
+                      ? Array.from(selectedRoutePreviewRoadIds).join(", ")
+                      : "none"}
+                  </li>
+                  <li>
+                    Blocked edges: {(bootstrap.bundle?.snapshot?.blocked_edge_ids ?? []).join(", ") || "none"}
+                  </li>
                 </ul>
               </div>
             </div>
