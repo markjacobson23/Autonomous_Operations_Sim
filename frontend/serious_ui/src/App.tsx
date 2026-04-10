@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
 type Position3 = [number, number, number];
 
@@ -469,6 +469,33 @@ const emptyTransaction: EditTransaction = {
   label: "live_geometry_edit",
   operations: [],
 };
+
+function renderPanelHeader({
+  eyebrow,
+  title,
+  titleId,
+  lede,
+  meta,
+  className,
+}: {
+  eyebrow: string;
+  title: string;
+  titleId?: string;
+  lede?: string;
+  meta?: ReactNode;
+  className?: string;
+}): JSX.Element {
+  return (
+    <div className={`panel-header${className ? ` ${className}` : ""}`}>
+      <div className="panel-copy">
+        <p className="eyebrow">{eyebrow}</p>
+        <h2 id={titleId}>{title}</h2>
+        {lede ? <p className="panel-lede">{lede}</p> : null}
+      </div>
+      {meta ? <div className="panel-meta">{meta}</div> : null}
+    </div>
+  );
+}
 
 function App(): JSX.Element {
   const minimapRef = useRef<SVGSVGElement | null>(null);
@@ -1784,17 +1811,20 @@ function App(): JSX.Element {
       <main className="workspace">
         <section className="main-column operate-pane">
           <section className="stage panel" aria-labelledby="scene-title">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Scene Region</p>
-                <h2 id="scene-title">Operations Viewport</h2>
-              </div>
-              <div className="status-stack">
-                <span className="status-pill">Camera controls active</span>
-                <span className="status-pill secondary">Selection active</span>
-                <span className="status-pill accent">Layer toggles active</span>
-              </div>
-            </div>
+            {renderPanelHeader({
+              eyebrow: "Scene Region",
+              title: "Operations Viewport",
+              titleId: "scene-title",
+              lede:
+                "Scene layers, route previews, and live vehicle state stay layered into one operator view.",
+              meta: (
+                <div className="status-stack">
+                  <span className="status-pill">Camera controls active</span>
+                  <span className="status-pill secondary">Selection active</span>
+                  <span className="status-pill accent">Layer toggles active</span>
+                </div>
+              ),
+            })}
 
             <div className="scene-toolbar" aria-label="Scene toolbar">
               <div className="tool-group">
@@ -2534,16 +2564,20 @@ function App(): JSX.Element {
               </aside>
             </div>
             <section className="panel info-panel operate-session-controls" aria-labelledby="session-control-title">
-              <div className="panel-header compact">
-                <div>
-                  <p className="eyebrow">Operate Region</p>
-                  <h2 id="session-control-title">Compact Session Status</h2>
-                </div>
-                <span className="status-pill secondary">
-                  {liveSessionPlaying ? "playing" : "paused"} · step{" "}
-                  {formatSeconds(sessionControl?.step_seconds ?? null)}
-                </span>
-              </div>
+              {renderPanelHeader({
+                eyebrow: "Operate Region",
+                title: "Compact Session Status",
+                titleId: "session-control-title",
+                lede:
+                  "The live session controls stay compact so play-state changes remain easy to scan.",
+                className: "compact",
+                meta: (
+                  <span className="status-pill secondary">
+                    {liveSessionPlaying ? "playing" : "paused"} · step{" "}
+                    {formatSeconds(sessionControl?.step_seconds ?? null)}
+                  </span>
+                ),
+              })}
               <div className="section-stack">
                 <div className="subsection">
                   <div className="action-row">
@@ -2584,13 +2618,14 @@ function App(): JSX.Element {
           </section>
 
           <section className="timeline-region panel" aria-labelledby="timeline-title">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Timeline Region</p>
-                <h2 id="timeline-title">Playback and Session Timeline</h2>
-              </div>
-              <span className="status-pill secondary">Docked placeholder</span>
-            </div>
+            {renderPanelHeader({
+              eyebrow: "Timeline Region",
+              title: "Playback and Session Timeline",
+              titleId: "timeline-title",
+              lede:
+                "Playback, trace, and command surfaces stay visually docked even when the timeline is only a placeholder.",
+              meta: <span className="status-pill secondary">Docked placeholder</span>,
+            })}
             <div className="timeline-body">
               <div className="timeline-track">
                 <div className="timeline-fill" />
@@ -2623,27 +2658,27 @@ function App(): JSX.Element {
 
         <aside className="sidebar">
           <section className="panel info-panel editor-pane" aria-labelledby="editor-title">
-            <div className="panel-header compact editor-panel-header">
-              <div>
-                <p className="eyebrow">Authoring Region</p>
-                <h2 id="editor-title">Scenario Authoring</h2>
-                <p className="status-copy">
-                  Dedicated controls for the working scenario, staged geometry, and validation
-                  live here.
-                </p>
-              </div>
-              <div className="editor-header-stack" aria-label="Editor mode summary">
-                <span className={`status-pill ${editorEnabled ? "accent" : "secondary"}`}>
-                  {editorModeLabel}
-                </span>
-                <span className={`status-pill ${hasDraftEdits ? "accent" : "secondary"}`}>
-                  {draftStatusLabel}
-                </span>
-                <span className={`status-pill ${validationBlocked ? "secondary" : "accent"}`}>
-                  {validationStatusLabel}
-                </span>
-              </div>
-            </div>
+            {renderPanelHeader({
+              eyebrow: "Authoring Region",
+              title: "Scenario Authoring",
+              titleId: "editor-title",
+              lede:
+                "Dedicated controls for the working scenario, staged geometry, and validation live here.",
+              className: "compact editor-panel-header",
+              meta: (
+                <div className="editor-header-stack" aria-label="Editor mode summary">
+                  <span className={`status-pill ${editorEnabled ? "accent" : "secondary"}`}>
+                    {editorModeLabel}
+                  </span>
+                  <span className={`status-pill ${hasDraftEdits ? "accent" : "secondary"}`}>
+                    {draftStatusLabel}
+                  </span>
+                  <span className={`status-pill ${validationBlocked ? "secondary" : "accent"}`}>
+                    {validationStatusLabel}
+                  </span>
+                </div>
+              ),
+            })}
             <div className="section-stack">
               <div className="editor-mode-banner">
                 <div className="editor-mode-copy">
@@ -2808,24 +2843,24 @@ function App(): JSX.Element {
           </section>
 
           <section className="panel info-panel fleet-pane" aria-labelledby="command-center-title">
-            <div className="panel-header compact fleet-panel-header">
-              <div>
-                <p className="eyebrow">Command-Center Region</p>
-                <h2 id="command-center-title">Fleet Control</h2>
-                <p className="fleet-panel-lede">
-                  Dedicated fleet selection, batch actions, runtime admin changes, and inspection
-                  context stay grouped here so the control surface reads like an operations desk.
-                </p>
-              </div>
-              <div className="fleet-panel-meta">
-                <span className="status-pill secondary">
-                  {formatMaybeNumber(effectiveSelectedVehicleIds.length)} selected
-                </span>
-                <span className="status-pill accent">
-                  Lead {selectedFleetPrimaryVehicleId !== null ? `V${selectedFleetPrimaryVehicleId}` : "none"}
-                </span>
-              </div>
-            </div>
+            {renderPanelHeader({
+              eyebrow: "Command-Center Region",
+              title: "Fleet Control",
+              titleId: "command-center-title",
+              lede:
+                "Fleet selection, batch actions, runtime admin changes, and inspection context stay grouped here.",
+              className: "compact fleet-panel-header",
+              meta: (
+                <div className="fleet-panel-meta">
+                  <span className="status-pill secondary">
+                    {formatMaybeNumber(effectiveSelectedVehicleIds.length)} selected
+                  </span>
+                  <span className="status-pill accent">
+                    Lead {selectedFleetPrimaryVehicleId !== null ? `V${selectedFleetPrimaryVehicleId}` : "none"}
+                  </span>
+                </div>
+              ),
+            })}
 
             <div className="fleet-control-grid">
               <article className="subsection fleet-card fleet-summary-card">
@@ -3461,19 +3496,19 @@ function App(): JSX.Element {
           </section>
 
           <section className="panel info-panel traffic-pane" aria-labelledby="traffic-title">
-            <div className="panel-header compact traffic-panel-header">
-              <div>
-                <p className="eyebrow">Traffic Control Room</p>
-                <h2 id="traffic-title">Traffic Control</h2>
-                <p className="traffic-panel-lede">
-                  Urgent congestion, blocked edges, queue reservations, and road-state cards are
-                  ranked so the highest-pressure issues stay at the top.
-                </p>
-              </div>
-              <span className="status-pill secondary traffic-panel-status">
-                {formatMaybeNumber(blockedEdgeIds.length)} blocked edges
-              </span>
-            </div>
+            {renderPanelHeader({
+              eyebrow: "Traffic Control Room",
+              title: "Traffic Control",
+              titleId: "traffic-title",
+              lede:
+                "Congestion, blocked edges, queue reservations, and road-state cards are ranked by pressure.",
+              className: "compact traffic-panel-header",
+              meta: (
+                <span className="status-pill secondary traffic-panel-status">
+                  {formatMaybeNumber(blockedEdgeIds.length)} blocked edges
+                </span>
+              ),
+            })}
 
             <div className="section-stack traffic-monitor-stack">
               <div className="subsection traffic-monitor-board">
@@ -3853,31 +3888,32 @@ function App(): JSX.Element {
           </section>
 
           <section className="panel info-panel analyze-pane" aria-labelledby="inspector-title">
-            <div className="panel-header compact analyze-panel-header">
-              <div className="analyze-panel-copy">
-                <p className="eyebrow">Inspector Region</p>
-                <h2 id="inspector-title">Diagnostics and AI Review</h2>
-                <p className="analyze-panel-lede">
-                  Urgent issues first, recommended actions second, and supporting context last.
-                </p>
-              </div>
-              <div className="analyze-panel-meta">
-                <span className="status-pill secondary">
-                  {selectedTarget ? describeSelectedBadge(selectedTarget) : `${inspections.length} records`}
-                </span>
-                <div className="analyze-summary-strip" aria-label="Analyze summary">
-                  <span className="analysis-chip analysis-chip-alert">
-                    {reviewAnomalies.length} urgent issue{reviewAnomalies.length === 1 ? "" : "s"}
+            {renderPanelHeader({
+              eyebrow: "Inspector Region",
+              title: "Diagnostics and AI Review",
+              titleId: "inspector-title",
+              lede:
+                "Urgent issues first, recommended actions second, and supporting context last.",
+              className: "compact analyze-panel-header",
+              meta: (
+                <div className="analyze-panel-meta">
+                  <span className="status-pill secondary">
+                    {selectedTarget ? describeSelectedBadge(selectedTarget) : `${inspections.length} records`}
                   </span>
-                  <span className="analysis-chip analysis-chip-action">
-                    {reviewSuggestions.length} action{reviewSuggestions.length === 1 ? "" : "s"}
-                  </span>
-                  <span className="analysis-chip analysis-chip-context">
-                    {reviewExplanations.length} explanation{reviewExplanations.length === 1 ? "" : "s"}
-                  </span>
+                  <div className="analyze-summary-strip" aria-label="Analyze summary">
+                    <span className="analysis-chip analysis-chip-alert">
+                      {reviewAnomalies.length} urgent issue{reviewAnomalies.length === 1 ? "" : "s"}
+                    </span>
+                    <span className="analysis-chip analysis-chip-action">
+                      {reviewSuggestions.length} action{reviewSuggestions.length === 1 ? "" : "s"}
+                    </span>
+                    <span className="analysis-chip analysis-chip-context">
+                      {reviewExplanations.length} explanation{reviewExplanations.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </div>
+              ),
+            })}
 
             <div className="analyze-review-stack">
               <section className="subsection analyze-ai-feedback analyze-review-section analyze-review-section-urgent">

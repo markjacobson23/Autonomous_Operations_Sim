@@ -3,6 +3,9 @@
   --bg: #e8e2d7;
   --panel: rgba(252, 248, 241, 0.84);
   --panel-strong: rgba(255, 251, 246, 0.96);
+  --surface: rgba(255, 252, 247, 0.96);
+  --surface-soft: rgba(248, 243, 236, 0.94);
+  --surface-muted: rgba(244, 239, 231, 0.9);
   --ink: #18212c;
   --muted: #5f6d79;
   --line: rgba(66, 78, 88, 0.14);
@@ -16,6 +19,7 @@
   --alert-soft: rgba(178, 74, 59, 0.14);
   --shadow: 0 24px 70px rgba(24, 33, 44, 0.12);
   --shadow-strong: 0 22px 46px rgba(24, 33, 44, 0.18);
+  --shadow-soft: 0 14px 34px rgba(24, 33, 44, 0.1);
   --radius-xl: 30px;
   --radius-lg: 22px;
   --radius-md: 16px;
@@ -46,11 +50,12 @@ body {
 
 .shell {
   min-height: 100vh;
-  padding: 24px;
+  padding: clamp(16px, 2vw, 28px);
   display: grid;
-  gap: 18px;
+  gap: clamp(14px, 1.6vw, 20px);
   position: relative;
   overflow: hidden;
+  align-content: start;
 }
 
 .shell-accent {
@@ -87,10 +92,10 @@ body {
 }
 
 .masthead {
-  padding: 24px 26px;
+  padding: clamp(18px, 2vw, 26px) clamp(20px, 2vw, 28px);
   display: flex;
   justify-content: space-between;
-  gap: 24px;
+  gap: 18px;
   align-items: flex-start;
   flex-wrap: wrap;
   background:
@@ -105,14 +110,40 @@ body {
 }
 
 .masthead-copy {
-  flex: 1 1 440px;
+  flex: 1 1 500px;
+  min-width: 0;
 }
 
 .masthead-meta {
-  flex: 1 1 360px;
+  flex: 1 1 320px;
   display: grid;
   gap: 14px;
   justify-items: end;
+  min-width: 0;
+}
+
+.panel-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 440px;
+}
+
+.panel-meta {
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+  align-content: start;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.panel-lede {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 0.98rem;
+  max-width: 46rem;
 }
 
 .eyebrow {
@@ -160,6 +191,7 @@ h3 {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: flex-start;
 }
 
 .badge,
@@ -192,6 +224,31 @@ h3 {
   color: var(--accent-2);
 }
 
+.badge,
+.status-pill,
+.health-pill,
+.route-chip,
+.diagnostic-pill,
+.analysis-chip,
+.analysis-section-chip,
+.review-level-chip,
+.review-target-chip,
+.fleet-card-badge,
+.fleet-batch-chip,
+.fleet-inspection-chip,
+.fleet-state-pill,
+.traffic-summary-chip,
+.traffic-section-badge,
+.traffic-road-card-pill,
+.traffic-reservation-badge,
+.traffic-alert-badge,
+.editor-item-chip,
+.selection-pill {
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .status-pill.accent {
   background: linear-gradient(135deg, rgba(36, 83, 199, 0.14), rgba(10, 118, 108, 0.14));
   color: var(--accent-2);
@@ -204,13 +261,15 @@ h3 {
   cursor: default;
   padding: 10px 14px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  min-width: 0;
+  white-space: normal;
 }
 
 .session-bar {
-  padding: 14px 16px;
+  padding: 16px 18px;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr)) auto;
-  gap: 12px;
+  gap: 10px 12px;
   align-items: stretch;
 }
 
@@ -223,6 +282,7 @@ h3 {
   display: grid;
   gap: 4px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  min-width: 0;
 }
 
 .metric-label {
@@ -235,6 +295,7 @@ h3 {
 .health-pill {
   align-self: center;
   justify-self: end;
+  min-width: 0;
 }
 
 .health-pill-idle,
@@ -258,6 +319,7 @@ h3 {
   grid-template-columns: minmax(0, 1.55fr) minmax(330px, 0.95fr);
   gap: 18px;
   align-items: start;
+  min-width: 0;
 }
 
 .shell-tab-operate .workspace {
@@ -272,10 +334,11 @@ h3 {
 }
 
 .workspace-tabs {
-  padding: 14px;
+  padding: 16px;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
+  align-items: stretch;
 }
 
 .workspace-tab {
@@ -289,6 +352,8 @@ h3 {
   text-align: left;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
   cursor: pointer;
+  min-width: 0;
+  min-height: 78px;
 }
 
 .workspace-tab-editor {
@@ -299,12 +364,14 @@ h3 {
   font-size: 0.9rem;
   font-family: var(--font-display);
   letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
 }
 
 .workspace-tab span {
   color: var(--muted);
   font-size: 0.75rem;
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .workspace-tab-active {
@@ -401,6 +468,7 @@ h3 {
   display: grid;
   gap: 10px;
   justify-items: end;
+  min-width: 0;
 }
 
 .editor-mode-banner {
@@ -488,6 +556,7 @@ h3 {
 .editor-detail-grid {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .editor-state-card {
@@ -570,17 +639,19 @@ h3 {
 }
 
 .editor-empty-state {
-  padding: 12px;
-  border-radius: 14px;
+  padding: 12px 13px;
+  border-radius: 16px;
   border: 1px dashed rgba(97, 112, 125, 0.18);
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--muted);
+  line-height: 1.5;
 }
 
 .route-planning-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  min-width: 0;
 }
 
 .route-primary-actions {
@@ -594,6 +665,7 @@ h3 {
   border: 1px solid rgba(97, 112, 125, 0.14);
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 246, 247, 0.82));
+  min-width: 0;
 }
 
 .shell-tab-fleet .fleet-pane {
@@ -611,6 +683,7 @@ h3 {
   display: grid;
   gap: 10px;
   justify-items: end;
+  min-width: 0;
 }
 
 .fleet-panel-lede,
@@ -624,6 +697,7 @@ h3 {
 .fleet-control-grid {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .fleet-card {
@@ -684,6 +758,7 @@ h3 {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
 }
 
 .fleet-summary-metric,
@@ -743,6 +818,7 @@ h3 {
   border: 1px solid rgba(97, 112, 125, 0.12);
   background: rgba(255, 255, 255, 0.64);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  min-width: 0;
 }
 
 .fleet-vehicle-strip {
@@ -801,12 +877,14 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: flex-start;
 }
 
 .fleet-selection-actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: flex-start;
 }
 
 .fleet-admin-grid {
@@ -909,6 +987,7 @@ h3 {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
   gap: 12px;
+  min-width: 0;
 }
 
 .fleet-inspection-panel {
@@ -1004,6 +1083,7 @@ h3 {
   border: 1px dashed rgba(97, 112, 125, 0.18);
   background: rgba(255, 255, 255, 0.72);
   color: var(--muted);
+  line-height: 1.5;
 }
 
 .traffic-pane,
@@ -1012,6 +1092,7 @@ h3 {
 .analyze-pane {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .main-column,
@@ -1019,25 +1100,45 @@ h3 {
 .section-stack {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .stage,
 .timeline-region,
 .info-panel {
-  padding: 20px;
+  padding: 22px;
+  min-width: 0;
 }
 
 .panel-header {
   display: flex;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
   align-items: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
 }
 
 .panel-header.compact {
   margin-bottom: 14px;
+}
+
+.panel-header,
+.subsection-header,
+.traffic-section-heading,
+.analyze-section-header,
+.fleet-card-header,
+.fleet-admin-group-header,
+.fleet-inspection-panel-header,
+.traffic-alert-card-header,
+.traffic-road-card-header,
+.traffic-reservation-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .operate-session-controls {
@@ -1056,7 +1157,7 @@ h3 {
 
 .stage-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.55fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.62fr);
   gap: 16px;
 }
 
@@ -1084,6 +1185,7 @@ h3 {
   font-size: 0.8rem;
   font-weight: 700;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  min-width: 0;
 }
 
 .scene-button:disabled {
@@ -1094,6 +1196,10 @@ h3 {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.action-row .scene-button {
+  flex: 1 1 170px;
 }
 
 .layer-chip-active {
@@ -1265,6 +1371,7 @@ h3 {
 .overview-panel {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .overview-card,
@@ -1361,6 +1468,7 @@ h3 {
   display: grid;
   gap: 12px;
   justify-items: end;
+  min-width: 0;
 }
 
 .analyze-summary-strip {
@@ -1428,6 +1536,7 @@ h3 {
   border-radius: var(--radius-lg);
   border: 1px solid rgba(97, 112, 125, 0.12);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 243, 235, 0.9));
+  min-width: 0;
 }
 
 .analyze-review-section-urgent {
@@ -1480,6 +1589,7 @@ h3 {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 243, 236, 0.92));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  min-width: 0;
 }
 
 .review-card-urgent {
@@ -1551,6 +1661,7 @@ h3 {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: flex-start;
 }
 
 .review-level-chip {
@@ -1615,6 +1726,7 @@ h3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+  min-width: 0;
 }
 
 .review-metric {
@@ -1722,6 +1834,7 @@ h3 {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
+  min-width: 0;
 }
 
 .selection-strip {
@@ -1729,6 +1842,7 @@ h3 {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+  min-width: 0;
 }
 
 .selection-pill {
@@ -1783,6 +1897,40 @@ h3 {
   color: var(--muted);
 }
 
+@media (max-width: 1320px) {
+  .masthead {
+    flex-direction: column;
+  }
+
+  .masthead-meta {
+    justify-items: start;
+  }
+
+  .session-bar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .workspace-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .editor-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .route-planning-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fleet-inspection-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analyze-summary-strip {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 1180px) {
   .session-bar {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1790,6 +1938,14 @@ h3 {
 
   .workspace-tabs {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .masthead {
+    flex-direction: column;
+  }
+
+  .masthead-meta {
+    justify-items: start;
   }
 
   .command-grid {
@@ -1813,6 +1969,14 @@ h3 {
   .timeline-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .editor-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .route-planning-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 980px) {
@@ -1826,6 +1990,10 @@ h3 {
 
   .masthead-meta {
     justify-items: start;
+  }
+
+  .masthead-copy {
+    flex-basis: auto;
   }
 
   .stage-canvas {
@@ -1842,6 +2010,11 @@ h3 {
 
   .review-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .editor-status-grid,
+  .route-planning-grid {
+    grid-template-columns: 1fr;
   }
 
   .traffic-alert-grid,
@@ -1867,6 +2040,13 @@ h3 {
   .traffic-reservation-card-header {
     align-items: flex-start;
   }
+
+  .traffic-alert-badge,
+  .traffic-section-badge,
+  .traffic-road-card-pill,
+  .traffic-reservation-badge {
+    white-space: normal;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1877,6 +2057,23 @@ h3 {
 
   .workspace-tabs {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .badge-row,
+  .toolbar-strip,
+  .status-stack,
+  .selection-strip,
+  .fleet-state-strip,
+  .fleet-batch-summary,
+  .fleet-selection-actions,
+  .traffic-summary-row,
+  .traffic-context-strip,
+  .traffic-hazard-focus-meta,
+  .traffic-reservation-meta,
+  .traffic-road-card-footnote,
+  .review-card-meta,
+  .analyze-summary-strip {
+    gap: 8px;
   }
 
   .command-grid {
@@ -2398,6 +2595,7 @@ h3 {
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 247, 249, 0.82)),
     linear-gradient(135deg, rgba(178, 74, 59, 0.05), rgba(10, 118, 108, 0.04));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  min-width: 0;
 }
 
 .traffic-summary-row {
@@ -2405,6 +2603,7 @@ h3 {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 0;
+  align-items: flex-start;
 }
 
 .traffic-summary-chip {
@@ -2442,6 +2641,7 @@ h3 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: start;
+  min-width: 0;
 }
 
 .traffic-alert-card {
@@ -2452,6 +2652,7 @@ h3 {
   border: 1px solid rgba(97, 112, 125, 0.14);
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 18px 32px rgba(24, 33, 44, 0.08);
+  min-width: 0;
 }
 
 .traffic-alert-card-congestion {
@@ -2646,6 +2847,8 @@ h3 {
   display: grid;
   gap: 4px;
   border-style: dashed;
+  background: rgba(255, 255, 255, 0.72);
+  line-height: 1.5;
 }
 
 .traffic-section-heading {
@@ -2661,6 +2864,7 @@ h3 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  min-width: 0;
 }
 
 .traffic-road-card,
@@ -2672,6 +2876,7 @@ h3 {
   border: 1px solid rgba(97, 112, 125, 0.14);
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 14px 26px rgba(24, 33, 44, 0.06);
+  min-width: 0;
 }
 
 .traffic-road-card-spotlight,
@@ -2731,6 +2936,7 @@ h3 {
   border-radius: 16px;
   border: 1px solid rgba(97, 112, 125, 0.12);
   background: rgba(255, 255, 255, 0.8);
+  align-items: flex-start;
 }
 
 .traffic-context-strip span {
