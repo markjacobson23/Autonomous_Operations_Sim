@@ -1747,29 +1747,33 @@ function App(): JSX.Element {
 
                   {layers.roads &&
                     (bundle?.render_geometry?.roads ?? []).map((road, index) => {
+                      const roadPath = toSmoothPathString(road.centerline);
+                      if (!roadPath) {
+                        return null;
+                      }
                       const roadWidth = Math.min(
-                        Math.max((road.width_m ?? 1.4) * 0.42, 0.58),
-                        2.2,
+                        Math.max((road.width_m ?? 1.4) * 0.34, 0.4),
+                        1.72,
                       );
                       const roadTraffic = trafficRoadById.get(road.road_id ?? "");
                       return (
                         <g key={road.road_id ?? `road-${index}`}>
-                          <polyline
-                            points={toPointString(road.centerline)}
+                          <path
+                            d={roadPath}
                             className={`scene-road-heatmap scene-road-heatmap-${
                               roadTraffic?.congestion_level ?? "free"
                             }`}
-                            strokeWidth={roadWidth + 0.5}
+                            strokeWidth={roadWidth + 0.34}
                             style={{
                               opacity: Math.max(
-                                0.06,
-                                (roadTraffic?.congestion_intensity ?? 0) * 0.45,
+                                0.05,
+                                (roadTraffic?.congestion_intensity ?? 0) * 0.38,
                               ),
                             }}
                             aria-hidden="true"
                           />
-                          <polyline
-                            points={toPointString(road.centerline)}
+                          <path
+                            d={roadPath}
                             className={`scene-road scene-road-${road.road_class ?? "connector"} ${
                               selectedTarget?.kind === "road" &&
                               selectedTarget.roadId === road.road_id
@@ -1802,10 +1806,14 @@ function App(): JSX.Element {
                       const controlPoint = (bundle?.traffic_baseline?.control_points ?? []).find(
                         (point) => point.node_id === intersection.node_id,
                       );
+                      const intersectionPath = toSmoothPathString(intersection.polygon, true);
+                      if (!intersectionPath) {
+                        return null;
+                      }
                       return (
-                        <polygon
+                        <path
                           key={intersection.intersection_id ?? `intersection-${index}`}
-                          points={toPointString(intersection.polygon)}
+                          d={intersectionPath}
                           className="scene-intersection"
                           onMouseEnter={() =>
                             setHoverTarget({
@@ -1895,17 +1903,18 @@ function App(): JSX.Element {
                         typeof record.road_id === "string"
                           ? trafficRoadById.get(record.road_id) ?? null
                           : null;
-                      const roadWidth = Math.min(
-                        Math.max((road?.width_m ?? 1.4) * 0.42, 0.58),
-                        2.2,
-                      );
-                      if (!road?.centerline || road.centerline.length < 2) {
+                      const roadPath = toSmoothPathString(road?.centerline);
+                      if (!roadPath) {
                         return null;
                       }
+                      const roadWidth = Math.min(
+                        Math.max((road?.width_m ?? 1.4) * 0.34, 0.4),
+                        1.72,
+                      );
                       return (
-                        <polyline
+                        <path
                           key={`reservation-${queueIndex}`}
-                          points={toPointString(road.centerline)}
+                          d={roadPath}
                           className={`scene-reservation scene-queue-overlay ${
                             selectedTarget?.kind === "queue" &&
                             selectedTarget.roadId === record.road_id
@@ -1926,19 +1935,105 @@ function App(): JSX.Element {
                       );
                     })}
 
+                  {layers.vehicles &&
+                    displayedVehicles.map((vehicle, vehicleIndex) => {
+                      const position = vehicle.position ?? [0, 0, 0];
+                      const isSelected = effectiveSelectedVehicleIds.includes(
+                        vehicle.vehicle_id ?? -1,
+                      );
+                      const vehicleLabel = `${vehiclePresentationBadge(vehicle)} ${vehicle.vehicle_id ?? vehicleIndex}`;
+                      const labelWidth = Math.max(1.12, vehicleLabel.length * 0.22 + 0.34);
+                      const labelY = position[1] - Math.max((vehicle.body_length_m ?? 1.12) * 0.66, 1);
+                      const selectionEnvelopeLength = Math.max(
+                        vehicle.spacing_envelope_m ?? spacingEnvelopeFromVehicle(vehicle),
+                        0.9,
+                      );
+                      const selectionEnvelopeWidth = Math.max((vehicle.body_width_m ?? 0.62) * 1.9, 1);
+                      return (
+                        <g
+                          key={vehicle.vehicle_id ?? `vehicle-${vehicleIndex}`}
+                          className={isSelected ? "scene-vehicle selected" : "scene-vehicle"}
+                          onClick={(event) =>
+                            selectVehicle(vehicle.vehicle_id, {
+                              additive: event.shiftKey || event.metaKey || event.ctrlKey,
+                            })
+                          }
+                          onMouseEnter={() =>
+                            setHoverTarget({
+                              label: `Vehicle ${vehicle.vehicle_id ?? vehicleIndex}`,
+                              detail: `${vehicle.operational_state ?? "unknown_state"} · ${
+                                vehicle.lane_id ?? "lane-unassigned"
+                              } · ${formatMeters(vehicle.spacing_envelope_m ?? null)} envelope`,
+                            })
+                          }
+                        >
+                          {isSelected ? (
+                            <rect
+                              x={position[0] - selectionEnvelopeLength * 0.56}
+                              y={position[1] - selectionEnvelopeWidth * 0.5}
+                              width={selectionEnvelopeLength * 1.12}
+                              height={selectionEnvelopeWidth}
+                              rx={0.28}
+                              className="vehicle-selection-ring"
+                            />
+                          ) : null}
+                          <g transform={`translate(${position[0]} ${position[1]}) rotate(${radiansToDegrees(
+                            vehicle.heading_rad ?? 0,
+                          )})`}>
+                            {renderVehicleEnvelope(vehicle)}
+                            {renderVehicleGlyph(vehicle)}
+                          </g>
+                          <g className="vehicle-label">
+                            <rect
+                              x={position[0] - labelWidth * 0.5}
+                              y={labelY - 0.24}
+                              width={labelWidth}
+                              height={0.46}
+                              rx={0.16}
+                              className="vehicle-label-bg"
+                            />
+                            <text x={position[0]} y={labelY} className="vehicle-label-text">
+                              {vehicleLabel}
+                            </text>
+                          </g>
+                        </g>
+                      );
+                    })}
+
+                  {layers.routes &&
+                    routeDestinationMarkers.map((marker) => (
+                      <g
+                        key={`route-destination-${marker.destinationNodeId}`}
+                        className={`scene-destination scene-route-endpoint ${
+                          marker.selected ? "selected" : ""
+                        }`}
+                        transform={`translate(${marker.position[0]} ${marker.position[1]})`}
+                      >
+                        <circle
+                          r={marker.selected ? 1.08 : 0.86}
+                          className="scene-destination-threshold"
+                        />
+                        <circle
+                          r={marker.selected ? 0.38 : 0.3}
+                          className="scene-destination-core"
+                        />
+                      </g>
+                    ))}
+
                   {layers.routes &&
                     routePreviews.map((preview, previewIndex) => {
                       const routePoints = buildRoutePreviewPoints(
                         preview,
                         bundle?.map_surface?.nodes ?? [],
                       );
-                      if (routePoints.length < 2) {
+                      const routePath = toSmoothPathString(routePoints);
+                      if (!routePath) {
                         return null;
                       }
                       return (
-                        <polyline
+                        <path
                           key={`route-preview-${previewIndex}`}
-                          points={toPointString(routePoints)}
+                          d={routePath}
                           className={`scene-route-preview ${
                             preview.vehicle_id === selectedVehicleId ? "selected" : ""
                           }`}
@@ -1987,26 +2082,6 @@ function App(): JSX.Element {
                         />
                       );
                     })}
-
-                  {layers.routes &&
-                    routeDestinationMarkers.map((marker) => (
-                      <g
-                        key={`route-destination-${marker.destinationNodeId}`}
-                        className={`scene-destination scene-route-endpoint ${
-                          marker.selected ? "selected" : ""
-                        }`}
-                        transform={`translate(${marker.position[0]} ${marker.position[1]})`}
-                      >
-                        <circle
-                          r={marker.selected ? 1.08 : 0.86}
-                          className="scene-destination-threshold"
-                        />
-                        <circle
-                          r={marker.selected ? 0.38 : 0.3}
-                          className="scene-destination-core"
-                        />
-                      </g>
-                    ))}
 
                   {editorEnabled &&
                     (bundle?.map_surface?.nodes ?? []).map((node, index) => {
@@ -2062,50 +2137,6 @@ function App(): JSX.Element {
                         }
                       />
                     ))}
-
-                  {layers.vehicles &&
-                    displayedVehicles.map((vehicle, vehicleIndex) => {
-                      const position = vehicle.position ?? [0, 0, 0];
-                      const isSelected = effectiveSelectedVehicleIds.includes(
-                        vehicle.vehicle_id ?? -1,
-                      );
-                      return (
-                        <g
-                          key={vehicle.vehicle_id ?? `vehicle-${vehicleIndex}`}
-                          className={isSelected ? "scene-vehicle selected" : "scene-vehicle"}
-                          onClick={(event) =>
-                            selectVehicle(vehicle.vehicle_id, {
-                              additive: event.shiftKey || event.metaKey || event.ctrlKey,
-                            })
-                          }
-                          onMouseEnter={() =>
-                            setHoverTarget({
-                              label: `Vehicle ${vehicle.vehicle_id ?? vehicleIndex}`,
-                              detail: `${vehicle.operational_state ?? "unknown_state"} · ${
-                                vehicle.lane_id ?? "lane-unassigned"
-                              } · ${formatMeters(vehicle.spacing_envelope_m ?? null)} envelope`,
-                            })
-                          }
-                        >
-                          <g transform={`translate(${position[0]} ${position[1]}) rotate(${radiansToDegrees(
-                            vehicle.heading_rad ?? 0,
-                          )})`}>
-                            {renderVehicleEnvelope(vehicle)}
-                            {renderVehicleGlyph(vehicle)}
-                          </g>
-                          <text x={position[0]} y={position[1] - 0.9}>
-                            {vehicle.presentation_key === "haul_truck"
-                              ? "HT"
-                              : vehicle.presentation_key === "forklift"
-                                ? "FL"
-                                : vehicle.presentation_key === "car"
-                                  ? "CV"
-                                  : "GV"}
-                            {vehicle.vehicle_id ?? vehicleIndex}
-                          </text>
-                        </g>
-                      );
-                    })}
                 </svg>
 
                 <div className="focus-card">
@@ -3366,6 +3397,42 @@ function toPointString(points: Position3[] | undefined): string {
   return (points ?? []).map(([x, y]) => `${x},${y}`).join(" ");
 }
 
+function toSmoothPathString(points: Position3[] | undefined, closed = false): string {
+  const pathPoints = (points ?? []).map(([x, y]) => [x, y] as const);
+  if (pathPoints.length < 2) {
+    return "";
+  }
+  if (pathPoints.length === 2) {
+    const [[x1, y1], [x2, y2]] = pathPoints;
+    return `M ${x1} ${y1} L ${x2} ${y2}`;
+  }
+
+  const smoothFactor = closed ? 0.14 : 0.16;
+  const commands: string[] = [`M ${pathPoints[0][0]} ${pathPoints[0][1]}`];
+
+  for (let index = 0; index < pathPoints.length - 1; index += 1) {
+    const current = pathPoints[index];
+    const next = pathPoints[index + 1];
+    const previous = closed
+      ? pathPoints[(index - 1 + pathPoints.length) % pathPoints.length]
+      : pathPoints[Math.max(index - 1, 0)];
+    const following = closed
+      ? pathPoints[(index + 2) % pathPoints.length]
+      : pathPoints[Math.min(index + 2, pathPoints.length - 1)];
+
+    const c1x = current[0] + (next[0] - previous[0]) * smoothFactor;
+    const c1y = current[1] + (next[1] - previous[1]) * smoothFactor;
+    const c2x = next[0] - (following[0] - current[0]) * smoothFactor;
+    const c2y = next[1] - (following[1] - current[1]) * smoothFactor;
+    commands.push(`C ${c1x} ${c1y} ${c2x} ${c2y} ${next[0]} ${next[1]}`);
+  }
+
+  if (closed) {
+    commands.push("Z");
+  }
+  return commands.join(" ");
+}
+
 function toScaledPointString(points: Position3[] | undefined, bounds: Bounds): string {
   return (points ?? [])
     .map(([x, y]) => `${scaleX(x, bounds)},${scaleY(y, bounds)}`)
@@ -3927,6 +3994,19 @@ function radiansToDegrees(value: number): number {
   return (value * 180) / Math.PI;
 }
 
+function vehiclePresentationBadge(vehicle: VehicleSnapshotPayload): string {
+  if (vehicle.presentation_key === "haul_truck") {
+    return "HT";
+  }
+  if (vehicle.presentation_key === "forklift") {
+    return "FL";
+  }
+  if (vehicle.presentation_key === "car") {
+    return "CV";
+  }
+  return "GV";
+}
+
 function renderVehicleEnvelope(
   vehicle: VehicleSnapshotPayload & { heading_rad?: number; speed?: number },
 ): JSX.Element {
@@ -3938,10 +4018,40 @@ function renderVehicleEnvelope(
       y={-width * 0.5}
       width={length}
       height={width}
-      rx={0.18}
+      rx={0.24}
       className="vehicle-envelope"
     />
   );
+}
+
+function renderVehicleHeading(length: number, width: number): JSX.Element {
+  return (
+    <g className="vehicle-heading-group">
+      <line
+        x1={-length * 0.12}
+        y1={0}
+        x2={length * 0.3}
+        y2={0}
+        className="vehicle-heading"
+      />
+      <path
+        d={`M ${length * 0.24} ${-width * 0.16} L ${length * 0.52} 0 L ${length * 0.24} ${width * 0.16} Z`}
+        className="vehicle-heading"
+      />
+    </g>
+  );
+}
+
+function renderWheelPair(
+  frontX: number,
+  rearX: number,
+  y: number,
+  radius: number,
+): JSX.Element[] {
+  return [
+    <circle key={`rear-${rearX}`} cx={rearX} cy={y} r={radius} className="vehicle-wheel" />,
+    <circle key={`front-${frontX}`} cx={frontX} cy={y} r={radius} className="vehicle-wheel" />,
+  ];
 }
 
 function renderVehicleGlyph(
@@ -3954,24 +4064,34 @@ function renderVehicleGlyph(
       <>
         <rect
           x={-length * 0.5}
-          y={-width * 0.42}
-          width={length * 0.82}
-          height={width * 0.84}
-          rx={0.1}
+          y={-width * 0.34}
+          width={length * 0.76}
+          height={width * 0.68}
+          rx={0.11}
           className="vehicle-body vehicle-body-haul"
         />
+        <rect
+          x={-length * 0.18}
+          y={-width * 0.45}
+          width={length * 0.16}
+          height={width * 0.14}
+          rx={0.05}
+          className="vehicle-cab vehicle-cab-haul"
+        />
         <polygon
-          points={`${length * 0.24},${-width * 0.36} ${length * 0.54},0 ${length * 0.24},${width * 0.36}`}
+          points={`${length * 0.18},${-width * 0.29} ${length * 0.52},0 ${length * 0.18},${width * 0.29}`}
           className="vehicle-cab vehicle-cab-haul"
         />
         <rect
-          x={-length * 0.3}
-          y={-width * 0.55}
-          width={length * 0.22}
-          height={width * 0.18}
-          rx={0.06}
+          x={-length * 0.38}
+          y={-width * 0.5}
+          width={length * 0.18}
+          height={width * 0.16}
+          rx={0.05}
           className="vehicle-cab vehicle-cab-haul"
         />
+        {renderWheelPair(length * 0.14, -length * 0.28, width * 0.33, width * 0.08)}
+        {renderVehicleHeading(length, width)}
       </>
     );
   }
@@ -3980,63 +4100,79 @@ function renderVehicleGlyph(
       <>
         <rect
           x={-length * 0.45}
-          y={-width * 0.32}
-          width={length * 0.68}
-          height={width * 0.64}
-          rx={0.08}
+          y={-width * 0.28}
+          width={length * 0.66}
+          height={width * 0.56}
+          rx={0.09}
           className="vehicle-body vehicle-body-forklift"
         />
         <rect
-          x={-length * 0.06}
-          y={-width * 0.16}
-          width={length * 0.18}
-          height={width * 0.32}
-          rx={0.06}
+          x={-length * 0.04}
+          y={-width * 0.24}
+          width={length * 0.14}
+          height={width * 0.48}
+          rx={0.05}
+          className="vehicle-cab vehicle-cab-forklift"
+        />
+        <rect
+          x={-length * 0.14}
+          y={-width * 0.42}
+          width={length * 0.28}
+          height={width * 0.1}
+          rx={0.04}
           className="vehicle-cab vehicle-cab-forklift"
         />
         <line
-          x1={length * 0.21}
-          y1={-width * 0.4}
-          x2={length * 0.21}
-          y2={width * 0.4}
+          x1={length * 0.2}
+          y1={-width * 0.38}
+          x2={length * 0.2}
+          y2={width * 0.34}
           className="vehicle-fork"
         />
         <line
-          x1={length * 0.21}
-          y1={-width * 0.2}
+          x1={length * 0.2}
+          y1={-width * 0.18}
           x2={length * 0.58}
-          y2={-width * 0.2}
+          y2={-width * 0.18}
           className="vehicle-fork"
         />
         <line
-          x1={length * 0.21}
-          y1={width * 0.2}
+          x1={length * 0.2}
+          y1={width * 0.18}
           x2={length * 0.58}
-          y2={width * 0.2}
+          y2={width * 0.18}
           className="vehicle-fork"
         />
+        {renderWheelPair(length * 0.1, -length * 0.22, width * 0.34, width * 0.075)}
+        {renderVehicleHeading(length, width)}
       </>
     );
   }
   if (vehicle.presentation_key === "car") {
     return (
       <>
-        <rect
-          x={-length * 0.46}
-          y={-width * 0.3}
-          width={length * 0.92}
-          height={width * 0.6}
-          rx={0.18}
+        <path
+          d={`M ${-length * 0.48} ${width * 0.16}
+              L ${-length * 0.36} ${-width * 0.22}
+              Q ${-length * 0.14} ${-width * 0.42} ${length * 0.12} ${-width * 0.42}
+              L ${length * 0.3} ${-width * 0.28}
+              Q ${length * 0.44} ${-width * 0.18} ${length * 0.48} 0
+              Q ${length * 0.44} ${width * 0.18} ${length * 0.3} ${width * 0.28}
+              L ${-length * 0.14} ${width * 0.28}
+              Q ${-length * 0.34} ${width * 0.28} ${-length * 0.48} ${width * 0.16}
+              Z`}
           className="vehicle-body vehicle-body-car"
         />
-        <rect
-          x={-length * 0.12}
-          y={-width * 0.22}
-          width={length * 0.32}
-          height={width * 0.44}
-          rx={0.12}
+        <path
+          d={`M ${-length * 0.18} ${-width * 0.18}
+              Q ${-length * 0.08} ${-width * 0.34} ${length * 0.08} ${-width * 0.34}
+              L ${length * 0.2} ${-width * 0.12}
+              Q ${length * 0.12} ${0} ${-length * 0.08} ${0}
+              Z`}
           className="vehicle-cab vehicle-cab-car"
         />
+        {renderWheelPair(length * 0.26, -length * 0.24, width * 0.32, width * 0.078)}
+        {renderVehicleHeading(length, width)}
       </>
     );
   }
@@ -4044,13 +4180,22 @@ function renderVehicleGlyph(
     <>
       <rect
         x={-length * 0.42}
-        y={-width * 0.28}
-        width={length * 0.84}
-        height={width * 0.56}
-        rx={0.14}
+        y={-width * 0.26}
+        width={length * 0.78}
+        height={width * 0.52}
+        rx={0.12}
         className="vehicle-body vehicle-body-generic"
       />
-      <path d="M 0.06 -0.14 L 0.54 0 L 0.06 0.14 Z" className="vehicle-heading" />
+      <rect
+        x={-length * 0.14}
+        y={-width * 0.4}
+        width={length * 0.24}
+        height={width * 0.11}
+        rx={0.04}
+        className="vehicle-cab vehicle-cab-generic"
+      />
+      {renderWheelPair(length * 0.2, -length * 0.22, width * 0.3, width * 0.074)}
+      {renderVehicleHeading(length, width)}
     </>
   );
 }

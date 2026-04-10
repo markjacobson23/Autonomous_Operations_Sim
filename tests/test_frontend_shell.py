@@ -59,6 +59,10 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "scene-road-heatmap" in app_source
     assert "scene-route-endpoint" in app_source
     assert "scene-destination-threshold" in app_source
+    assert "toSmoothPathString" in app_source
+    assert "vehiclePresentationBadge" in app_source
+    assert "vehicle-selection-ring" in app_source
+    assert "vehicle-label-text" in app_source
     assert "traffic-summary-chip" in app_source
     assert "scene-legend" in app_source
     assert "scene-button-primary" in app_source
@@ -112,6 +116,10 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".vehicle-body-forklift" in css_source
     assert ".vehicle-body-car" in css_source
     assert ".vehicle-body-generic" in css_source
+    assert ".vehicle-wheel" in css_source
+    assert ".vehicle-selection-ring" in css_source
+    assert ".vehicle-label-bg" in css_source
+    assert ".vehicle-label-text" in css_source
     assert ".scene-edit-handle" in css_source
     assert ".scene-area.selected" in css_source
     assert ".scene-road.selected" in css_source
