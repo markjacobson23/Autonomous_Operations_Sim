@@ -728,6 +728,13 @@ h3 {
   stroke-width: 0.08;
 }
 
+.vehicle-envelope {
+  fill: rgba(201, 106, 24, 0.08);
+  stroke: rgba(201, 106, 24, 0.28);
+  stroke-dasharray: 0.18 0.14;
+  stroke-width: 0.06;
+}
+
 .vehicle-cab {
   stroke: rgba(255, 255, 255, 0.92);
   stroke-width: 0.08;
@@ -782,7 +789,8 @@ h3 {
 .scene-vehicle.selected .vehicle-body,
 .scene-vehicle.selected .vehicle-cab,
 .scene-vehicle.selected .vehicle-fork,
-.scene-vehicle.selected .vehicle-heading {
+.scene-vehicle.selected .vehicle-heading,
+.scene-vehicle.selected .vehicle-envelope {
   fill: rgba(201, 106, 24, 0.96);
   stroke: rgba(255, 255, 255, 0.95);
   stroke-width: 0.1;

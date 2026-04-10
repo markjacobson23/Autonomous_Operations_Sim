@@ -182,6 +182,7 @@ type VehicleSnapshotPayload = {
   role_label?: string;
   body_length_m?: number;
   body_width_m?: number;
+  spacing_envelope_m?: number;
   primary_color?: string;
   accent_color?: string;
 };
@@ -199,6 +200,9 @@ type MotionSegmentPayload = {
   start_position?: Position3;
   end_position?: Position3;
   path_points?: Position3[];
+  body_length_m?: number;
+  body_width_m?: number;
+  spacing_envelope_m?: number;
   heading_rad?: number;
   nominal_speed?: number;
   peak_speed?: number;
@@ -517,6 +521,7 @@ function App(): JSX.Element {
 
   const bundle = applyTransactionToBundle(bootstrap.bundle, draftTransaction);
   const displayedVehicles = sampleDisplayedVehicles(bundle, motionClockS);
+  const minDisplayedSpacingM = computeMinDisplayedSpacing(displayedVehicles);
   const bounds = computeSceneBounds(bundle);
   const routePreviews = bootstrap.commandCenter.route_previews ?? [];
   const inspections = bootstrap.commandCenter.vehicle_inspections ?? [];
@@ -871,12 +876,12 @@ function App(): JSX.Element {
       <div className="shell-accent shell-accent-right" aria-hidden="true" />
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 54 Vehicle Presentation Upgrade</p>
+          <p className="eyebrow">Step 55 Collision Envelopes and Following Distance</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
-            The serious frontend now plays vehicles along curved path geometry
-            with typed haul-truck, forklift, car, and generic renderers so
-            mixed fleets read clearly at a glance.
+            Collision envelopes and follow distance are now live, so vehicles
+            leave a visible safety gap instead of visually stacking on the
+            same corridor.
           </p>
         </div>
         <div className="masthead-meta">
@@ -911,6 +916,10 @@ function App(): JSX.Element {
         <div className="metric-pill">
           <span className="metric-label">Vehicles</span>
           <strong>{formatMaybeNumber(bootstrap.vehicleCount)}</strong>
+        </div>
+        <div className="metric-pill">
+          <span className="metric-label">Min Spacing</span>
+          <strong>{formatMeters(minDisplayedSpacingM)}</strong>
         </div>
         <div className="metric-pill">
           <span className="metric-label">Pending Edits</span>
@@ -1316,15 +1325,16 @@ function App(): JSX.Element {
                           onMouseEnter={() =>
                             setHoverTarget({
                               label: `Vehicle ${vehicle.vehicle_id ?? vehicleIndex}`,
-                              detail: vehicle.operational_state ?? "unknown_state",
+                              detail: `${vehicle.operational_state ?? "unknown_state"} · ${formatMeters(
+                                vehicle.spacing_envelope_m ?? null,
+                              )} envelope`,
                             })
                           }
                         >
-                          <g
-                            transform={`translate(${position[0]} ${position[1]}) rotate(${radiansToDegrees(
-                              vehicle.heading_rad ?? 0,
-                            )})`}
-                          >
+                          <g transform={`translate(${position[0]} ${position[1]}) rotate(${radiansToDegrees(
+                            vehicle.heading_rad ?? 0,
+                          )})`}>
+                            {renderVehicleEnvelope(vehicle)}
                             {renderVehicleGlyph(vehicle)}
                           </g>
                           <text x={position[0]} y={position[1] - 0.9}>
@@ -1343,12 +1353,11 @@ function App(): JSX.Element {
                 </svg>
 
                 <div className="focus-card">
-                  <strong>Curved motion and typed vehicle presentation are now live</strong>
+                  <strong>Collision envelopes and follow distance are now live</strong>
                   <p>
                     Motion playback now follows authored path geometry instead of
-                    only straight edge interpolation, and haul trucks,
-                    forklifts, cars, and generic units now read as distinct
-                    operational families.
+                    only straight edge interpolation, and trailing vehicles now
+                    slow or wait before they visually overlap leaders.
                   </p>
                 </div>
                 <div className="scene-legend">
@@ -1689,6 +1698,7 @@ function App(): JSX.Element {
                     <li>Job: {selectedInspection.current_job_id ?? "none"}</li>
                     <li>Wait: {selectedInspection.wait_reason ?? "none"}</li>
                     <li>Type: {displayedSelectedVehicle?.vehicle_type ?? "GENERIC"}</li>
+                    <li>Spacing: {formatMeters(displayedSelectedVehicle?.spacing_envelope_m ?? null)}</li>
                     <li>Heading: {formatHeadingDegrees(displayedSelectedVehicle?.heading_rad ?? null)}</li>
                   </ul>
                   <div className="diagnostic-row">
@@ -1728,6 +1738,11 @@ function App(): JSX.Element {
                       <li>Job: {inspection.current_job_id ?? "none"}</li>
                       <li>Wait: {inspection.wait_reason ?? "none"}</li>
                       <li>Type: {findVehicleById(bundle, inspection.vehicle_id ?? null)?.vehicle_type ?? "GENERIC"}</li>
+                      <li>
+                        Spacing: {formatMeters(
+                          findDisplayedVehicleById(displayedVehicles, inspection.vehicle_id ?? null)?.spacing_envelope_m ?? null,
+                        )}
+                      </li>
                       <li>
                         Heading: {formatHeadingDegrees(findDisplayedVehicleById(displayedVehicles, inspection.vehicle_id ?? null)?.heading_rad ?? null)}
                       </li>
@@ -2076,19 +2091,26 @@ function sampleDisplayedVehicles(
   bundle: BundlePayload | null,
   motionClockS: number,
 ): Array<VehicleSnapshotPayload & { heading_rad?: number; speed?: number }> {
-  const baseVehicles = (bundle?.snapshot?.vehicles ?? []).map((vehicle) => ({
-    ...vehicle,
-    heading_rad: 0,
-    speed: 0,
-  }));
+  const baseVehicles = new Map<number, VehicleSnapshotPayload & { heading_rad?: number; speed?: number }>();
+  for (const vehicle of bundle?.snapshot?.vehicles ?? []) {
+    if (vehicle.vehicle_id === undefined) {
+      continue;
+    }
+    baseVehicles.set(vehicle.vehicle_id, {
+      ...vehicle,
+      heading_rad: 0,
+      speed: 0,
+      spacing_envelope_m: vehicle.spacing_envelope_m ?? spacingEnvelopeFromVehicle(vehicle),
+    });
+  }
   if (!bundle?.motion_segments?.length) {
-    return baseVehicles;
+    return [...baseVehicles.values()];
   }
 
-  const vehiclesById = new Map<number, VehicleSnapshotPayload & { heading_rad?: number; speed?: number }>();
-  for (const vehicle of baseVehicles) {
+  const sampledVehicles = new Map<number, VehicleSnapshotPayload & { heading_rad?: number; speed?: number }>();
+  for (const vehicle of baseVehicles.values()) {
     if (vehicle.vehicle_id !== undefined) {
-      vehiclesById.set(vehicle.vehicle_id, vehicle);
+      sampledVehicles.set(vehicle.vehicle_id, vehicle);
     }
   }
 
@@ -2097,6 +2119,17 @@ function sampleDisplayedVehicles(
       (left.start_time_s ?? 0) - (right.start_time_s ?? 0) ||
       (left.segment_index ?? 0) - (right.segment_index ?? 0),
   );
+
+  const activeEntries: Array<{
+    vehicleId: number;
+    edgeId: number;
+    pathPoints: Position3[];
+    distanceAlongPath: number;
+    headingRad: number;
+    speed: number;
+    spacingEnvelopeM: number;
+    segment: MotionSegmentPayload;
+  }> = [];
 
   for (const segment of motionSegments) {
     const vehicleId = segment.vehicle_id;
@@ -2107,9 +2140,9 @@ function sampleDisplayedVehicles(
     ) {
       continue;
     }
-    const existing = vehiclesById.get(vehicleId);
+    let existing = sampledVehicles.get(vehicleId);
     if (!existing) {
-      vehiclesById.set(vehicleId, {
+      sampledVehicles.set(vehicleId, {
         vehicle_id: vehicleId,
         node_id: segment.start_node_id,
         position: segment.start_position,
@@ -2120,19 +2153,40 @@ function sampleDisplayedVehicles(
         role_label: "General operations",
         body_length_m: 1.12,
         body_width_m: 0.62,
+        spacing_envelope_m: spacingEnvelopeFromVehicle({
+          body_length_m: 1.12,
+          body_width_m: 0.62,
+        }),
         primary_color: "rgba(95, 109, 121, 0.96)",
         accent_color: "rgba(255, 255, 255, 0.92)",
         heading_rad: segment.heading_rad ?? 0,
         speed: 0,
       });
-    } else if (existing.position === undefined && segment.start_position) {
+      existing = sampledVehicles.get(vehicleId);
+    }
+    if (existing.position === undefined && segment.start_position) {
       existing.position = segment.start_position;
     }
     if (motionClockS < segment.start_time_s) {
       continue;
     }
+    const pathPoints = resolvePathPoints(segment);
+    const pathLength = polylineLength(pathPoints);
+    const sampled = sampleMotionSegmentPayload(segment, motionClockS);
+    const progress = sampled.progress;
+    const distanceAlongPath = pathLength * progress;
+    activeEntries.push({
+      vehicleId,
+      edgeId: segment.edge_id ?? -1,
+      pathPoints,
+      distanceAlongPath,
+      headingRad: sampled.headingRad,
+      speed: sampled.speed,
+      spacingEnvelopeM: segment.spacing_envelope_m ?? spacingEnvelopeFromVehicle(segment),
+      segment,
+    });
     if (motionClockS > segment.end_time_s) {
-      const settled = vehiclesById.get(vehicleId);
+      const settled = sampledVehicles.get(vehicleId);
       if (settled) {
         settled.position = segment.end_position ?? settled.position;
         settled.node_id = segment.end_node_id ?? settled.node_id;
@@ -2141,26 +2195,57 @@ function sampleDisplayedVehicles(
       }
       continue;
     }
-    const sampled = sampleMotionSegmentPayload(segment, motionClockS);
-    const active = vehiclesById.get(vehicleId);
-    if (active) {
-      active.position = sampled.position;
-      active.node_id = segment.start_node_id ?? active.node_id;
-      active.operational_state = "moving";
-      active.heading_rad = sampled.headingRad;
-      active.speed = sampled.speed;
-    }
   }
 
-  return [...vehiclesById.values()].sort(
+  const adjustedEntries = applyFollowingSpacing(activeEntries);
+  for (const entry of adjustedEntries) {
+    const vehicle = sampledVehicles.get(entry.vehicleId);
+    if (!vehicle) {
+      continue;
+    }
+    vehicle.position = entry.position;
+    vehicle.node_id = entry.segment.start_node_id ?? vehicle.node_id;
+    vehicle.operational_state = entry.operationalState;
+    vehicle.heading_rad = entry.headingRad;
+    vehicle.speed = entry.speed;
+    vehicle.spacing_envelope_m = entry.spacingEnvelopeM;
+    vehicle.body_length_m = entry.segment.body_length_m ?? vehicle.body_length_m;
+    vehicle.body_width_m = entry.segment.body_width_m ?? vehicle.body_width_m;
+    vehicle.presentation_key = vehicle.presentation_key ?? "generic";
+  }
+
+  return [...sampledVehicles.values()].sort(
     (left, right) => (left.vehicle_id ?? 0) - (right.vehicle_id ?? 0),
   );
+}
+
+function computeMinDisplayedSpacing(
+  vehicles: Array<VehicleSnapshotPayload & { heading_rad?: number; speed?: number }>,
+): number | null {
+  let minimum: number | null = null;
+  for (let index = 0; index < vehicles.length; index += 1) {
+    const left = vehicles[index];
+    if (!left.position) {
+      continue;
+    }
+    for (let inner = index + 1; inner < vehicles.length; inner += 1) {
+      const right = vehicles[inner];
+      if (!right.position) {
+        continue;
+      }
+      const distance = pointDistance(left.position, right.position);
+      if (minimum === null || distance < minimum) {
+        minimum = distance;
+      }
+    }
+  }
+  return minimum;
 }
 
 function sampleMotionSegmentPayload(
   segment: MotionSegmentPayload,
   timestampS: number,
-): { position: Position3; headingRad: number; speed: number } {
+): { position: Position3; headingRad: number; speed: number; progress: number } {
   const startTimeS = segment.start_time_s ?? 0;
   const endTimeS = segment.end_time_s ?? startTimeS;
   const durationS = Math.max((segment.duration_s ?? endTimeS - startTimeS), 0.0001);
@@ -2178,6 +2263,7 @@ function sampleMotionSegmentPayload(
     position: samplePathPosition(pathPoints, distanceAlongPath),
     headingRad: headingAlongPath(pathPoints, distanceAlongPath),
     speed: sampleSegmentSpeed(segment, progress),
+    progress,
   };
 }
 
@@ -2247,6 +2333,92 @@ function headingAlongPath(points: Position3[], distanceAlongPath: number): numbe
   return Math.atan2(end[1] - start[1], end[0] - start[0]);
 }
 
+function spacingEnvelopeFromVehicle(
+  vehicle: Pick<VehicleSnapshotPayload, "body_length_m" | "body_width_m">,
+): number {
+  const length = vehicle.body_length_m ?? 1.12;
+  const width = vehicle.body_width_m ?? 0.62;
+  return Math.max(length * 1.35, width * 2.2, 0.9);
+}
+
+function resolvePathPoints(segment: MotionSegmentPayload): Position3[] {
+  return (segment.path_points?.length ?? 0) >= 2
+    ? (segment.path_points as Position3[])
+    : ([segment.start_position ?? [0, 0, 0], segment.end_position ?? [0, 0, 0]] as Position3[]);
+}
+
+function applyFollowingSpacing(
+  entries: Array<{
+    vehicleId: number;
+    edgeId: number;
+    pathPoints: Position3[];
+    distanceAlongPath: number;
+    headingRad: number;
+    speed: number;
+    spacingEnvelopeM: number;
+    segment: MotionSegmentPayload;
+  }>,
+): Array<{
+  vehicleId: number;
+  position: Position3;
+  headingRad: number;
+  speed: number;
+  operationalState: string;
+  spacingEnvelopeM: number;
+  segment: MotionSegmentPayload;
+}> {
+  const adjusted: Array<{
+    vehicleId: number;
+    position: Position3;
+    headingRad: number;
+    speed: number;
+    operationalState: string;
+    spacingEnvelopeM: number;
+    segment: MotionSegmentPayload;
+  }> = [];
+  const grouped = new Map<number, typeof entries>();
+  for (const entry of entries) {
+    const current = grouped.get(entry.edgeId) ?? [];
+    current.push(entry);
+    grouped.set(entry.edgeId, current);
+  }
+  for (const [edgeId, edgeEntries] of [...grouped.entries()].sort((left, right) => left[0] - right[0])) {
+    const sorted = [...edgeEntries].sort(
+      (left, right) =>
+        right.distanceAlongPath - left.distanceAlongPath ||
+        left.vehicleId - right.vehicleId,
+    );
+    let leaderDistance: number | null = null;
+    let leaderEnvelope = 0;
+    for (const entry of sorted) {
+      let finalDistance = entry.distanceAlongPath;
+      let finalSpeed = entry.speed;
+      let finalState = "moving";
+      if (leaderDistance !== null) {
+        const safeDistance = Math.max(leaderEnvelope, entry.spacingEnvelopeM);
+        const allowedDistance = Math.max(0, leaderDistance - safeDistance);
+        if (finalDistance > allowedDistance) {
+          finalDistance = allowedDistance;
+          finalSpeed = 0;
+          finalState = "waiting";
+        }
+      }
+      adjusted.push({
+        vehicleId: entry.vehicleId,
+        position: samplePathPosition(entry.pathPoints, finalDistance),
+        headingRad: headingAlongPath(entry.pathPoints, finalDistance),
+        speed: finalSpeed,
+        operationalState: finalState,
+        spacingEnvelopeM: entry.spacingEnvelopeM,
+        segment: entry.segment,
+      });
+      leaderDistance = finalDistance;
+      leaderEnvelope = entry.spacingEnvelopeM;
+    }
+  }
+  return adjusted;
+}
+
 function pointDistance(start: Position3, end: Position3): number {
   return Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
 }
@@ -2260,6 +2432,23 @@ function maxMotionTime(bundle: BundlePayload | null): number {
 
 function radiansToDegrees(value: number): number {
   return (value * 180) / Math.PI;
+}
+
+function renderVehicleEnvelope(
+  vehicle: VehicleSnapshotPayload & { heading_rad?: number; speed?: number },
+): JSX.Element {
+  const length = Math.max(vehicle.spacing_envelope_m ?? spacingEnvelopeFromVehicle(vehicle), 0.9);
+  const width = Math.max((vehicle.body_width_m ?? 0.62) * 1.7, 0.8);
+  return (
+    <rect
+      x={-length * 0.5}
+      y={-width * 0.5}
+      width={length}
+      height={width}
+      rx={0.18}
+      className="vehicle-envelope"
+    />
+  );
 }
 
 function renderVehicleGlyph(
@@ -2462,6 +2651,10 @@ function formatMaybeNumber(value: number | null): string {
 
 function formatSeconds(value: number | null): string {
   return value === null ? "pending" : `${value.toFixed(1)}s`;
+}
+
+function formatMeters(value: number | null): string {
+  return value === null ? "pending" : `${value.toFixed(2)}m`;
 }
 
 export default App;

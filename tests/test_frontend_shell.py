@@ -9,7 +9,7 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
         REPO_ROOT / "frontend" / "serious_ui" / "src" / "App.tsx"
     ).read_text(encoding="utf-8")
 
-    assert "Step 54 Vehicle Presentation Upgrade" in app_source
+    assert "Step 55 Collision Envelopes and Following Distance" in app_source
     assert "Command-Center Region" in app_source
     assert "Inspector Region" in app_source
     assert "Alerts Region" in app_source
@@ -19,7 +19,7 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "Autonomous Ops Command Deck" in app_source
     assert "Fit Scene" in app_source
     assert "Focus Selected" in app_source
-    assert "Curved motion and typed vehicle presentation are now live" in app_source
+    assert "Collision envelopes and follow distance are now live" in app_source
     assert "Save Scenario" in app_source
     assert "Reload Scenario" in app_source
     assert "turn_connectors" in app_source
@@ -28,6 +28,8 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "renderVehicleGlyph" in app_source
     assert "motion_segments" in app_source
     assert "formatHeadingDegrees" in app_source
+    assert "vehicle-envelope" in app_source
+    assert "Min Spacing" in app_source
     assert "scene-legend" in app_source
     assert "selectVehicle" in app_source
     assert "selectRoad" in app_source

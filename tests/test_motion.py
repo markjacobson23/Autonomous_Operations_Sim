@@ -15,11 +15,19 @@ from autonomous_ops_sim.simulation import (
 )
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
 from autonomous_ops_sim.visualization import (
+    EdgeSurface,
+    FrameTrigger,
+    MapSurface,
+    ReplayFrame,
+    VehicleMotionSegment,
+    VehicleSurfaceState,
+    VisualizationState,
     build_render_geometry_surface,
     build_vehicle_motion_segments,
     build_visualization_state_from_controller,
     sample_motion,
 )
+from autonomous_ops_sim.visualization.state import NodeSurface
 
 
 def build_motion_engine() -> SimulationEngine:
@@ -134,6 +142,108 @@ def test_motion_sampling_clamps_to_authoritative_endpoints_outside_segments() ->
     assert final.timestamp_s == state.final_time_s
     assert final.vehicles[0].position == (2.0, 0.0, 0.0)
     assert final.vehicles[0].is_interpolated is False
+
+
+def test_motion_sampling_applies_following_spacing_on_shared_corridor() -> None:
+    map_surface = MapSurface(
+        nodes=(
+            NodeSurface(node_id=1, position=(0.0, 0.0, 0.0), node_type="road"),
+            NodeSurface(node_id=2, position=(4.0, 0.0, 0.0), node_type="road"),
+        ),
+        edges=(
+            EdgeSurface(edge_id=1, start_node_id=1, end_node_id=2, distance=4.0, speed_limit=10.0),
+        ),
+    )
+    state = VisualizationState(
+        schema_version=1,
+        seed=1,
+        final_time_s=1.0,
+        map_surface=map_surface,
+        frames=(
+            ReplayFrame(
+                frame_index=0,
+                timestamp_s=0.0,
+                trigger=FrameTrigger(
+                    source="initial",
+                    sequence=0,
+                    timestamp_s=0.0,
+                    event_name="initial_state",
+                ),
+                blocked_edge_ids=(),
+                vehicles=(
+                    VehicleSurfaceState(
+                        vehicle_id=1,
+                        node_id=1,
+                        position=(0.0, 0.0, 0.0),
+                        operational_state="moving",
+                    ),
+                    VehicleSurfaceState(
+                        vehicle_id=2,
+                        node_id=1,
+                        position=(0.0, 0.0, 0.0),
+                        operational_state="moving",
+                    ),
+                ),
+            ),
+        ),
+    )
+    segments = (
+        VehicleMotionSegment(
+            vehicle_id=1,
+            segment_index=0,
+            edge_id=1,
+            start_node_id=1,
+            end_node_id=2,
+            start_time_s=0.0,
+            end_time_s=1.0,
+            duration_s=1.0,
+            distance=4.0,
+            start_position=(0.0, 0.0, 0.0),
+            end_position=(4.0, 0.0, 0.0),
+            path_points=((0.0, 0.0, 0.0), (4.0, 0.0, 0.0)),
+            body_length_m=1.0,
+            body_width_m=0.5,
+            spacing_envelope_m=1.4,
+            heading_rad=0.0,
+            nominal_speed=4.0,
+            peak_speed=4.0,
+            acceleration_mps2=4.0,
+            deceleration_mps2=4.0,
+            profile_kind="triangle_authoritative",
+        ),
+        VehicleMotionSegment(
+            vehicle_id=2,
+            segment_index=0,
+            edge_id=1,
+            start_node_id=1,
+            end_node_id=2,
+            start_time_s=0.0,
+            end_time_s=1.0,
+            duration_s=1.0,
+            distance=4.0,
+            start_position=(0.0, 0.0, 0.0),
+            end_position=(4.0, 0.0, 0.0),
+            path_points=((0.0, 0.0, 0.0), (4.0, 0.0, 0.0)),
+            body_length_m=1.0,
+            body_width_m=0.5,
+            spacing_envelope_m=1.4,
+            heading_rad=0.0,
+            nominal_speed=4.0,
+            peak_speed=4.0,
+            acceleration_mps2=4.0,
+            deceleration_mps2=4.0,
+            profile_kind="triangle_authoritative",
+        ),
+    )
+
+    sample = sample_motion(state, timestamp_s=0.5, segments=segments)
+
+    leading = next(vehicle for vehicle in sample.vehicles if vehicle.vehicle_id == 1)
+    trailing = next(vehicle for vehicle in sample.vehicles if vehicle.vehicle_id == 2)
+
+    assert leading.position[0] > trailing.position[0]
+    assert trailing.operational_state == "waiting"
+    assert trailing.speed == 0.0
 
 
 def test_motion_segments_follow_curved_render_geometry_when_available() -> None:

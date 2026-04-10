@@ -303,8 +303,8 @@
         "node_id": 150,
         "node_type": "job_site",
         "position": [
-          7.0,
-          -2.0,
+          6.839,
+          -4.259,
           0.0
         ]
       },
@@ -312,8 +312,8 @@
         "node_id": 160,
         "node_type": "intersection",
         "position": [
-          10.0,
-          -2.0,
+          10.01,
+          -1.826,
           0.0
         ]
       },
@@ -321,8 +321,8 @@
         "node_id": 170,
         "node_type": "job_site",
         "position": [
-          1.5,
-          -2.0,
+          2.964,
+          -4.403,
           0.0
         ]
       }
@@ -331,7 +331,7 @@
   "metadata": {
     "api_version": 1,
     "surface_name": "live_session_bundle",
-    "surface_schema_version": 7
+    "surface_schema_version": 9
   },
   "motion_segments": [],
   "render_geometry": {
@@ -560,23 +560,442 @@
         "node_id": 150,
         "polygon": [
           [
-            6.3,
-            -2.6,
+            6.139,
+            -4.859,
             0.0
           ],
           [
-            7.6,
-            -2.6,
+            7.439,
+            -4.859,
             0.0
           ],
           [
-            7.8,
-            -1.4,
+            7.639,
+            -3.6590000000000003,
             0.0
           ],
           [
-            6.5,
+            6.339,
+            -3.559,
+            0.0
+          ]
+        ]
+      }
+    ],
+    "lanes": [
+      {
+        "centerline": [
+          [
+            0.02807022876983124,
+            -0.44912366031729983,
+            0.0
+          ],
+          [
+            1.6,
+            -0.35,
+            0.0
+          ],
+          [
+            2.967938827505441,
+            -0.44885641492383077,
+            0.0
+          ]
+        ],
+        "directionality": "forward",
+        "lane_id": "dispatch-spine:lane:0",
+        "lane_index": 0,
+        "lane_role": "travel",
+        "road_id": "dispatch-spine",
+        "width_m": 0.9
+      },
+      {
+        "centerline": [
+          [
+            2.967938827505441,
+            -0.44885641492383077,
+            0.0
+          ],
+          [
+            1.6,
+            -0.35,
+            0.0
+          ],
+          [
+            0.02807022876983124,
+            -0.44912366031729983,
+            0.0
+          ]
+        ],
+        "directionality": "reverse",
+        "lane_id": "dispatch-spine:lane:1",
+        "lane_index": 1,
+        "lane_role": "travel",
+        "road_id": "dispatch-spine",
+        "width_m": 0.9
+      },
+      {
+        "centerline": [
+          [
+            3.136697225234682,
+            -0.3759173693953748,
+            0.0
+          ],
+          [
+            4.30579830217101,
+            0.05700282971498227,
+            0.0
+          ],
+          [
+            5.257654298313112,
+            0.8940355207531796,
+            0.0
+          ],
+          [
+            6.24987801902177,
+            1.6876524762227878,
+            0.0
+          ]
+        ],
+        "directionality": "forward",
+        "lane_id": "pit-approach:lane:0",
+        "lane_index": 0,
+        "lane_role": "travel",
+        "road_id": "pit-approach",
+        "width_m": 0.8
+      },
+      {
+        "centerline": [
+          [
+            6.24987801902177,
+            1.6876524762227878,
+            0.0
+          ],
+          [
+            5.257654298313112,
+            0.8940355207531796,
+            0.0
+          ],
+          [
+            4.30579830217101,
+            0.05700282971498227,
+            0.0
+          ],
+          [
+            3.136697225234682,
+            -0.3759173693953748,
+            0.0
+          ]
+        ],
+        "directionality": "reverse",
+        "lane_id": "pit-approach:lane:1",
+        "lane_index": 1,
+        "lane_role": "travel",
+        "road_id": "pit-approach",
+        "width_m": 0.8
+      },
+      {
+        "centerline": [
+          [
+            6.0,
+            2.0,
+            0.0
+          ],
+          [
+            7.0,
+            2.2,
+            0.0
+          ],
+          [
+            8.0,
+            2.5,
+            0.0
+          ],
+          [
+            9.0,
+            2.5,
+            0.0
+          ]
+        ],
+        "directionality": "forward",
+        "lane_id": "cut-ramp:lane:0",
+        "lane_index": 0,
+        "lane_role": "loading_approach",
+        "road_id": "cut-ramp",
+        "width_m": 1.3
+      },
+      {
+        "centerline": [
+          [
+            8.875019232248748,
+            2.041737184912077,
+            0.0
+          ],
+          [
+            9.88757354213752,
+            1.77514708427504,
+            0.0
+          ],
+          [
+            10.683272441751832,
+            1.1460103760755778,
+            0.0
+          ],
+          [
+            11.66412427893639,
+            0.16412427893638998,
+            0.0
+          ]
+        ],
+        "directionality": "forward",
+        "lane_id": "crusher-run:lane:0",
+        "lane_index": 0,
+        "lane_role": "travel",
+        "road_id": "crusher-run",
+        "width_m": 0.95
+      },
+      {
+        "centerline": [
+          [
+            11.66412427893639,
+            0.16412427893638998,
+            0.0
+          ],
+          [
+            10.683272441751832,
+            1.1460103760755778,
+            0.0
+          ],
+          [
+            9.88757354213752,
+            1.77514708427504,
+            0.0
+          ],
+          [
+            8.875019232248748,
+            2.041737184912077,
+            0.0
+          ]
+        ],
+        "directionality": "reverse",
+        "lane_id": "crusher-run:lane:1",
+        "lane_index": 1,
+        "lane_role": "travel",
+        "road_id": "crusher-run",
+        "width_m": 0.95
+      },
+      {
+        "centerline": [
+          [
+            3.0,
+            0.0,
+            0.0
+          ],
+          [
+            2.5,
+            -0.7,
+            0.0
+          ],
+          [
+            2.0,
             -1.3,
+            0.0
+          ],
+          [
+            2.964,
+            -4.403,
+            0.0
+          ]
+        ],
+        "directionality": "forward",
+        "lane_id": "fuel-branch:lane:0",
+        "lane_index": 0,
+        "lane_role": "loading_approach",
+        "road_id": "fuel-branch",
+        "width_m": 1.0
+      },
+      {
+        "centerline": [
+          [
+            3.0,
+            0.0,
+            0.0
+          ],
+          [
+            4.4,
+            -0.4,
+            0.0
+          ],
+          [
+            5.8,
+            -1.3,
+            0.0
+          ],
+          [
+            6.839,
+            -4.259,
+            0.0
+          ]
+        ],
+        "directionality": "forward",
+        "lane_id": "maintenance-link:lane:0",
+        "lane_index": 0,
+        "lane_role": "travel",
+        "road_id": "maintenance-link",
+        "width_m": 1.1
+      },
+      {
+        "centerline": [
+          [
+            6.839,
+            -4.259,
+            0.0
+          ],
+          [
+            8.725,
+            -3.728,
+            0.0
+          ],
+          [
+            10.362,
+            -4.116,
+            0.0
+          ],
+          [
+            12.662,
+            -2.93,
+            0.0
+          ],
+          [
+            12.0,
+            0.5,
+            0.0
+          ]
+        ],
+        "directionality": "forward",
+        "lane_id": "south-bypass:lane:0",
+        "lane_index": 0,
+        "lane_role": "travel",
+        "road_id": "south-bypass",
+        "width_m": 1.2
+      },
+      {
+        "centerline": [
+          [
+            6.0,
+            2.0,
+            0.0
+          ],
+          [
+            6.4,
+            0.7,
+            0.0
+          ],
+          [
+            6.8,
+            -0.5,
+            0.0
+          ],
+          [
+            6.839,
+            -4.259,
+            0.0
+          ]
+        ],
+        "directionality": "forward",
+        "lane_id": "escape-ramp:lane:0",
+        "lane_index": 0,
+        "lane_role": "loading_approach",
+        "road_id": "escape-ramp",
+        "width_m": 1.0
+      }
+    ],
+    "merge_zones": [
+      {
+        "kind": "merge",
+        "lane_ids": [
+          "dispatch-spine:lane:0",
+          "dispatch-spine:lane:1"
+        ],
+        "merge_zone_id": "dispatch-spine:merge",
+        "polygon": [
+          [
+            0.79,
+            -0.7100000000000001,
+            0.0
+          ],
+          [
+            2.41,
+            -0.7100000000000001,
+            0.0
+          ],
+          [
+            2.41,
+            0.91,
+            0.0
+          ],
+          [
+            0.79,
+            0.91,
+            0.0
+          ]
+        ]
+      },
+      {
+        "kind": "merge",
+        "lane_ids": [
+          "pit-approach:lane:0",
+          "pit-approach:lane:1"
+        ],
+        "merge_zone_id": "pit-approach:merge",
+        "polygon": [
+          [
+            4.28,
+            0.47999999999999987,
+            0.0
+          ],
+          [
+            5.72,
+            0.47999999999999987,
+            0.0
+          ],
+          [
+            5.72,
+            1.92,
+            0.0
+          ],
+          [
+            4.28,
+            1.92,
+            0.0
+          ]
+        ]
+      },
+      {
+        "kind": "merge",
+        "lane_ids": [
+          "crusher-run:lane:0",
+          "crusher-run:lane:1"
+        ],
+        "merge_zone_id": "crusher-run:merge",
+        "polygon": [
+          [
+            10.145,
+            0.645,
+            0.0
+          ],
+          [
+            11.855,
+            0.645,
+            0.0
+          ],
+          [
+            11.855,
+            2.355,
+            0.0
+          ],
+          [
+            10.145,
+            2.355,
             0.0
           ]
         ]
@@ -728,8 +1147,8 @@
             0.0
           ],
           [
-            1.5,
-            -2.0,
+            2.964,
+            -4.403,
             0.0
           ]
         ],
@@ -761,8 +1180,8 @@
             0.0
           ],
           [
-            7.0,
-            -2.0,
+            6.839,
+            -4.259,
             0.0
           ]
         ],
@@ -779,23 +1198,23 @@
       {
         "centerline": [
           [
-            7.0,
-            -2.0,
+            6.839,
+            -4.259,
             0.0
           ],
           [
-            8.6,
-            -2.1,
+            8.725,
+            -3.728,
             0.0
           ],
           [
-            10.0,
-            -2.0,
+            10.362,
+            -4.116,
             0.0
           ],
           [
-            11.0,
-            -1.1,
+            12.662,
+            -2.93,
             0.0
           ],
           [
@@ -834,8 +1253,8 @@
             0.0
           ],
           [
-            7.0,
-            -2.0,
+            6.839,
+            -4.259,
             0.0
           ]
         ],
@@ -848,6 +1267,413 @@
         "road_class": "ramp",
         "road_id": "escape-ramp",
         "width_m": 1.0
+      }
+    ],
+    "stop_lines": [
+      {
+        "control_kind": "stop",
+        "lane_id": "dispatch-spine:lane:0",
+        "segment": [
+          [
+            2.9520815084083223,
+            -0.6682841830641739,
+            0.0
+          ],
+          [
+            2.9837961466025593,
+            -0.22942864678348768,
+            0.0
+          ]
+        ],
+        "stop_line_id": "dispatch-spine:lane:0:stop"
+      },
+      {
+        "control_kind": "stop",
+        "lane_id": "dispatch-spine:lane:1",
+        "segment": [
+          [
+            0.014224841000985457,
+            -0.2295597624708408,
+            0.0
+          ],
+          [
+            0.04191561653867702,
+            -0.6686875581637588,
+            0.0
+          ]
+        ],
+        "stop_line_id": "dispatch-spine:lane:1:stop"
+      },
+      {
+        "control_kind": "stop",
+        "lane_id": "pit-approach:lane:0",
+        "segment": [
+          [
+            6.3872938226055584,
+            1.5158476540395274,
+            0.0
+          ],
+          [
+            6.112462215437981,
+            1.8594572984060482,
+            0.0
+          ]
+        ],
+        "stop_line_id": "pit-approach:lane:0:stop"
+      },
+      {
+        "control_kind": "stop",
+        "lane_id": "pit-approach:lane:1",
+        "segment": [
+          [
+            3.0603005126071854,
+            -0.16960803296167928,
+            0.0
+          ],
+          [
+            3.2130939378621783,
+            -0.5822267058290703,
+            0.0
+          ]
+        ],
+        "stop_line_id": "pit-approach:lane:1:stop"
+      },
+      {
+        "control_kind": "stop",
+        "lane_id": "cut-ramp:lane:0",
+        "segment": [
+          [
+            9.0,
+            2.28,
+            0.0
+          ],
+          [
+            9.0,
+            2.72,
+            0.0
+          ]
+        ],
+        "stop_line_id": "cut-ramp:lane:0:stop"
+      },
+      {
+        "control_kind": "stop",
+        "lane_id": "crusher-run:lane:0",
+        "segment": [
+          [
+            11.508478834883066,
+            0.008642782463517934,
+            0.0
+          ],
+          [
+            11.819769722989713,
+            0.31960577540926205,
+            0.0
+          ]
+        ],
+        "stop_line_id": "crusher-run:lane:0:stop"
+      },
+      {
+        "control_kind": "stop",
+        "lane_id": "crusher-run:lane:1",
+        "segment": [
+          [
+            8.931032996653638,
+            2.254486939781956,
+            0.0
+          ],
+          [
+            8.819005467843859,
+            1.8289874300421984,
+            0.0
+          ]
+        ],
+        "stop_line_id": "crusher-run:lane:1:stop"
+      },
+      {
+        "control_kind": "stop",
+        "lane_id": "fuel-branch:lane:0",
+        "segment": [
+          [
+            2.753905065503444,
+            -4.468269583259645,
+            0.0
+          ],
+          [
+            3.174094934496556,
+            -4.337730416740354,
+            0.0
+          ]
+        ],
+        "stop_line_id": "fuel-branch:lane:0:stop"
+      },
+      {
+        "control_kind": "stop",
+        "lane_id": "maintenance-link:lane:0",
+        "segment": [
+          [
+            6.631424542429172,
+            -4.331886414469785,
+            0.0
+          ],
+          [
+            7.046575457570829,
+            -4.186113585530216,
+            0.0
+          ]
+        ],
+        "stop_line_id": "maintenance-link:lane:0:stop"
+      },
+      {
+        "control_kind": "stop",
+        "lane_id": "south-bypass:lane:0",
+        "segment": [
+          [
+            12.21601351945646,
+            0.5416912390321216,
+            0.0
+          ],
+          [
+            11.78398648054354,
+            0.4583087609678785,
+            0.0
+          ]
+        ],
+        "stop_line_id": "south-bypass:lane:0:stop"
+      },
+      {
+        "control_kind": "stop",
+        "lane_id": "escape-ramp:lane:0",
+        "segment": [
+          [
+            6.619011839740617,
+            -4.261282399108837,
+            0.0
+          ],
+          [
+            7.058988160259384,
+            -4.256717600891164,
+            0.0
+          ]
+        ],
+        "stop_line_id": "escape-ramp:lane:0:stop"
+      }
+    ],
+    "turn_connectors": [
+      {
+        "centerline": [
+          [
+            9.0,
+            2.5,
+            0.0
+          ],
+          [
+            8.875019232248748,
+            2.041737184912077,
+            0.0
+          ]
+        ],
+        "connector_id": "cut-ramp:lane:0->crusher-run:lane:0",
+        "connector_type": "turn",
+        "from_lane_id": "cut-ramp:lane:0",
+        "to_lane_id": "crusher-run:lane:0"
+      },
+      {
+        "centerline": [
+          [
+            2.967938827505441,
+            -0.44885641492383077,
+            0.0
+          ],
+          [
+            3.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "connector_id": "dispatch-spine:lane:0->fuel-branch:lane:0",
+        "connector_type": "turn",
+        "from_lane_id": "dispatch-spine:lane:0",
+        "to_lane_id": "fuel-branch:lane:0"
+      },
+      {
+        "centerline": [
+          [
+            2.967938827505441,
+            -0.44885641492383077,
+            0.0
+          ],
+          [
+            3.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "connector_id": "dispatch-spine:lane:0->maintenance-link:lane:0",
+        "connector_type": "turn",
+        "from_lane_id": "dispatch-spine:lane:0",
+        "to_lane_id": "maintenance-link:lane:0"
+      },
+      {
+        "centerline": [
+          [
+            2.967938827505441,
+            -0.44885641492383077,
+            0.0
+          ],
+          [
+            3.136697225234682,
+            -0.3759173693953748,
+            0.0
+          ]
+        ],
+        "connector_id": "dispatch-spine:lane:0->pit-approach:lane:0",
+        "connector_type": "turn",
+        "from_lane_id": "dispatch-spine:lane:0",
+        "to_lane_id": "pit-approach:lane:0"
+      },
+      {
+        "centerline": [
+          [
+            6.839,
+            -4.259,
+            0.0
+          ],
+          [
+            6.839,
+            -4.259,
+            0.0
+          ]
+        ],
+        "connector_id": "escape-ramp:lane:0->south-bypass:lane:0",
+        "connector_type": "turn",
+        "from_lane_id": "escape-ramp:lane:0",
+        "to_lane_id": "south-bypass:lane:0"
+      },
+      {
+        "centerline": [
+          [
+            6.839,
+            -4.259,
+            0.0
+          ],
+          [
+            6.839,
+            -4.259,
+            0.0
+          ]
+        ],
+        "connector_id": "maintenance-link:lane:0->south-bypass:lane:0",
+        "connector_type": "turn",
+        "from_lane_id": "maintenance-link:lane:0",
+        "to_lane_id": "south-bypass:lane:0"
+      },
+      {
+        "centerline": [
+          [
+            6.24987801902177,
+            1.6876524762227878,
+            0.0
+          ],
+          [
+            6.0,
+            2.0,
+            0.0
+          ]
+        ],
+        "connector_id": "pit-approach:lane:0->cut-ramp:lane:0",
+        "connector_type": "turn",
+        "from_lane_id": "pit-approach:lane:0",
+        "to_lane_id": "cut-ramp:lane:0"
+      },
+      {
+        "centerline": [
+          [
+            6.24987801902177,
+            1.6876524762227878,
+            0.0
+          ],
+          [
+            6.0,
+            2.0,
+            0.0
+          ]
+        ],
+        "connector_id": "pit-approach:lane:0->escape-ramp:lane:0",
+        "connector_type": "turn",
+        "from_lane_id": "pit-approach:lane:0",
+        "to_lane_id": "escape-ramp:lane:0"
+      },
+      {
+        "centerline": [
+          [
+            3.136697225234682,
+            -0.3759173693953748,
+            0.0
+          ],
+          [
+            2.967938827505441,
+            -0.44885641492383077,
+            0.0
+          ]
+        ],
+        "connector_id": "pit-approach:lane:1->dispatch-spine:lane:1",
+        "connector_type": "turn",
+        "from_lane_id": "pit-approach:lane:1",
+        "to_lane_id": "dispatch-spine:lane:1"
+      },
+      {
+        "centerline": [
+          [
+            3.136697225234682,
+            -0.3759173693953748,
+            0.0
+          ],
+          [
+            3.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "connector_id": "pit-approach:lane:1->fuel-branch:lane:0",
+        "connector_type": "turn",
+        "from_lane_id": "pit-approach:lane:1",
+        "to_lane_id": "fuel-branch:lane:0"
+      },
+      {
+        "centerline": [
+          [
+            3.136697225234682,
+            -0.3759173693953748,
+            0.0
+          ],
+          [
+            3.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "connector_id": "pit-approach:lane:1->maintenance-link:lane:0",
+        "connector_type": "turn",
+        "from_lane_id": "pit-approach:lane:1",
+        "to_lane_id": "maintenance-link:lane:0"
+      },
+      {
+        "centerline": [
+          [
+            12.0,
+            0.5,
+            0.0
+          ],
+          [
+            11.66412427893639,
+            0.16412427893638998,
+            0.0
+          ]
+        ],
+        "connector_id": "south-bypass:lane:0->crusher-run:lane:1",
+        "connector_type": "turn",
+        "from_lane_id": "south-bypass:lane:0",
+        "to_lane_id": "crusher-run:lane:1"
       }
     ],
     "world_model": {
@@ -1126,6 +1952,10 @@
     "trace_event_count": 0,
     "vehicles": [
       {
+        "accent_color": "rgba(255, 255, 255, 0.92)",
+        "body_length_m": 1.12,
+        "body_width_m": 0.62,
+        "display_name": "Generic Vehicle",
         "node_id": 100,
         "operational_state": "idle",
         "position": [
@@ -1133,7 +1963,11 @@
           0.0,
           0.0
         ],
-        "vehicle_id": 301
+        "presentation_key": "generic",
+        "primary_color": "rgba(95, 109, 121, 0.96)",
+        "role_label": "General operations",
+        "vehicle_id": 301,
+        "vehicle_type": "GENERIC"
       }
     ]
   },

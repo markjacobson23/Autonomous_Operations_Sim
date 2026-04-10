@@ -11,6 +11,10 @@ from autonomous_ops_sim.simulation.kinematics import (
     sample_profile_speed,
 )
 from autonomous_ops_sim.vehicles.vehicle import Position
+from autonomous_ops_sim.vehicles.presentation import (
+    VehiclePresentationSurface,
+    build_vehicle_presentation_surface,
+)
 from autonomous_ops_sim.visualization.geometry import (
     LaneGeometrySurface,
     RenderGeometrySurface,
@@ -38,6 +42,9 @@ class VehicleMotionSegment:
     start_position: Position
     end_position: Position
     path_points: tuple[Position, ...]
+    body_length_m: float
+    body_width_m: float
+    spacing_envelope_m: float
     heading_rad: float
     nominal_speed: float
     peak_speed: float
@@ -73,10 +80,29 @@ class MotionSample:
     vehicles: tuple[InterpolatedVehicleState, ...]
 
 
+@dataclass(frozen=True)
+class _SampledVehicleState:
+    vehicle_id: int
+    node_id: int
+    position: Position
+    operational_state: str
+    heading_rad: float
+    speed: float
+    active_edge_id: int | None
+    start_node_id: int | None
+    end_node_id: int | None
+    motion_progress: float
+    is_interpolated: bool
+    distance_along_path: float
+    spacing_envelope_m: float
+    path_points: tuple[Position, ...]
+
+
 def build_vehicle_motion_segments(
     state: VisualizationState,
     *,
     render_geometry: RenderGeometrySurface | None = None,
+    vehicle_presentations: tuple[VehiclePresentationSurface, ...] | None = None,
 ) -> tuple[VehicleMotionSegment, ...]:
     """Derive edge motion segments from authoritative replay frames."""
 
@@ -128,6 +154,10 @@ def build_vehicle_motion_segments(
         )
         segment_index = segment_count_by_vehicle.get(vehicle_id, 0)
         segment_count_by_vehicle[vehicle_id] = segment_index + 1
+        profile_surface = _vehicle_presentation_for_segment(
+            vehicle_presentations=vehicle_presentations,
+            vehicle_id=vehicle_id,
+        )
         segments.append(
             VehicleMotionSegment(
                 vehicle_id=vehicle_id,
@@ -142,6 +172,12 @@ def build_vehicle_motion_segments(
                 start_position=start_position,
                 end_position=end_position,
                 path_points=path_points,
+                body_length_m=profile_surface.body_length_m,
+                body_width_m=profile_surface.body_width_m,
+                spacing_envelope_m=_spacing_envelope_m(
+                    body_length_m=profile_surface.body_length_m,
+                    body_width_m=profile_surface.body_width_m,
+                ),
                 heading_rad=heading_rad,
                 nominal_speed=nominal_speed,
                 peak_speed=profile.peak_speed_mps,
@@ -169,6 +205,10 @@ def sample_motion(
     motion_segments = segments or build_vehicle_motion_segments(state)
     reference_frame = _reference_frame_for_time(state, bounded_timestamp_s)
 
+    sampled_states = _sample_active_vehicle_states(
+        motion_segments=motion_segments,
+        timestamp_s=bounded_timestamp_s,
+    )
     vehicles = {
         vehicle.vehicle_id: InterpolatedVehicleState(
             vehicle_id=vehicle.vehicle_id,
@@ -186,44 +226,19 @@ def sample_motion(
         for vehicle in reference_frame.vehicles
     }
 
-    for segment in motion_segments:
-        if not (segment.start_time_s < bounded_timestamp_s < segment.end_time_s):
-            continue
-        if segment.duration_s <= 0.0:
-            continue
-        elapsed_s = bounded_timestamp_s - segment.start_time_s
-        profile = _segment_profile(
-            distance=segment.distance,
-            duration_s=segment.duration_s,
-            speed_limit=segment.nominal_speed,
-        )
-        traversed_distance = sample_profile_distance(profile, elapsed_s)
-        progress = min(
-            1.0,
-            max(0.0, traversed_distance / segment.distance if segment.distance > 0.0 else 1.0),
-        )
-        speed = sample_profile_speed(profile, elapsed_s)
-        path_length = _polyline_length(segment.path_points)
-        distance_along_path = (
-            path_length * progress if path_length > 0.0 else segment.distance * progress
-        )
-        position = _sample_path_position(segment.path_points, distance_along_path)
-        heading_rad = _heading_along_path(
-            segment.path_points,
-            distance_along_path=distance_along_path,
-        )
-        vehicles[segment.vehicle_id] = InterpolatedVehicleState(
-            vehicle_id=segment.vehicle_id,
-            node_id=segment.start_node_id,
-            position=position,
-            operational_state="moving",
-            heading_rad=heading_rad,
-            speed=speed,
-            active_edge_id=segment.edge_id,
-            start_node_id=segment.start_node_id,
-            end_node_id=segment.end_node_id,
-            motion_progress=progress,
-            is_interpolated=True,
+    for sampled in sampled_states:
+        vehicles[sampled.vehicle_id] = InterpolatedVehicleState(
+            vehicle_id=sampled.vehicle_id,
+            node_id=sampled.node_id,
+            position=sampled.position,
+            operational_state=sampled.operational_state,
+            heading_rad=sampled.heading_rad,
+            speed=sampled.speed,
+            active_edge_id=sampled.active_edge_id,
+            start_node_id=sampled.start_node_id,
+            end_node_id=sampled.end_node_id,
+            motion_progress=sampled.motion_progress,
+            is_interpolated=sampled.is_interpolated,
         )
 
     return MotionSample(
@@ -250,6 +265,9 @@ def motion_segment_to_dict(segment: VehicleMotionSegment) -> dict[str, Any]:
         "start_position": list(segment.start_position),
         "end_position": list(segment.end_position),
         "path_points": [list(point) for point in segment.path_points],
+        "body_length_m": segment.body_length_m,
+        "body_width_m": segment.body_width_m,
+        "spacing_envelope_m": segment.spacing_envelope_m,
         "heading_rad": segment.heading_rad,
         "nominal_speed": segment.nominal_speed,
         "peak_speed": segment.peak_speed,
@@ -346,6 +364,140 @@ def _heading_rad(start: Position, end: Position) -> float:
     if dx == 0.0 and dy == 0.0:
         return 0.0
     return math.atan2(dy, dx)
+
+
+def _vehicle_presentation_for_segment(
+    *,
+    vehicle_presentations: tuple[VehiclePresentationSurface, ...] | None,
+    vehicle_id: int,
+) -> VehiclePresentationSurface:
+    if vehicle_presentations is None:
+        return build_vehicle_presentation_surface(
+            vehicle_id=vehicle_id,
+            vehicle_type=None,
+        )
+    for presentation in vehicle_presentations:
+        if presentation.vehicle_id == vehicle_id:
+            return presentation
+    return build_vehicle_presentation_surface(vehicle_id=vehicle_id, vehicle_type=None)
+
+
+def _spacing_envelope_m(*, body_length_m: float, body_width_m: float) -> float:
+    return max(body_length_m * 1.35, body_width_m * 2.2, 0.9)
+
+
+def _sample_active_vehicle_states(
+    *,
+    motion_segments: tuple[VehicleMotionSegment, ...],
+    timestamp_s: float,
+) -> tuple[_SampledVehicleState, ...]:
+    active_entries: list[_SampledVehicleState] = []
+
+    for segment in motion_segments:
+        if not (segment.start_time_s < timestamp_s < segment.end_time_s):
+            continue
+        if segment.duration_s <= 0.0:
+            continue
+        elapsed_s = timestamp_s - segment.start_time_s
+        profile = _segment_profile(
+            distance=segment.distance,
+            duration_s=segment.duration_s,
+            speed_limit=segment.nominal_speed,
+        )
+        traversed_distance = sample_profile_distance(profile, elapsed_s)
+        progress = min(
+            1.0,
+            max(
+                0.0,
+                traversed_distance / segment.distance if segment.distance > 0.0 else 1.0,
+            ),
+        )
+        speed = sample_profile_speed(profile, elapsed_s)
+        path_length = _polyline_length(segment.path_points)
+        distance_along_path = (
+            path_length * progress if path_length > 0.0 else segment.distance * progress
+        )
+        position = _sample_path_position(segment.path_points, distance_along_path)
+        heading_rad = _heading_along_path(
+            segment.path_points,
+            distance_along_path=distance_along_path,
+        )
+        active_entries.append(
+            _SampledVehicleState(
+                vehicle_id=segment.vehicle_id,
+                node_id=segment.start_node_id,
+                position=position,
+                operational_state="moving",
+                heading_rad=heading_rad,
+                speed=speed,
+                active_edge_id=segment.edge_id,
+                start_node_id=segment.start_node_id,
+                end_node_id=segment.end_node_id,
+                motion_progress=progress,
+                is_interpolated=True,
+                distance_along_path=distance_along_path,
+                spacing_envelope_m=segment.spacing_envelope_m,
+                path_points=segment.path_points,
+            )
+        )
+
+    if len(active_entries) < 2:
+        return tuple(active_entries)
+
+    adjusted_entries: list[_SampledVehicleState] = []
+    for edge_id in sorted({entry.active_edge_id for entry in active_entries if entry.active_edge_id is not None}):
+        edge_entries = [
+            entry for entry in active_entries if entry.active_edge_id == edge_id
+        ]
+        edge_entries.sort(key=lambda entry: (-entry.distance_along_path, entry.vehicle_id))
+        leader_distance: float | None = None
+        leader_envelope = 0.0
+        for entry in edge_entries:
+            final_distance = entry.distance_along_path
+            final_speed = entry.speed
+            final_state = entry.operational_state
+            if leader_distance is not None:
+                safe_distance = max(leader_envelope, entry.spacing_envelope_m)
+                if final_distance > leader_distance - safe_distance:
+                    final_distance = max(0.0, leader_distance - safe_distance)
+                    final_speed = 0.0
+                    final_state = "waiting"
+            position = _sample_path_position(entry.path_points, final_distance)
+            heading_rad = _heading_along_path(
+                entry.path_points,
+                distance_along_path=final_distance,
+            )
+            adjusted_entries.append(
+                _SampledVehicleState(
+                    vehicle_id=entry.vehicle_id,
+                    node_id=entry.node_id,
+                    position=position,
+                    operational_state=final_state,
+                    heading_rad=heading_rad,
+                    speed=final_speed,
+                    active_edge_id=entry.active_edge_id,
+                    start_node_id=entry.start_node_id,
+                    end_node_id=entry.end_node_id,
+                    motion_progress=(
+                        final_distance / _polyline_length(entry.path_points)
+                        if _polyline_length(entry.path_points) > 0.0
+                        else entry.motion_progress
+                    ),
+                    is_interpolated=entry.is_interpolated,
+                    distance_along_path=final_distance,
+                    spacing_envelope_m=entry.spacing_envelope_m,
+                    path_points=entry.path_points,
+                )
+            )
+            leader_distance = final_distance
+            leader_envelope = entry.spacing_envelope_m
+
+    adjusted_entries.extend(
+        entry
+        for entry in active_entries
+        if entry.active_edge_id is None
+    )
+    return tuple(sorted(adjusted_entries, key=lambda entry: entry.vehicle_id))
 
 
 def _resolve_segment_path_points(

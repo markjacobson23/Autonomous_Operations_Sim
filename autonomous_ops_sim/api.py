@@ -210,11 +210,12 @@ def build_replay_bundle(
         session_history=session_history,
     )
     render_geometry = build_render_geometry_surface(engine.map)
+    vehicle_presentations = _build_vehicle_presentations(engine.vehicles)
     motion_segments = build_vehicle_motion_segments(
         replay_state,
         render_geometry=render_geometry,
+        vehicle_presentations=vehicle_presentations,
     )
-    vehicle_presentations = _build_vehicle_presentations(engine.vehicles)
     command_results = _build_replay_command_results(
         command_history=tuple(command_history),
         frames=replay_state.frames,
@@ -289,11 +290,12 @@ def build_live_session_bundle(
     metrics_summary = summary or summarize_engine_execution(session.engine)
     replay_state = build_visualization_state_from_live_session(session)
     render_geometry = build_render_geometry_surface(session.engine.map)
+    vehicle_presentations = _build_vehicle_presentations(session.engine.vehicles)
     motion_segments = build_vehicle_motion_segments(
         replay_state,
         render_geometry=render_geometry,
+        vehicle_presentations=vehicle_presentations,
     )
-    vehicle_presentations = _build_vehicle_presentations(session.engine.vehicles)
     return LiveSessionBundle(
         metadata=SimulationApiMetadata(
             api_version=SIMULATION_API_VERSION,
@@ -341,11 +343,12 @@ def build_live_sync_bundle(
     surface = build_live_sync_surface(session)
     replay_state = build_visualization_state_from_live_session(session)
     render_geometry = build_render_geometry_surface(session.engine.map)
+    vehicle_presentations = _build_vehicle_presentations(session.engine.vehicles)
     motion_segments = build_vehicle_motion_segments(
         replay_state,
         render_geometry=render_geometry,
+        vehicle_presentations=vehicle_presentations,
     )
-    vehicle_presentations = _build_vehicle_presentations(session.engine.vehicles)
     return LiveSyncBundle(
         metadata=SimulationApiMetadata(
             api_version=SIMULATION_API_VERSION,
