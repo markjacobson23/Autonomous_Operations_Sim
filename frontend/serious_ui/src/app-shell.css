@@ -254,6 +254,17 @@ h3 {
   align-items: start;
 }
 
+.shell-tab-operate .workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.shell-tab-traffic .workspace,
+.shell-tab-fleet .workspace,
+.shell-tab-editor .workspace,
+.shell-tab-analyze .workspace {
+  grid-template-columns: 1fr;
+}
+
 .workspace-tabs {
   padding: 14px;
   display: grid;
@@ -296,51 +307,77 @@ h3 {
 
 .shell-tab-operate .editor-pane,
 .shell-tab-operate .fleet-pane,
-.shell-tab-operate .alerts-pane,
+.shell-tab-operate .traffic-pane,
 .shell-tab-operate .analyze-pane,
 .shell-tab-traffic .operate-pane,
 .shell-tab-traffic .editor-pane,
+.shell-tab-traffic .fleet-pane,
 .shell-tab-traffic .analyze-pane,
 .shell-tab-fleet .operate-pane,
 .shell-tab-fleet .editor-pane,
-.shell-tab-fleet .alerts-pane,
+.shell-tab-fleet .traffic-pane,
 .shell-tab-fleet .analyze-pane,
 .shell-tab-editor .operate-pane,
+.shell-tab-editor .traffic-pane,
 .shell-tab-editor .fleet-pane,
-.shell-tab-editor .alerts-pane,
 .shell-tab-editor .analyze-pane,
 .shell-tab-analyze .operate-pane,
+.shell-tab-analyze .traffic-pane,
 .shell-tab-analyze .editor-pane,
 .shell-tab-analyze .fleet-pane {
   display: none;
 }
 
-.shell-tab-fleet .fleet-session-controls {
+.shell-tab-operate .sidebar {
   display: none;
 }
 
-.shell-tab-fleet .traffic-reservation-inspection {
-  display: none;
+.shell-tab-operate .operate-pane {
+  grid-column: 1 / -1;
 }
 
-.shell-tab-traffic .fleet-session-controls {
-  display: none;
+.shell-tab-traffic .traffic-pane,
+.shell-tab-fleet .fleet-pane,
+.shell-tab-editor .editor-pane,
+.shell-tab-analyze .analyze-pane {
+  grid-column: 1 / -1;
 }
 
-.shell-tab-traffic .fleet-pane .subsection:not(.traffic-reservation-inspection) {
-  display: none;
-}
-
-.shell-tab-traffic .traffic-reservation-inspection {
+.shell-tab-operate .operate-route-planning {
   display: grid;
 }
 
-.shell-tab-traffic .alerts-pane .analyze-ai-feedback {
-  display: none;
+.scene-button-primary {
+  background: linear-gradient(135deg, rgba(10, 118, 108, 0.18), rgba(36, 83, 199, 0.14));
+  border-color: rgba(10, 118, 108, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 10px 18px rgba(24, 33, 44, 0.08);
 }
 
-.shell-tab-analyze .alerts-pane .traffic-heatmap-pane {
-  display: none;
+.route-planning-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.route-primary-actions {
+  margin-top: 4px;
+}
+
+.route-preview-summary {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 246, 247, 0.82));
+}
+
+.traffic-pane,
+.fleet-pane,
+.editor-pane,
+.analyze-pane {
+  display: grid;
+  gap: 18px;
 }
 
 .main-column,
@@ -641,6 +678,19 @@ h3 {
 }
 
 .subsection {
+  display: grid;
+  gap: 8px;
+}
+
+.traffic-road-state-pane,
+.traffic-heatmap-pane,
+.traffic-reservation-inspection,
+.traffic-hazard-pane {
+  display: grid;
+  gap: 8px;
+}
+
+.analyze-ai-feedback {
   display: grid;
   gap: 8px;
 }

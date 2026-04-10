@@ -436,11 +436,11 @@ const workspaceTabs: Array<{
   label: string;
   summary: string;
 }> = [
-  { id: "operate", label: "Operate", summary: "Map, session, and scene control" },
-  { id: "traffic", label: "Traffic", summary: "Queues, heatmaps, and bottlenecks" },
-  { id: "fleet", label: "Fleet", summary: "Commanding and selection" },
+  { id: "operate", label: "Operate", summary: "Primary map and route workflow" },
+  { id: "traffic", label: "Traffic", summary: "Congestion, queues, and hazards" },
+  { id: "fleet", label: "Fleet", summary: "Selection and runtime admin" },
   { id: "editor", label: "Editor", summary: "Scenario authoring" },
-  { id: "analyze", label: "Analyze", summary: "Inspection and AI feedback" },
+  { id: "analyze", label: "Analyze", summary: "Diagnostics and AI review" },
 ];
 
 const sessionActions = [
@@ -2086,6 +2086,136 @@ function App(): JSX.Element {
               </div>
 
               <aside className="overview-panel">
+                <div className="overview-card operate-route-planning">
+                  <p className="eyebrow">Route Planning</p>
+                  <h3>Primary Operator Workflow</h3>
+                  <div className="selection-strip">
+                    <span className="selection-pill">
+                      Fleet selection: {effectiveSelectedVehicleIds.length} vehicle(s)
+                    </span>
+                    <span className="selection-pill">
+                      Selected preview:{" "}
+                      {selectedRoutePreview?.vehicle_id !== undefined
+                        ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id)}`
+                        : "none"}
+                    </span>
+                    <span className="selection-pill">
+                      Destination node:{" "}
+                      {formatMaybeNumber(selectedRoutePreview?.destination_node_id ?? null)}
+                    </span>
+                  </div>
+                  <div className="route-planning-grid">
+                    <label className="form-field">
+                      <span>Vehicle ID</span>
+                      <input
+                        type="number"
+                        value={liveCommandDraft.vehicleId}
+                        onChange={(event) =>
+                          setLiveCommandDraft((current) => ({
+                            ...current,
+                            vehicleId: event.target.value,
+                          }))
+                        }
+                        placeholder={selectedVehicleId !== null ? String(selectedVehicleId) : "77"}
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>Destination Node</span>
+                      <input
+                        type="number"
+                        value={liveCommandDraft.destinationNodeId}
+                        onChange={(event) =>
+                          setLiveCommandDraft((current) => ({
+                            ...current,
+                            destinationNodeId: event.target.value,
+                          }))
+                        }
+                        placeholder={
+                          routePreviews[0]?.destination_node_id !== undefined
+                            ? String(routePreviews[0].destination_node_id)
+                            : "3"
+                        }
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>Reposition Node</span>
+                      <input
+                        type="number"
+                        value={liveCommandDraft.nodeId}
+                        onChange={(event) =>
+                          setLiveCommandDraft((current) => ({
+                            ...current,
+                            nodeId: event.target.value,
+                          }))
+                        }
+                        placeholder={
+                          selectedInspection?.current_node_id !== undefined
+                            ? String(selectedInspection.current_node_id)
+                            : "1"
+                        }
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>Step Seconds</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={liveCommandDraft.stepSeconds}
+                        onChange={(event) =>
+                          setLiveCommandDraft((current) => ({
+                            ...current,
+                            stepSeconds: event.target.value,
+                          }))
+                        }
+                        placeholder={String(sessionControl?.step_seconds ?? 0.5)}
+                      />
+                    </label>
+                  </div>
+                  <div className="route-primary-actions action-row">
+                    <button
+                      className="scene-button scene-button-primary"
+                      type="button"
+                      onClick={previewRouteFromDraft}
+                      disabled={!sessionControl?.route_preview_endpoint}
+                    >
+                      Preview Route
+                    </button>
+                    <button
+                      className="scene-button scene-button-primary"
+                      type="button"
+                      onClick={assignDestinationFromDraft}
+                      disabled={!sessionControl?.command_endpoint}
+                    >
+                      Assign Destination
+                    </button>
+                    <button
+                      className="scene-button"
+                      type="button"
+                      onClick={repositionVehicleFromDraft}
+                      disabled={!sessionControl?.command_endpoint}
+                    >
+                      Reposition Vehicle
+                    </button>
+                  </div>
+                  <div className="route-preview-summary">
+                    <div className="preview-badge">
+                      <span className="preview-label">Selected Preview</span>
+                      <strong>
+                        V{formatMaybeNumber(selectedRoutePreview?.vehicle_id ?? null)} · Node{" "}
+                        {formatMaybeNumber(selectedRoutePreview?.destination_node_id ?? null)}
+                      </strong>
+                    </div>
+                    <ul className="mini-list">
+                      <li>Actionable: {selectedRoutePreview?.is_actionable ? "yes" : "no"}</li>
+                      <li>Reason: {selectedRoutePreview?.reason ?? "none"}</li>
+                      <li>
+                        Distance: {formatMeters(selectedRoutePreview?.total_distance ?? null)}
+                      </li>
+                      <li>Edges: {(selectedRoutePreview?.edge_ids ?? []).join(", ") || "none"}</li>
+                      <li>Nodes: {(selectedRoutePreview?.node_ids ?? []).join(" → ") || "none"}</li>
+                    </ul>
+                  </div>
+                </div>
                 <div className="overview-card">
                   <p className="eyebrow">Overview</p>
                   <h3>Minimap Navigation</h3>
@@ -2152,7 +2282,7 @@ function App(): JSX.Element {
               <div className="panel-header compact">
                 <div>
                   <p className="eyebrow">Operate Region</p>
-                  <h2 id="session-control-title">Session Control</h2>
+                  <h2 id="session-control-title">Compact Session Status</h2>
                 </div>
                 <span className="status-pill secondary">
                   {liveSessionPlaying ? "playing" : "paused"} · step{" "}
@@ -2163,7 +2293,7 @@ function App(): JSX.Element {
                 <div className="subsection">
                   <div className="action-row">
                     <button
-                      className="scene-button"
+                      className="scene-button scene-button-primary"
                       type="button"
                       onClick={() => controlLiveSession("play")}
                       disabled={!sessionControl?.session_control_endpoint}
@@ -2190,6 +2320,7 @@ function App(): JSX.Element {
                   <ul className="mini-list">
                     <li>Mode: {sessionControl?.play_state ?? "paused"}</li>
                     <li>Step size: {formatSeconds(sessionControl?.step_seconds ?? null)}</li>
+                    <li>Session channel: {sessionControl?.session_control_endpoint ?? "unbound"}</li>
                   </ul>
                   <p className="status-copy">{liveCommandMessage}</p>
                 </div>
@@ -2240,13 +2371,13 @@ function App(): JSX.Element {
             <div className="panel-header compact">
               <div>
                 <p className="eyebrow">Authoring Region</p>
-                <h2 id="editor-title">Live Geometry Editing</h2>
+                <h2 id="editor-title">Scenario Authoring</h2>
               </div>
               <span className="status-pill secondary">{editCount} staged</span>
             </div>
             <div className="section-stack">
               <div className="subsection">
-                <h3>Authoring Controls</h3>
+                <h3>Draft Operations</h3>
                 <div className="action-row">
                   <button className="scene-button" type="button" onClick={toggleEditMode}>
                     {editorEnabled ? "Pause Edit Mode" : "Edit Scene"}
@@ -2319,16 +2450,15 @@ function App(): JSX.Element {
             <div className="panel-header compact">
               <div>
                 <p className="eyebrow">Command-Center Region</p>
-                <h2 id="command-center-title">Fleet Actions</h2>
+                <h2 id="command-center-title">Fleet Control</h2>
               </div>
               <span className="status-pill secondary">
-                {formatMaybeNumber(effectiveSelectedVehicleIds.length)} selected ·{" "}
-                {liveSessionPlaying ? "playing" : "paused"}
+                {formatMaybeNumber(effectiveSelectedVehicleIds.length)} selected · admin
               </span>
             </div>
             <div className="section-stack">
               <div className="subsection">
-                <h3>Live Command Console</h3>
+                <h3>Selected Fleet</h3>
                 <div className="selection-strip">
                   <span className="selection-pill">
                     Fleet selection: {effectiveSelectedVehicleIds.length} vehicle(s)
@@ -2350,6 +2480,21 @@ function App(): JSX.Element {
                     Clear Selection
                   </button>
                 </div>
+                {effectiveSelectedVehicleIds.length > 1 ? (
+                  <p className="status-copy">
+                    Batch mode is active for vehicles {effectiveSelectedVehicleIds.join(", ")}.
+                    Admin actions apply to every selected vehicle.
+                  </p>
+                ) : (
+                  <p className="status-copy">
+                    Fleet selection and admin commands are grouped here so live routing stays in
+                    Operate.
+                  </p>
+                )}
+              </div>
+
+              <div className="subsection">
+                <h3>Runtime Admin Controls</h3>
                 <div className="command-grid">
                   <label className="form-field">
                     <span>Vehicle ID</span>
@@ -2363,24 +2508,6 @@ function App(): JSX.Element {
                         }))
                       }
                       placeholder={selectedVehicleId !== null ? String(selectedVehicleId) : "77"}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>Destination Node</span>
-                    <input
-                      type="number"
-                      value={liveCommandDraft.destinationNodeId}
-                      onChange={(event) =>
-                        setLiveCommandDraft((current) => ({
-                          ...current,
-                          destinationNodeId: event.target.value,
-                        }))
-                      }
-                      placeholder={
-                        routePreviews[0]?.destination_node_id !== undefined
-                          ? String(routePreviews[0].destination_node_id)
-                          : "3"
-                      }
                     />
                   </label>
                   <label className="form-field">
@@ -2404,39 +2531,6 @@ function App(): JSX.Element {
                     />
                   </label>
                   <label className="form-field">
-                    <span>Reposition Node</span>
-                    <input
-                      type="number"
-                      value={liveCommandDraft.nodeId}
-                      onChange={(event) =>
-                        setLiveCommandDraft((current) => ({
-                          ...current,
-                          nodeId: event.target.value,
-                        }))
-                      }
-                      placeholder={
-                        selectedInspection?.current_node_id !== undefined
-                          ? String(selectedInspection.current_node_id)
-                          : "1"
-                      }
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>Step Seconds</span>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={liveCommandDraft.stepSeconds}
-                      onChange={(event) =>
-                        setLiveCommandDraft((current) => ({
-                          ...current,
-                          stepSeconds: event.target.value,
-                        }))
-                      }
-                      placeholder={String(sessionControl?.step_seconds ?? 0.5)}
-                    />
-                  </label>
-                  <label className="form-field">
                     <span>Hazard Label</span>
                     <input
                       type="text"
@@ -2448,6 +2542,56 @@ function App(): JSX.Element {
                         }))
                       }
                       placeholder="temporary closure"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Job ID</span>
+                    <input
+                      type="text"
+                      value={liveCommandDraft.jobId}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          jobId: event.target.value,
+                        }))
+                      }
+                      placeholder="live-job-77"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Job Node</span>
+                    <input
+                      type="number"
+                      value={liveCommandDraft.jobTaskNodeId}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          jobTaskNodeId: event.target.value,
+                        }))
+                      }
+                      placeholder={
+                        selectedInspection?.current_node_id !== undefined
+                          ? String(selectedInspection.current_node_id)
+                          : "1"
+                      }
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Job Destination</span>
+                    <input
+                      type="number"
+                      value={liveCommandDraft.jobTaskDestinationNodeId}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          jobTaskDestinationNodeId: event.target.value,
+                        }))
+                      }
+                      placeholder={
+                        routePreviews[0]?.destination_node_id !== undefined
+                          ? String(routePreviews[0].destination_node_id)
+                          : "3"
+                      }
                     />
                   </label>
                   <label className="form-field">
@@ -2524,82 +2668,10 @@ function App(): JSX.Element {
                       placeholder="0"
                     />
                   </label>
-                  <label className="form-field">
-                    <span>Job ID</span>
-                    <input
-                      type="text"
-                      value={liveCommandDraft.jobId}
-                      onChange={(event) =>
-                        setLiveCommandDraft((current) => ({
-                          ...current,
-                          jobId: event.target.value,
-                        }))
-                      }
-                      placeholder="live-job-77"
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>Job Destination</span>
-                    <input
-                      type="number"
-                      value={liveCommandDraft.jobTaskDestinationNodeId}
-                      onChange={(event) =>
-                        setLiveCommandDraft((current) => ({
-                          ...current,
-                          jobTaskDestinationNodeId: event.target.value,
-                        }))
-                      }
-                      placeholder={
-                        routePreviews[0]?.destination_node_id !== undefined
-                          ? String(routePreviews[0].destination_node_id)
-                          : "3"
-                      }
-                    />
-                  </label>
                 </div>
                 <div className="action-row">
                   <button
-                    className="scene-button"
-                    type="button"
-                    onClick={previewRouteFromDraft}
-                    disabled={!sessionControl?.route_preview_endpoint}
-                  >
-                    Preview Route
-                  </button>
-                  <button
-                    className="scene-button"
-                    type="button"
-                    onClick={assignDestinationFromDraft}
-                    disabled={!sessionControl?.command_endpoint}
-                  >
-                    Assign Destination
-                  </button>
-                  <button
-                    className="scene-button"
-                    type="button"
-                    onClick={repositionVehicleFromDraft}
-                    disabled={!sessionControl?.command_endpoint}
-                  >
-                    Reposition Vehicle
-                  </button>
-                  <button
-                    className="scene-button"
-                    type="button"
-                    onClick={blockRoadFromDraft}
-                    disabled={!sessionControl?.command_endpoint}
-                  >
-                    Block Road
-                  </button>
-                  <button
-                    className="scene-button"
-                    type="button"
-                    onClick={unblockRoadFromDraft}
-                    disabled={!sessionControl?.command_endpoint}
-                  >
-                    Unblock Road
-                  </button>
-                  <button
-                    className="scene-button"
+                    className="scene-button scene-button-primary"
                     type="button"
                     onClick={spawnVehicleFromDraft}
                     disabled={!sessionControl?.command_endpoint}
@@ -2625,6 +2697,22 @@ function App(): JSX.Element {
                   <button
                     className="scene-button"
                     type="button"
+                    onClick={blockRoadFromDraft}
+                    disabled={!sessionControl?.command_endpoint}
+                  >
+                    Block Road
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={unblockRoadFromDraft}
+                    disabled={!sessionControl?.command_endpoint}
+                  >
+                    Unblock Road
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
                     onClick={declareTemporaryHazardFromDraft}
                     disabled={!sessionControl?.command_endpoint}
                   >
@@ -2639,46 +2727,6 @@ function App(): JSX.Element {
                     Clear Hazard
                   </button>
                 </div>
-                {effectiveSelectedVehicleIds.length > 1 ? (
-                  <p className="status-copy">
-                    Batch mode is active for vehicles {effectiveSelectedVehicleIds.join(", ")}.
-                    Destination and reposition actions will apply to every selected vehicle.
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="subsection fleet-session-controls">
-                <h3>Session Control</h3>
-                <div className="action-row">
-                  <button
-                    className="scene-button"
-                    type="button"
-                    onClick={() => controlLiveSession("play")}
-                    disabled={!sessionControl?.session_control_endpoint}
-                  >
-                    Play
-                  </button>
-                  <button
-                    className="scene-button"
-                    type="button"
-                    onClick={() => controlLiveSession("pause")}
-                    disabled={!sessionControl?.session_control_endpoint}
-                  >
-                    Pause
-                  </button>
-                  <button
-                    className="scene-button"
-                    type="button"
-                    onClick={() => controlLiveSession("step")}
-                    disabled={!sessionControl?.session_control_endpoint}
-                  >
-                    Single-Step
-                  </button>
-                </div>
-                <ul className="mini-list">
-                  <li>Mode: {sessionControl?.play_state ?? "paused"}</li>
-                  <li>Step size: {formatSeconds(sessionControl?.step_seconds ?? null)}</li>
-                </ul>
                 <p className="status-copy">{liveCommandMessage}</p>
               </div>
 
@@ -2696,42 +2744,125 @@ function App(): JSX.Element {
                   )}
                 </ul>
               </div>
-              <div className="subsection">
-                <h3>Route Previews</h3>
-                <ul className="data-list">
-                  {routePreviews.length > 0 ? (
-                    routePreviews.slice(0, 3).map((preview, index) => (
-                      <li key={`${preview.vehicle_id ?? "vehicle"}-${index}`}>
-                        Vehicle {formatMaybeNumber(preview.vehicle_id ?? null)} to node{" "}
-                        {formatMaybeNumber(preview.destination_node_id ?? null)}
-                        {" · "}
-                        {preview.reason ?? (preview.is_actionable ? "actionable" : "queued")}
-                      </li>
-                    ))
+            </div>
+          </section>
+
+          <section className="panel info-panel traffic-pane" aria-labelledby="traffic-title">
+            <div className="panel-header compact">
+              <div>
+                <p className="eyebrow">Traffic Region</p>
+                <h2 id="traffic-title">Traffic Monitoring</h2>
+              </div>
+              <span className="status-pill secondary">
+                {formatMaybeNumber(bootstrap.blockedEdgeCount)} blocked edges
+              </span>
+            </div>
+            <div className="section-stack">
+              <div className="subsection traffic-heatmap-pane">
+                <h3>Traffic Heatmap</h3>
+                <div className="traffic-summary-row">
+                  <span className="traffic-summary-chip">
+                    {formatMaybeNumber(queuedVehicleCount)} queued
+                  </span>
+                  <span className="traffic-summary-chip">
+                    {formatMaybeNumber(congestedRoadCount)} congested roads
+                  </span>
+                  <span className="traffic-summary-chip accent">
+                    Peak {Math.round(peakTrafficIntensity * 100)}%
+                  </span>
+                  <span className="traffic-summary-chip">
+                    {formatMaybeNumber(bootstrap.blockedEdgeCount)} blocked edges
+                  </span>
+                </div>
+                <ul className="traffic-heatmap-list">
+                  {trafficRoadStates.filter((roadState) => (roadState.congestion_intensity ?? 0) > 0)
+                    .length > 0 ? (
+                    trafficRoadStates
+                      .filter((roadState) => (roadState.congestion_intensity ?? 0) > 0)
+                      .sort(
+                        (left, right) =>
+                          (right.congestion_intensity ?? 0) - (left.congestion_intensity ?? 0),
+                      )
+                      .slice(0, 4)
+                      .map((roadState) => (
+                        <li
+                          key={roadState.road_id ?? "road"}
+                          className="traffic-heatmap-row"
+                        >
+                          <div className="traffic-heatmap-label">
+                            <strong>{roadState.road_id ?? "road"}</strong>
+                            <span>
+                              {roadState.congestion_level ?? "active"} ·{" "}
+                              {roadState.queued_vehicle_ids?.length ?? 0} queued
+                            </span>
+                          </div>
+                          <div className="traffic-heatmap-bar" aria-hidden="true">
+                            <span
+                              style={{
+                                width: `${Math.round((roadState.congestion_intensity ?? 0) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </li>
+                      ))
                   ) : (
-                    <li>No route previews are currently attached.</li>
+                    <li className="traffic-heatmap-row">
+                      <div className="traffic-heatmap-label">
+                        <strong>All roads</strong>
+                        <span>No congestion at the current sample</span>
+                      </div>
+                      <div className="traffic-heatmap-bar" aria-hidden="true">
+                        <span style={{ width: "0%" }} />
+                      </div>
+                    </li>
                   )}
                 </ul>
-                <div className="preview-summary">
-                  <div className="preview-badge">
-                    <span className="preview-label">Selected Preview</span>
-                    <strong>
-                      V{formatMaybeNumber(selectedRoutePreview?.vehicle_id ?? null)} · Node{" "}
-                      {formatMaybeNumber(selectedRoutePreview?.destination_node_id ?? null)}
-                    </strong>
-                  </div>
-                  <ul className="mini-list">
-                    <li>Actionable: {selectedRoutePreview?.is_actionable ? "yes" : "no"}</li>
-                    <li>Reason: {selectedRoutePreview?.reason ?? "none"}</li>
-                    <li>
-                      Distance: {formatMeters(selectedRoutePreview?.total_distance ?? null)}
-                    </li>
-                    <li>Edges: {(selectedRoutePreview?.edge_ids ?? []).join(", ") || "none"}</li>
-                    <li>Nodes: {(selectedRoutePreview?.node_ids ?? []).join(" → ") || "none"}</li>
-                  </ul>
-                </div>
               </div>
-
+              <div className="subsection traffic-road-state-pane">
+                <h3>Road State Inspection</h3>
+                <ul className="data-list">
+                  {selectedTarget?.kind === "road" && selectedRoad ? (
+                    <>
+                      <li>
+                        {selectedRoad.road_id ?? "road"} · {selectedRoad.road_class ?? "connector"} ·{" "}
+                        {selectedRoadTraffic?.congestion_level ?? "free"}
+                      </li>
+                      <li>
+                        Directionality: {selectedRoad.directionality ?? "unknown"} · Lanes:{" "}
+                        {formatMaybeNumber(selectedRoad.lane_count ?? null)} · Width:{" "}
+                        {selectedRoad.width_m ?? "pending"}m
+                      </li>
+                      <li>
+                        Queued: {selectedRoadTraffic?.queued_vehicle_ids?.length ?? 0} · Active:{" "}
+                        {selectedRoadTraffic?.active_vehicle_ids?.length ?? 0}
+                      </li>
+                      <li>
+                        Control: {selectedRoadTraffic?.control_state ?? "free_flow"} · Min spacing:{" "}
+                        {formatMeters(selectedRoadTraffic?.min_spacing_m ?? null)}
+                      </li>
+                      <li>
+                        Stop lines: {selectedRoadTraffic?.stop_line_ids?.join(", ") || "none"}
+                      </li>
+                      <li>
+                        Protected areas:{" "}
+                        {selectedRoadTraffic?.protected_conflict_zone_ids?.join(", ") || "none"}
+                      </li>
+                    </>
+                  ) : trafficRoadStates.length > 0 ? (
+                    trafficRoadStates
+                      .slice(0, 4)
+                      .map((roadState) => (
+                        <li key={roadState.road_id ?? "road-state"}>
+                          Road {roadState.road_id ?? "unknown"} · {roadState.congestion_level ?? "free"} ·{" "}
+                          queued {roadState.queued_vehicle_ids?.length ?? 0} · active{" "}
+                          {roadState.active_vehicle_ids?.length ?? 0}
+                        </li>
+                      ))
+                  ) : (
+                    <li>No traffic road-state samples are currently attached.</li>
+                  )}
+                </ul>
+              </div>
               <div className="subsection traffic-reservation-inspection">
                 <h3>Reservation & Conflict Inspection</h3>
                 <ul className="data-list">
@@ -2756,9 +2887,7 @@ function App(): JSX.Element {
                   )}
                 </ul>
                 <ul className="mini-list">
-                  <li>
-                    Selected route conflicts: {selectedRoutePreview?.reason ?? "none"}
-                  </li>
+                  <li>Selected route conflicts: {selectedRoutePreview?.reason ?? "none"}</li>
                   <li>
                     Route preview roads:{" "}
                     {selectedRoutePreviewRoadIds.size > 0
@@ -2770,6 +2899,30 @@ function App(): JSX.Element {
                   </li>
                 </ul>
               </div>
+              <div className="subsection traffic-hazard-pane">
+                <h3>Blocked Edges and Hazards</h3>
+                <ul className="data-list">
+                  {selectedTarget?.kind === "hazard" && selectedHazardEdge ? (
+                    <>
+                      <li>
+                        Blocked edge {selectedHazardEdge.edge_id ?? "?"} · distance{" "}
+                        {selectedHazardEdge.distance ?? "pending"}
+                      </li>
+                      <li>
+                        Start node: {formatMaybeNumber(selectedHazardEdge.start_node_id ?? null)} · End node:{" "}
+                        {formatMaybeNumber(selectedHazardEdge.end_node_id ?? null)}
+                      </li>
+                      <li>Speed limit: {selectedHazardEdge.speed_limit ?? "pending"}</li>
+                    </>
+                  ) : (bootstrap.bundle?.snapshot?.blocked_edge_ids ?? []).length > 0 ? (
+                    (bootstrap.bundle?.snapshot?.blocked_edge_ids ?? []).slice(0, 5).map((edgeId) => (
+                      <li key={`blocked-${edgeId}`}>Blocked edge {edgeId}</li>
+                    ))
+                  ) : (
+                    <li>No blocked edges are currently visible.</li>
+                  )}
+                </ul>
+              </div>
             </div>
           </section>
 
@@ -2777,123 +2930,13 @@ function App(): JSX.Element {
             <div className="panel-header compact">
               <div>
                 <p className="eyebrow">Inspector Region</p>
-                <h2 id="inspector-title">Vehicle Inspection</h2>
+                <h2 id="inspector-title">Diagnostics and AI Review</h2>
               </div>
               <span className="status-pill secondary">
                 {selectedTarget ? describeSelectedBadge(selectedTarget) : `${inspections.length} records`}
               </span>
             </div>
             <div className="section-stack">
-              {selectedTarget?.kind === "road" && selectedRoad ? (
-                <article className="inspection-card">
-                  <div className="inspection-header">
-                    <strong>{selectedRoad.road_id ?? "road"}</strong>
-                    <span>{selectedRoad.road_class ?? "connector"}</span>
-                  </div>
-                  <ul className="mini-list">
-                    <li>Directionality: {selectedRoad.directionality ?? "unknown"}</li>
-                    <li>Lanes: {formatMaybeNumber(selectedRoad.lane_count ?? null)}</li>
-                    <li>Width: {selectedRoad.width_m ?? "pending"}m</li>
-                    <li>Edges: {(selectedRoad.edge_ids ?? []).join(", ") || "none"}</li>
-                    <li>Traffic: {selectedRoadTraffic?.congestion_level ?? "free"}</li>
-                    <li>
-                      Intensity: {Math.round((selectedRoadTraffic?.congestion_intensity ?? 0) * 100)}%
-                    </li>
-                    <li>
-                      Queued: {selectedRoadTraffic?.queued_vehicle_ids?.length ?? 0} · Active:{" "}
-                      {selectedRoadTraffic?.active_vehicle_ids?.length ?? 0}
-                    </li>
-                    <li>Min spacing: {formatMeters(selectedRoadTraffic?.min_spacing_m ?? null)}</li>
-                    <li>Control: {selectedRoadTraffic?.control_state ?? "free_flow"}</li>
-                    <li>
-                      Stop lines: {selectedRoadTraffic?.stop_line_ids?.join(", ") || "none"}
-                    </li>
-                    <li>
-                      Protected areas:{" "}
-                      {selectedRoadTraffic?.protected_conflict_zone_ids?.join(", ") || "none"}
-                    </li>
-                  </ul>
-                </article>
-              ) : null}
-
-              {selectedTarget?.kind === "area" && selectedArea ? (
-                <article className="inspection-card">
-                  <div className="inspection-header">
-                    <strong>{selectedArea.label ?? selectedArea.area_id ?? "zone"}</strong>
-                    <span>{selectedArea.kind ?? "area"}</span>
-                  </div>
-                  <ul className="mini-list">
-                    <li>Polygon vertices: {selectedArea.polygon?.length ?? 0}</li>
-                    <li>Area id: {selectedArea.area_id ?? "unknown"}</li>
-                    <li>Editing target: zone polygon</li>
-                  </ul>
-                </article>
-              ) : null}
-
-              {selectedTarget?.kind === "queue" && selectedQueueRecord ? (
-                <article className="inspection-card">
-                  <div className="inspection-header">
-                    <strong>Queue {selectedQueueRecord.road_id ?? "road"}</strong>
-                    <span>reservation queue</span>
-                  </div>
-                  <ul className="mini-list">
-                    <li>
-                      Queued vehicles:{" "}
-                      {selectedQueueRecord.vehicle_ids?.join(", ") ||
-                        (selectedQueueRecord.vehicle_id !== undefined
-                          ? String(selectedQueueRecord.vehicle_id)
-                          : "none")}
-                    </li>
-                    <li>
-                      Queue length:{" "}
-                      {selectedQueueRecord.vehicle_ids?.length ?? (selectedQueueRecord.vehicle_id !== undefined ? 1 : 0)}
-                    </li>
-                    <li>Road traffic: {selectedQueueTraffic?.congestion_level ?? "queued"}</li>
-                    <li>Intensity: {Math.round((selectedQueueTraffic?.congestion_intensity ?? 0) * 100)}%</li>
-                    <li>Queue window: {formatSeconds(selectedQueueRecord.queue_start_s ?? null)} to {formatSeconds(selectedQueueRecord.queue_end_s ?? null)}</li>
-                    <li>Reason: {selectedQueueRecord.reason ?? "queued"}</li>
-                    <li>Control: {selectedQueueTraffic?.control_state ?? "yield"}</li>
-                  </ul>
-                </article>
-              ) : null}
-
-              {selectedTarget?.kind === "hazard" && selectedHazardEdge ? (
-                <article className="inspection-card">
-                  <div className="inspection-header">
-                    <strong>Blocked Edge {selectedHazardEdge.edge_id ?? "?"}</strong>
-                    <span>conflict area</span>
-                  </div>
-                  <ul className="mini-list">
-                    <li>Start node: {formatMaybeNumber(selectedHazardEdge.start_node_id ?? null)}</li>
-                    <li>End node: {formatMaybeNumber(selectedHazardEdge.end_node_id ?? null)}</li>
-                    <li>Distance: {selectedHazardEdge.distance ?? "pending"}</li>
-                    <li>Speed limit: {selectedHazardEdge.speed_limit ?? "pending"}</li>
-                  </ul>
-                </article>
-              ) : null}
-
-              {effectiveSelectedVehicleIds.length > 1 ? (
-                <article className="inspection-card">
-                  <div className="inspection-header">
-                    <strong>Fleet Selection</strong>
-                    <span>multi-select</span>
-                  </div>
-                  <ul className="mini-list">
-                    <li>Vehicles: {effectiveSelectedVehicleIds.join(", ")}</li>
-                    <li>Selected records: {selectedVehicleInspections.length}</li>
-                    <li>
-                      Route previews:{" "}
-                      {
-                        routePreviews.filter((preview) =>
-                          effectiveSelectedVehicleIds.includes(preview.vehicle_id ?? -1),
-                        ).length
-                      }
-                    </li>
-                    <li>Batch commands: assign and reposition apply to every selected vehicle.</li>
-                  </ul>
-                </article>
-              ) : null}
-
               {selectedInspection ? (
                 <article className="inspection-card">
                   <div className="inspection-header">
@@ -2946,122 +2989,42 @@ function App(): JSX.Element {
                 </article>
               ) : null}
 
-              {!selectedTarget && inspections.length > 0 ? (
-                inspections.slice(0, 2).map((inspection, index) => (
-                  <article
-                    key={`${inspection.vehicle_id ?? "inspection"}-${index}`}
-                    className="inspection-card"
-                  >
-                    <div className="inspection-header">
-                      <strong>
-                        {findVehicleById(bundle, inspection.vehicle_id ?? null)?.display_name ?? "Vehicle"}{" "}
-                        {formatMaybeNumber(inspection.vehicle_id ?? null)}
-                      </strong>
-                      <span>
-                        {findVehicleById(bundle, inspection.vehicle_id ?? null)?.role_label ??
-                          inspection.operational_state ??
-                          "unknown_state"}
-                      </span>
-                    </div>
-                    <ul className="mini-list">
-                      <li>Node: {formatMaybeNumber(inspection.current_node_id ?? null)}</li>
-                      <li>ETA: {formatSeconds(inspection.eta_s ?? null)}</li>
-                      <li>Job: {inspection.current_job_id ?? "none"}</li>
-                      <li>Wait: {inspection.wait_reason ?? "none"}</li>
-                      <li>Type: {findVehicleById(bundle, inspection.vehicle_id ?? null)?.vehicle_type ?? "GENERIC"}</li>
-                      <li>
-                        Lane: {findDisplayedVehicleById(displayedVehicles, inspection.vehicle_id ?? null)?.lane_id ?? "unassigned"}
-                      </li>
-                      <li>
-                        Spacing: {formatMeters(
-                          findDisplayedVehicleById(displayedVehicles, inspection.vehicle_id ?? null)?.spacing_envelope_m ?? null,
-                        )}
-                      </li>
-                      <li>
-                        Heading: {formatHeadingDegrees(findDisplayedVehicleById(displayedVehicles, inspection.vehicle_id ?? null)?.heading_rad ?? null)}
-                      </li>
-                    </ul>
-                  </article>
-                ))
-              ) : null}
-
-              {!selectedTarget && inspections.length === 0 ? (
-                <div className="empty-state">
-                  Inspection surfaces will populate here once a live session carries
-                  selected vehicles and runtime diagnostics.
-                </div>
-              ) : null}
-            </div>
-          </section>
-
-          <section className="panel info-panel alerts-pane" aria-labelledby="alerts-title">
-            <div className="panel-header compact">
-              <div>
-                <p className="eyebrow">Alerts Region</p>
-                <h2 id="alerts-title">AI and Operational Alerts</h2>
-              </div>
-              <span className="status-pill secondary">
-                {formatMaybeNumber(bootstrap.anomalyCount)} anomalies
-              </span>
-            </div>
-            <div className="section-stack">
-              <div className="subsection traffic-heatmap-pane">
-                <h3>Traffic Heatmap</h3>
-                <div className="traffic-summary-row">
-                  <span className="traffic-summary-chip">
-                    {formatMaybeNumber(queuedVehicleCount)} queued
-                  </span>
-                  <span className="traffic-summary-chip">
-                    {formatMaybeNumber(congestedRoadCount)} congested roads
-                  </span>
-                  <span className="traffic-summary-chip accent">
-                    Peak {Math.round(peakTrafficIntensity * 100)}%
-                  </span>
-                </div>
-                <ul className="traffic-heatmap-list">
-                  {trafficRoadStates.filter((roadState) => (roadState.congestion_intensity ?? 0) > 0)
-                    .length > 0 ? (
-                    trafficRoadStates
-                      .filter((roadState) => (roadState.congestion_intensity ?? 0) > 0)
-                      .sort(
-                        (left, right) =>
-                          (right.congestion_intensity ?? 0) - (left.congestion_intensity ?? 0),
-                      )
-                      .slice(0, 4)
-                      .map((roadState) => (
-                        <li
-                          key={roadState.road_id ?? "road"}
-                          className="traffic-heatmap-row"
-                        >
-                          <div className="traffic-heatmap-label">
-                            <strong>{roadState.road_id ?? "road"}</strong>
-                            <span>
-                              {roadState.congestion_level ?? "active"} ·{" "}
-                              {roadState.queued_vehicle_ids?.length ?? 0} queued
-                            </span>
-                          </div>
-                          <div className="traffic-heatmap-bar" aria-hidden="true">
-                            <span
-                              style={{
-                                width: `${Math.round((roadState.congestion_intensity ?? 0) * 100)}%`,
-                              }}
-                            />
-                          </div>
-                        </li>
-                      ))
-                  ) : (
-                    <li className="traffic-heatmap-row">
-                      <div className="traffic-heatmap-label">
-                        <strong>All roads</strong>
-                        <span>No congestion at the current sample</span>
-                      </div>
-                      <div className="traffic-heatmap-bar" aria-hidden="true">
-                        <span style={{ width: "0%" }} />
-                      </div>
+              {effectiveSelectedVehicleIds.length > 1 ? (
+                <article className="inspection-card">
+                  <div className="inspection-header">
+                    <strong>Fleet Selection</strong>
+                    <span>multi-select</span>
+                  </div>
+                  <ul className="mini-list">
+                    <li>Vehicles: {effectiveSelectedVehicleIds.join(", ")}</li>
+                    <li>Selected records: {selectedVehicleInspections.length}</li>
+                    <li>
+                      Route previews:{" "}
+                      {
+                        routePreviews.filter((preview) =>
+                          effectiveSelectedVehicleIds.includes(preview.vehicle_id ?? -1),
+                        ).length
+                      }
                     </li>
-                  )}
-                </ul>
-              </div>
+                    <li>Batch commands: assign and reposition apply to every selected vehicle.</li>
+                  </ul>
+                </article>
+              ) : null}
+
+              {selectedTarget?.kind === "area" && selectedArea ? (
+                <article className="inspection-card">
+                  <div className="inspection-header">
+                    <strong>{selectedArea.label ?? selectedArea.area_id ?? "zone"}</strong>
+                    <span>{selectedArea.kind ?? "area"}</span>
+                  </div>
+                  <ul className="mini-list">
+                    <li>Polygon vertices: {selectedArea.polygon?.length ?? 0}</li>
+                    <li>Area id: {selectedArea.area_id ?? "unknown"}</li>
+                    <li>Editing target: zone polygon</li>
+                  </ul>
+                </article>
+              ) : null}
+
               <div className="subsection analyze-ai-feedback">
                 <h3>Suggestions</h3>
                 <ul className="data-list">
