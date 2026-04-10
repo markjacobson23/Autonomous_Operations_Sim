@@ -996,6 +996,7 @@ function App(): JSX.Element {
 
   useEffect(() => {
     setLiveCommandDraft((current) => ({
+      ...current,
       vehicleId:
         current.vehicleId ||
         (effectiveSelectedVehicleIds[0] !== undefined
