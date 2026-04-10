@@ -4,29 +4,29 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
+def test_serious_ui_shell_source_includes_finished_operator_regions() -> None:
     app_source = (
         REPO_ROOT / "frontend" / "serious_ui" / "src" / "App.tsx"
     ).read_text(encoding="utf-8")
 
-    assert "Step 64 Task/resource realism expansion" in app_source
+    assert "Final UI cleanup pass" in app_source
     assert "Operate" in app_source
     assert "Traffic" in app_source
     assert "Fleet" in app_source
     assert "Editor" in app_source
     assert "Analyze" in app_source
     assert "Primary Operator Workflow" in app_source
-    assert "Compact Session Status" in app_source
-    assert "Traffic Control Room" in app_source
+    assert "Session Status" in app_source
+    assert "Traffic Region" in app_source
     assert "Fleet Control" in app_source
-    assert "Current Controlled Fleet" in app_source
-    assert "Batch Selection" in app_source
-    assert "Runtime Admin Actions" in app_source
-    assert "Inspection and Support Context" in app_source
-    assert "Selected Vehicle Roster" in app_source
-    assert "Recent Command Trace" in app_source
+    assert "Selected Fleet" in app_source
+    assert "Batch Actions" in app_source
+    assert "Runtime Controls" in app_source
+    assert "Inspection Context" in app_source
+    assert "Selected Vehicles" in app_source
+    assert "Recent Commands" in app_source
     assert "Scenario Authoring" in app_source
-    assert "Dedicated controls for the working scenario" in app_source
+    assert "Working scenario controls, staged geometry, and validation live together here." in app_source
     assert "Authoring Controls" in app_source
     assert "Working Scenario" in app_source
     assert "Validation clean" in app_source
@@ -34,12 +34,13 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "Diagnostics and AI Review" in app_source
     assert "Urgent issues" in app_source
     assert "Recommended actions" in app_source
-    assert "Supporting context" in app_source
-    assert "Recent command trace" in app_source
+    assert "Supporting Context" in app_source
+    assert "Recent Commands" in app_source
     assert "Current target" in app_source
     assert "Route Planning" in app_source
-    assert "Selected Preview" in app_source
+    assert "Route Preview" in app_source
     assert "Preview Route" in app_source
+    assert "Waiting for route preview" in app_source
     assert "Assign Destination" in app_source
     assert "Reposition Vehicle" in app_source
     assert "Select Visible" in app_source
@@ -53,16 +54,16 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "Save Scenario" in app_source
     assert "Reload Scenario" in app_source
     assert "Single-Step" in app_source
-    assert "Batch mode is active" in app_source
-    assert "Traffic Control Room" in app_source
+    assert "Batch mode activates" in app_source
+    assert "Traffic Region" in app_source
     assert "Traffic Control" in app_source
     assert "Congestion Overview" in app_source
     assert "Active Road Conditions" in app_source
-    assert "Queue & Reservation Detail" in app_source
+    assert "Queue and Reservation Detail" in app_source
     assert "Blocked Edge Watch" in app_source
     assert "Suggestions" in app_source
     assert "Anomalies" in app_source
-    assert "Explanations" in app_source
+    assert "Supporting Context" in app_source
     assert "analysis-chip-alert" in app_source
     assert "analyze-review-section-urgent" in app_source
     assert "review-card-urgent" in app_source
@@ -92,6 +93,8 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "editor-mode-banner" in app_source
     assert "editor-status-grid" in app_source
     assert "editor-detail-grid" in app_source
+    assert "bundle-status-strip" in app_source
+    assert "state-callout" in app_source
     assert "fleet-control-grid" in app_source
     assert "fleet-summary-card" in app_source
     assert "fleet-batch-card" in app_source
@@ -132,12 +135,13 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "scene-edit-handle" in app_source
 
 
-def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None:
+def test_serious_ui_shell_styles_define_final_multi_panel_layout() -> None:
     css_source = (
         REPO_ROOT / "frontend" / "serious_ui" / "src" / "app-shell.css"
     ).read_text(encoding="utf-8")
 
     assert ".session-bar" in css_source
+    assert ".bundle-status-strip" in css_source
     assert ".workspace-tabs" in css_source
     assert ".workspace-tab" in css_source
     assert ".workspace-tab-active" in css_source
@@ -152,6 +156,9 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".timeline-region" in css_source
     assert ".overview-panel" in css_source
     assert ".shell-editor-focused .masthead" in css_source
+    assert ".state-callout" in css_source
+    assert ".state-callout-loading" in css_source
+    assert ".state-callout-error" in css_source
     assert ".workspace-tab-editor" in css_source
     assert ".shell-tab-editor .workspace-tabs" in css_source
     assert ".shell-tab-editor .editor-pane" in css_source

@@ -443,11 +443,11 @@ const workspaceTabs: Array<{
   label: string;
   summary: string;
 }> = [
-  { id: "operate", label: "Operate", summary: "Primary map and route workflow" },
-  { id: "traffic", label: "Traffic", summary: "Congestion, queues, and hazards" },
-  { id: "fleet", label: "Fleet", summary: "Selection and runtime admin" },
-  { id: "editor", label: "Editor", summary: "Scenario authoring" },
-  { id: "analyze", label: "Analyze", summary: "Diagnostics and AI review" },
+  { id: "operate", label: "Operate", summary: "Operator workflow, routing, and selection" },
+  { id: "traffic", label: "Traffic", summary: "Pressure, queues, and closures" },
+  { id: "fleet", label: "Fleet", summary: "Selection, batch actions, and control" },
+  { id: "editor", label: "Editor", summary: "Scenario authoring and validation" },
+  { id: "analyze", label: "Analyze", summary: "Diagnostics, review, and context" },
 ];
 
 const sessionActions = [
@@ -497,6 +497,28 @@ function renderPanelHeader({
   );
 }
 
+function renderStateCallout({
+  title,
+  copy,
+  action,
+  tone = "muted",
+  className,
+}: {
+  title: string;
+  copy: string;
+  action?: string;
+  tone?: "muted" | "loading" | "warning" | "error" | "success";
+  className?: string;
+}): JSX.Element {
+  return (
+    <div className={`state-callout state-callout-${tone}${className ? ` ${className}` : ""}`}>
+      <strong className="state-callout-title">{title}</strong>
+      <p className="state-callout-copy">{copy}</p>
+      {action ? <p className="state-callout-action">{action}</p> : null}
+    </div>
+  );
+}
+
 function App(): JSX.Element {
   const minimapRef = useRef<SVGSVGElement | null>(null);
   const sceneRef = useRef<SVGSVGElement | null>(null);
@@ -507,10 +529,8 @@ function App(): JSX.Element {
   const [editorEnabled, setEditorEnabled] = useState(false);
   const [draftTransaction, setDraftTransaction] = useState<EditTransaction>(emptyTransaction);
   const [validationMessages, setValidationMessages] = useState<ValidationMessage[]>([]);
-  const [editorMessage, setEditorMessage] = useState("Authoring surface is standing by.");
-  const [liveCommandMessage, setLiveCommandMessage] = useState(
-    "Live command controls are standing by.",
-  );
+  const [editorMessage, setEditorMessage] = useState("Authoring surface is ready.");
+  const [liveCommandMessage, setLiveCommandMessage] = useState("Live command controls are ready.");
   const [bundlePath, setBundlePath] = useState<string | null>(null);
   const [liveCommandDraft, setLiveCommandDraft] = useState<LiveCommandDraft>({
     vehicleId: "",
@@ -602,7 +622,7 @@ function App(): JSX.Element {
           suggestionCount: null,
           anomalyCount: null,
           routePreviewCount: null,
-          message,
+          message: `Live bundle bootstrap failed: ${message}`,
           commandCenter: {},
           summary: null,
           bundle: null,
@@ -636,7 +656,7 @@ function App(): JSX.Element {
         })
         .catch(() => {
           if (!cancelled) {
-            setLiveCommandMessage("Live bundle refresh failed.");
+            setLiveCommandMessage("Live bundle refresh failed. Use Reconnect Bundle to retry the live snapshot.");
           }
         });
     };
@@ -854,7 +874,7 @@ function App(): JSX.Element {
           .slice(0, 3)
           .map(([state, count]) => `${count} ${state}`)
           .join(" · ")
-      : "No selected vehicles";
+      : "No vehicles selected yet";
   const selectedFleetRoutePreview =
     routePreviews.find((preview) => preview.vehicle_id === selectedFleetPrimaryVehicleId) ??
     routePreviews.find((preview) => effectiveSelectedVehicleIds.includes(preview.vehicle_id ?? -1)) ??
@@ -865,14 +885,14 @@ function App(): JSX.Element {
           ? ` · ${formatMeters(selectedFleetRoutePreview.total_distance)}`
           : ""
       }`
-    : "No route preview attached";
+    : "Waiting for route preview";
   const selectedFleetRouteDetail = selectedFleetRoutePreview
-    ? `${selectedFleetRoutePreview.is_actionable ? "Actionable" : "Held"}${
+    ? `${selectedFleetRoutePreview.is_actionable ? "Actionable" : "Pending"}${
         selectedFleetRoutePreview.reason ? ` · ${selectedFleetRoutePreview.reason}` : ""
       }`
     : selectedFleetPrimaryInspection?.route_ahead_node_ids?.length
       ? `Inspection sees ${selectedFleetPrimaryInspection.route_ahead_node_ids.length} upcoming node(s)`
-      : "No route preview context available";
+      : "Select a vehicle first to surface route and inspection context.";
   const reviewAnomalies = [...anomalies].sort(
     (left, right) =>
       reviewSeverityRank(left.severity) - reviewSeverityRank(right.severity) ||
@@ -1011,6 +1031,37 @@ function App(): JSX.Element {
       : editorEnabled
         ? "Use the scene handles to build a draft directly on the map."
         : "Press Edit Scene to switch the scene into authoring mode.";
+
+  const bundleHealthLabel =
+    bootstrap.loadState === "loading"
+      ? "CONNECTING"
+      : bootstrap.loadState === "error"
+        ? "RECONNECT"
+        : bootstrap.loadState === "loaded"
+          ? "READY"
+          : "UNBOUND";
+  const bundleStatusTitle =
+    bootstrap.loadState === "loading"
+      ? "Loading live bundle"
+      : bootstrap.loadState === "error"
+        ? "Live bundle needs attention"
+        : bootstrap.loadState === "loaded"
+          ? "Live bundle connected"
+          : "No live bundle attached";
+  const bundleStatusCopy =
+    bootstrap.loadState === "loading"
+      ? bootstrap.message
+      : bootstrap.loadState === "error"
+        ? bootstrap.message
+        : bootstrap.message;
+  const bundleStatusAction =
+    bootstrap.loadState === "loading"
+      ? "The shell will settle into the loaded state as soon as the bundle arrives."
+      : bootstrap.loadState === "error"
+        ? "Check the bundle path and reconnect the live session when the endpoint is available."
+        : bootstrap.loadState === "loaded"
+          ? "Use Reconnect Bundle to refresh the current snapshot if the live session has advanced."
+          : "Open the deck with a bundle URL to populate the shell, or reconnect once the live endpoint is ready.";
 
   function applyLoadedBundle(
     bundlePayload: BundlePayload,
@@ -1195,7 +1246,7 @@ function App(): JSX.Element {
       .then((payload) => {
         setValidationMessages(payload.validation_messages ?? []);
         if (!payload.ok || !payload.bundle) {
-          setEditorMessage("Save rejected. Resolve validation issues and try again.");
+          setEditorMessage("Save rejected. Review the validation panel, clear the blocking items, and try again.");
           return;
         }
         applyLoadedBundle(payload.bundle, "Live authoring save completed.");
@@ -1203,7 +1254,7 @@ function App(): JSX.Element {
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : "Save request failed";
-        setEditorMessage(message);
+        setEditorMessage(`Save request failed. ${message}`);
       });
   }
 
@@ -1228,7 +1279,7 @@ function App(): JSX.Element {
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : "Reload request failed";
-        setEditorMessage(message);
+        setEditorMessage(`Reload request failed. ${message}`);
       });
   }
 
@@ -1351,7 +1402,7 @@ function App(): JSX.Element {
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : "Command request failed";
-        setLiveCommandMessage(message);
+        setLiveCommandMessage(`Command request failed. ${message}`);
       });
   }
 
@@ -1391,7 +1442,7 @@ function App(): JSX.Element {
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : "Route preview request failed";
-        setLiveCommandMessage(message);
+        setLiveCommandMessage(`Route preview request failed. ${message}`);
       });
   }
 
@@ -1444,7 +1495,7 @@ function App(): JSX.Element {
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : "Session control failed";
-        setLiveCommandMessage(message);
+        setLiveCommandMessage(`Session control failed. ${message}`);
       });
   }
 
@@ -1749,13 +1800,13 @@ function App(): JSX.Element {
       ? `Selected ${selectedVehicle.display_name ?? selectedVehicle.role_label ?? vehiclePresentationBadge(selectedVehicle)}`
       : effectiveSelectedVehicleIds.length > 0
         ? `Fleet ${effectiveSelectedVehicleIds.length} selected`
-        : "No selected vehicle";
+        : "No selected vehicle yet";
   const minimapBlockedContextLabel =
     selectedTarget?.kind === "hazard"
       ? `Blocked edge ${selectedTarget.edgeId}`
       : blockedEdgeIds.length > 0
         ? `${blockedEdgeIds.length} blocked edge${blockedEdgeIds.length === 1 ? "" : "s"}`
-        : "No blocked edges";
+        : "No blocked edges yet";
   const operateSelectedVehicleSummary =
     selectedVehicle !== null
       ? `${selectedVehicle.display_name ?? selectedVehicle.role_label ?? vehiclePresentationBadge(selectedVehicle)} · ${
@@ -1765,18 +1816,18 @@ function App(): JSX.Element {
         }`
       : effectiveSelectedVehicleIds.length > 0
         ? `Fleet selection active · ${effectiveSelectedVehicleIds.length} vehicle(s)`
-        : "No selected vehicle yet";
+        : "No vehicle selected yet";
   const operateSelectedContextSummary =
     selectedInspection !== null
       ? `Node ${formatMaybeNumber(selectedInspection.current_node_id ?? null)} · ETA ${formatSeconds(selectedInspection.eta_s ?? null)} · ${selectedInspection.current_job_id ?? "no job"}`
-      : "Choose a vehicle on the map or from the roster to populate inspection details.";
+      : "Select a vehicle on the map or from the roster to open inspection details.";
   const operateSelectedTargetSummary = describeSelectedTarget(selectedTarget, selectedVehicleId);
   const operateRoutePreviewSummary =
     selectedRoutePreview !== null
       ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id ?? null)} · Node ${formatMaybeNumber(selectedRoutePreview.destination_node_id ?? null)} · ${
-          selectedRoutePreview.is_actionable ? "actionable" : "held"
+          selectedRoutePreview.is_actionable ? "actionable" : "pending"
         }`
-      : "No route preview selected yet";
+      : "Waiting for route preview";
   const operateRoutePreviewDetail =
     selectedRoutePreview !== null
       ? `${selectedRoutePreview.reason ?? "No reason provided"}${
@@ -1784,7 +1835,7 @@ function App(): JSX.Element {
             ? ` · ${formatMeters(selectedRoutePreview.total_distance)}`
             : ""
         }`
-      : "Preview a route to see the node chain, edge list, and distance here.";
+      : "Choose a vehicle and destination, then preview the route to populate node, edge, and distance details.";
   const operatePrimaryActionLabel = selectedRoutePreview?.is_actionable
     ? "Assign Destination"
     : "Preview Route";
@@ -1803,7 +1854,7 @@ function App(): JSX.Element {
       <div className="shell-accent shell-accent-right" aria-hidden="true" />
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 64 Task/resource realism expansion</p>
+          <p className="eyebrow">Final UI cleanup pass</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
             Stop lines, yield controls, and protected conflict areas are now
@@ -1869,8 +1920,27 @@ function App(): JSX.Element {
           <strong>{validationMessages.length === 0 ? "clean" : `${validationMessages.length} issue(s)`}</strong>
         </div>
         <div className={`health-pill health-pill-${bootstrap.loadState}`}>
-          {bootstrap.loadState.toUpperCase()}
+          {bundleHealthLabel}
         </div>
+      </section>
+
+      <section
+        className={`bundle-status-strip panel bundle-status-${bootstrap.loadState}`}
+        aria-label="Bundle connection status"
+      >
+        {renderStateCallout({
+          title: bundleStatusTitle,
+          copy: bundleStatusCopy,
+          action: bundleStatusAction,
+          tone:
+            bootstrap.loadState === "loading"
+              ? "loading"
+              : bootstrap.loadState === "error"
+                ? "error"
+                : bootstrap.loadState === "loaded"
+                  ? "success"
+                  : "warning",
+        })}
       </section>
 
       <nav className="workspace-tabs panel" aria-label="Workspace tabs">
@@ -2462,11 +2532,10 @@ function App(): JSX.Element {
                       </span>
                     </div>
                     <div className="focus-card">
-                      <strong>Stop lines and yield controls are now live</strong>
+                      <strong>Stop lines and yield controls are visible</strong>
                       <p>
-                        Traffic snapshots now carry control-state overlays and
-                        inspection reasons, so dense corridors stay legible while
-                        still revealing where vehicles are waiting.
+                        Traffic snapshots now carry control-state overlays and inspection reasons, so
+                        dense corridors stay legible while still showing why vehicles are waiting.
                       </p>
                     </div>
                   </div>
@@ -2490,20 +2559,22 @@ function App(): JSX.Element {
                       Fleet selection: {effectiveSelectedVehicleIds.length} vehicle(s)
                     </span>
                     <span className="selection-pill">
-                      Selected preview:{" "}
+                      Route preview:{" "}
                       {selectedRoutePreview?.vehicle_id !== undefined
                         ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id)}`
-                        : "none"}
+                        : "waiting for preview"}
                     </span>
                     <span className="selection-pill">
                       Destination node:{" "}
-                      {formatMaybeNumber(selectedRoutePreview?.destination_node_id ?? null)}
+                      {selectedRoutePreview?.destination_node_id !== undefined
+                        ? formatMaybeNumber(selectedRoutePreview.destination_node_id)
+                        : "not set yet"}
                     </span>
                     <span className="selection-pill">Current target: {operateSelectedTargetSummary}</span>
                   </div>
                   <p className="operate-route-hint">
-                    Select a vehicle in the scene, confirm the route preview, then use the
-                    primary action to commit or refine the destination without leaving the map.
+                    Select a vehicle in the scene, confirm the route preview, then use the primary
+                    action to commit or refine the destination without leaving the map.
                   </p>
                   <div className="operate-context-grid">
                     <section className="operate-context-card">
@@ -2522,7 +2593,7 @@ function App(): JSX.Element {
                     </section>
                     <div className="route-preview-summary operate-context-card">
                       <div className="preview-badge">
-                        <span className="preview-label">Selected Preview</span>
+                        <span className="preview-label">Route Preview</span>
                         <strong>{operateRoutePreviewSummary}</strong>
                       </div>
                       <p className="operate-route-preview-detail">{operateRoutePreviewDetail}</p>
@@ -2807,10 +2878,10 @@ function App(): JSX.Element {
             <section className="panel info-panel operate-session-controls" aria-labelledby="session-control-title">
               {renderPanelHeader({
                 eyebrow: "Operate Region",
-                title: "Compact Session Status",
+                title: "Session Status",
                 titleId: "session-control-title",
                 lede:
-                  "The live session controls stay compact so play-state changes remain easy to scan.",
+                  "Live session controls stay grouped so play-state changes remain easy to scan.",
                 className: "compact",
               meta: (
                 <span className="status-pill secondary">{operateSessionStateSummary}</span>
@@ -2899,11 +2970,11 @@ function App(): JSX.Element {
         <aside className="sidebar">
           <section className="panel info-panel editor-pane" aria-labelledby="editor-title">
             {renderPanelHeader({
-              eyebrow: "Authoring Region",
+              eyebrow: "Editor Region",
               title: "Scenario Authoring",
               titleId: "editor-title",
               lede:
-                "Dedicated controls for the working scenario, staged geometry, and validation live here.",
+                "Working scenario controls, staged geometry, and validation live together here.",
               className: "compact editor-panel-header",
               meta: (
                 <div className="editor-header-stack" aria-label="Editor mode summary">
@@ -2950,7 +3021,7 @@ function App(): JSX.Element {
                     <p>
                       {hasDraftEdits
                         ? "Save to persist the staged geometry or reload to discard it."
-                        : "No staged geometry edits are present yet."}
+                        : "No staged geometry edits are present yet. Enable edit mode and move a handle to start a draft."}
                     </p>
                   </div>
                   <div className="editor-status-card">
@@ -2959,7 +3030,7 @@ function App(): JSX.Element {
                     <p>
                       {validationBlocked
                         ? "Resolve the messages below before saving."
-                        : "Draft validation is clean and the working scenario is ready."}
+                        : "Validation is clean and the working scenario is ready."}
                     </p>
                   </div>
                   <div className="editor-status-card editor-status-card-context">
@@ -3067,7 +3138,10 @@ function App(): JSX.Element {
                         );
                       })
                     ) : (
-                      <li className="editor-empty-state">No validation issues are currently blocking the draft.</li>
+                      <li className="editor-empty-state">
+                        No validation issues are blocking the draft yet. If Save Scenario is disabled,
+                        the draft may still be empty or the save endpoint may be unavailable.
+                      </li>
                     )}
                   </ul>
                 </div>
@@ -3100,7 +3174,10 @@ function App(): JSX.Element {
                         </li>
                       ))
                     ) : (
-                      <li className="editor-empty-state">No geometry edits are staged yet.</li>
+                      <li className="editor-empty-state">
+                        No geometry edits are staged yet. Turn on edit mode and move a node, road,
+                        or zone to create the first draft change.
+                      </li>
                     )}
                   </ul>
                 </div>
@@ -3110,11 +3187,11 @@ function App(): JSX.Element {
 
           <section className="panel info-panel fleet-pane" aria-labelledby="command-center-title">
             {renderPanelHeader({
-              eyebrow: "Command-Center Region",
+              eyebrow: "Fleet Region",
               title: "Fleet Control",
               titleId: "command-center-title",
               lede:
-                "Fleet selection, batch actions, runtime admin changes, and inspection context stay grouped here.",
+                "Fleet selection, batch actions, runtime admin controls, and inspection context live together here.",
               className: "compact fleet-panel-header",
               meta: (
                 <div className="fleet-panel-meta">
@@ -3132,10 +3209,10 @@ function App(): JSX.Element {
               <article className="subsection fleet-card fleet-summary-card">
                 <div className="subsection-header fleet-card-header">
                   <div>
-                    <h3>Current Controlled Fleet</h3>
+                    <h3>Selected Fleet</h3>
                     <p className="fleet-card-lede">
-                      The selected fleet stays on top so the operator can scan lead vehicle,
-                      state mix, and destination context before making a move.
+                      The selected fleet stays in view so the operator can scan lead vehicle, state
+                      mix, and destination context before making a move.
                     </p>
                   </div>
                   <span className="fleet-card-badge">
@@ -3184,7 +3261,10 @@ function App(): JSX.Element {
                       </span>
                     ))
                   ) : (
-                    <span className="fleet-empty-state">No fleet state is currently selected.</span>
+                    <span className="fleet-empty-state">
+                      No fleet selection is active yet. Select a vehicle or use Select Visible to
+                      populate the state mix.
+                    </span>
                   )}
                 </div>
                 <div className="fleet-selection-strip fleet-vehicle-strip">
@@ -3220,14 +3300,14 @@ function App(): JSX.Element {
                               ? `→ node ${formatMaybeNumber(vehicleRoutePreview.destination_node_id)}`
                               : vehicle.lane_id !== undefined && vehicle.lane_id !== null
                                 ? `${vehicle.lane_id}`
-                                : "No route preview"}
+                                : "Preview pending"}
                           </span>
                         </button>
                       );
                     })
                   ) : (
                     <div className="fleet-empty-state">
-                      No vehicles are selected yet. Use the batch tools to build a controlled fleet.
+                      No vehicles are selected yet. Use the scene or Select Visible to build a controlled fleet before applying batch actions.
                     </div>
                   )}
                 </div>
@@ -3236,9 +3316,9 @@ function App(): JSX.Element {
               <article className="subsection fleet-card fleet-batch-card">
                 <div className="subsection-header fleet-card-header">
                   <div>
-                    <h3>Batch Selection</h3>
+                    <h3>Batch Actions</h3>
                     <p className="fleet-card-lede">
-                      Use the viewport to shape a deliberate batch before applying fleet-scoped
+                      Use the viewport to shape a deliberate batch before applying batch
                       actions.
                     </p>
                   </div>
@@ -3273,15 +3353,15 @@ function App(): JSX.Element {
                   </button>
                 </div>
                 <p className="status-copy">
-                  Batch mode is active when more than one vehicle is selected, and fleet-scoped
-                  commands apply to every vehicle in that controlled set.
+                  Batch mode activates when more than one vehicle is selected, and batch commands
+                  apply to every vehicle in that controlled set.
                 </p>
               </article>
 
               <article className="subsection fleet-card fleet-admin-card">
                 <div className="subsection-header fleet-card-header">
                   <div>
-                    <h3>Runtime Admin Actions</h3>
+                    <h3>Runtime Controls</h3>
                     <p className="fleet-card-lede">
                       Live mutations stay grouped by task so spawn, inject, and hazard changes feel
                       deliberate instead of bolted on.
@@ -3587,7 +3667,7 @@ function App(): JSX.Element {
               <article className="subsection fleet-card fleet-inspection-card">
                 <div className="subsection-header fleet-card-header">
                   <div>
-                    <h3>Inspection and Support Context</h3>
+                    <h3>Inspection Context</h3>
                     <p className="fleet-card-lede">
                       The selected vehicle stays visible alongside recent commands so the operator
                       can confirm what changed and what still needs attention.
@@ -3680,20 +3760,24 @@ function App(): JSX.Element {
                           );
                         })
                       ) : (
-                        <span className="fleet-empty-state">No diagnostics are currently attached.</span>
+                        <span className="fleet-empty-state">
+                          No diagnostics are available yet. This target is waiting for the next
+                          inspection update.
+                        </span>
                       )}
                     </div>
                   </div>
                 ) : (
                   <div className="fleet-empty-state">
-                    Select a vehicle to reveal per-vehicle inspection context and live command trace.
+                    Select a vehicle to reveal per-vehicle inspection context, live command trace,
+                    and route detail.
                   </div>
                 )}
 
                 <div className="fleet-inspection-grid">
                   <div className="fleet-inspection-panel">
                     <div className="fleet-inspection-panel-header">
-                      <h4>Selected Vehicle Roster</h4>
+                      <h4>Selected Vehicles</h4>
                       <span>
                         {effectiveSelectedVehicleIds.length > 1
                           ? `${effectiveSelectedVehicleIds.length} vehicles`
@@ -3741,7 +3825,7 @@ function App(): JSX.Element {
 
                   <div className="fleet-inspection-panel">
                     <div className="fleet-inspection-panel-header">
-                      <h4>Recent Command Trace</h4>
+                      <h4>Recent Commands</h4>
                       <span>{recentCommands.length} total</span>
                     </div>
                     <ul className="data-list fleet-command-list">
@@ -3752,7 +3836,7 @@ function App(): JSX.Element {
                           </li>
                         ))
                       ) : (
-                        <li>No command history is available yet.</li>
+                        <li>No command history is available yet. The trace will populate after the first operator action.</li>
                       )}
                     </ul>
                   </div>
@@ -3763,7 +3847,7 @@ function App(): JSX.Element {
 
           <section className="panel info-panel traffic-pane" aria-labelledby="traffic-title">
             {renderPanelHeader({
-              eyebrow: "Traffic Control Room",
+              eyebrow: "Traffic Region",
               title: "Traffic Control",
               titleId: "traffic-title",
               lede:
@@ -3901,7 +3985,7 @@ function App(): JSX.Element {
                     ) : (
                       <div className="traffic-hazard-empty">
                         <strong>No blocked edges</strong>
-                        <span>Hazard watch is clear at the current sample.</span>
+                        <span>Hazard watch is clear at the current sample. Reconnect the live bundle if you expect a newer closure set.</span>
                       </div>
                     )}
                   </article>
@@ -4033,9 +4117,10 @@ function App(): JSX.Element {
                       </div>
                     </article>
                   ))}
-                  {trafficMonitoringRoadStates.length === 0 ? (
+                {trafficMonitoringRoadStates.length === 0 ? (
                     <div className="traffic-road-empty">
-                      No traffic road-state samples are currently attached.
+                      No road-state samples are available yet. Connect or refresh the live bundle to
+                      populate road pressure data.
                     </div>
                   ) : null}
                 </div>
@@ -4044,7 +4129,7 @@ function App(): JSX.Element {
               <div className="subsection traffic-reservation-inspection">
                 <div className="traffic-section-heading">
                   <div>
-                    <h3>Queue & Reservation Detail</h3>
+                    <h3>Queue and Reservation Detail</h3>
                     <p className="traffic-section-lede">
                       Queue records are linked to the road they affect so reservation pressure is
                       easy to follow.
@@ -4133,11 +4218,14 @@ function App(): JSX.Element {
                         );
                       })
                   ) : (
-                    <div className="traffic-reservation-empty">No queue reservations are currently active.</div>
+                    <div className="traffic-reservation-empty">
+                      No queue reservations are active yet. Reservation pressure will appear here
+                      when a road is blocked, yielded, or back-pressured.
+                    </div>
                   )}
                 </div>
                 <div className="traffic-context-strip">
-                  <span>Selected route conflicts {selectedRoutePreview?.reason ?? "none"}</span>
+                  <span>Selected route conflicts {selectedRoutePreview?.reason ?? "no route conflict noted yet"}</span>
                   <span>
                     Route preview roads{" "}
                     {selectedRoutePreviewRoadIds.size > 0
@@ -4155,7 +4243,7 @@ function App(): JSX.Element {
 
           <section className="panel info-panel analyze-pane" aria-labelledby="inspector-title">
             {renderPanelHeader({
-              eyebrow: "Inspector Region",
+              eyebrow: "Analyze Region",
               title: "Diagnostics and AI Review",
               titleId: "inspector-title",
               lede:
@@ -4189,7 +4277,7 @@ function App(): JSX.Element {
                     <p>Escalations and anomalies are surfaced first for immediate review.</p>
                   </div>
                   <span className="analysis-section-chip">
-                    {reviewAnomalies.length > 0 ? "highest severity" : "no active anomalies"}
+                    {reviewAnomalies.length > 0 ? "highest severity first" : "no active anomalies"}
                   </span>
                 </div>
                 <div className="analyze-card-stack">
@@ -4234,7 +4322,10 @@ function App(): JSX.Element {
                       );
                     })
                   ) : (
-                    <div className="review-empty-state">No anomalies are currently attached.</div>
+                    <div className="review-empty-state">
+                      No anomalies are available yet. The review feed is clear and waiting for the
+                      next escalation.
+                    </div>
                   )}
                 </div>
               </section>
@@ -4297,7 +4388,10 @@ function App(): JSX.Element {
                       );
                     })
                   ) : (
-                    <div className="review-empty-state">No actionable suggestions are currently attached.</div>
+                    <div className="review-empty-state">
+                      No actionable suggestions are available yet. The assistant has not returned a
+                      direct recommendation yet.
+                    </div>
                   )}
                 </div>
               </section>
@@ -4305,7 +4399,7 @@ function App(): JSX.Element {
               <section className="subsection analyze-ai-feedback analyze-review-section analyze-review-section-context">
                 <div className="analyze-section-header">
                   <div>
-                    <h3>Explanations</h3>
+                    <h3>Supporting Context</h3>
                     <p>Supporting context stays compact so the key review items remain easy to scan.</p>
                   </div>
                   <span className="analysis-section-chip">
@@ -4391,11 +4485,16 @@ function App(): JSX.Element {
                           );
                         })
                       ) : (
-                        <span className="review-empty-state">No diagnostics are currently attached.</span>
+                        <span className="review-empty-state">No diagnostics are available yet.</span>
                       )}
                     </div>
                   </article>
-                ) : null}
+                ) : (
+                  <div className="review-empty-state">
+                    No vehicle is selected for analysis yet. Choose a vehicle in Operate or Fleet to
+                    populate inspection context, supporting context, and diagnostics.
+                  </div>
+                )}
 
                 {effectiveSelectedVehicleIds.length > 1 ? (
                   <article className="review-card review-card-context">
@@ -4444,7 +4543,7 @@ function App(): JSX.Element {
                 <article className="review-card review-card-context analyze-command-card">
                   <div className="review-card-header">
                     <div className="review-card-title">
-                      <strong>Recent command trace</strong>
+                      <strong>Recent Commands</strong>
                       <span>Latest operator actions</span>
                     </div>
                     <span className="review-level-chip review-level-chip-info">
@@ -4460,7 +4559,10 @@ function App(): JSX.Element {
                         </div>
                       ))
                     ) : (
-                      <div className="review-empty-state">No recent commands are currently attached.</div>
+                      <div className="review-empty-state">
+                        No recent commands are available yet. The trace will appear here after the
+                        next operator action.
+                      </div>
                     )}
                   </div>
                 </article>
@@ -4497,7 +4599,10 @@ function App(): JSX.Element {
                       );
                     })
                   ) : (
-                    <div className="review-empty-state">No AI explanations are currently attached.</div>
+                    <div className="review-empty-state">
+                      No AI explanations are available yet. The assistant has not produced a
+                      vehicle-level note yet.
+                    </div>
                   )}
                 </div>
               </section>
@@ -5578,7 +5683,7 @@ function describeSelectedTarget(
   if (selectedVehicleId !== null) {
     return `vehicle ${selectedVehicleId}`;
   }
-  return "none";
+  return "no target selected";
 }
 
 function describeSelectedBadge(selectedTarget: SelectedTarget): string {

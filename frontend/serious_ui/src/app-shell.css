@@ -244,6 +244,9 @@ h3 {
 .traffic-alert-badge,
 .editor-item-chip,
 .selection-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1.1;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -300,18 +303,27 @@ h3 {
 
 .health-pill-idle,
 .health-pill-loading {
-  background: var(--warm-soft);
+  background: linear-gradient(135deg, rgba(187, 101, 30, 0.16), rgba(36, 83, 199, 0.08));
   color: var(--warm);
 }
 
 .health-pill-loaded {
-  background: var(--accent-soft);
+  background: linear-gradient(135deg, rgba(10, 118, 108, 0.16), rgba(36, 83, 199, 0.08));
   color: var(--accent);
 }
 
 .health-pill-error {
-  background: var(--alert-soft);
+  background: linear-gradient(135deg, rgba(178, 74, 59, 0.18), rgba(187, 101, 30, 0.08));
   color: var(--alert);
+}
+
+.bundle-status-strip {
+  padding: 18px 20px;
+  display: grid;
+}
+
+.bundle-status-strip .state-callout {
+  min-width: 0;
 }
 
 .workspace {
@@ -337,7 +349,7 @@ h3 {
   padding: 16px;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
   align-items: stretch;
 }
 
@@ -346,14 +358,14 @@ h3 {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 241, 233, 0.9));
   color: var(--ink);
   border-radius: 18px;
-  padding: 12px 14px;
+  padding: 11px 13px;
   display: grid;
-  gap: 4px;
+  gap: 5px;
   text-align: left;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
   cursor: pointer;
   min-width: 0;
-  min-height: 78px;
+  min-height: 76px;
 }
 
 .workspace-tab-editor {
@@ -732,12 +744,16 @@ h3 {
 }
 
 .editor-empty-state {
-  padding: 12px 13px;
-  border-radius: 16px;
+  display: grid;
+  gap: 6px;
+  padding: 13px 14px;
+  border-radius: 18px;
   border: 1px dashed rgba(97, 112, 125, 0.18);
-  background: rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 241, 233, 0.8)),
+    rgba(255, 255, 255, 0.72);
   color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .route-planning-grid {
@@ -1254,15 +1270,18 @@ h3 {
 }
 
 .fleet-empty-state {
-  display: inline-flex;
-  align-items: center;
+  display: grid;
+  gap: 6px;
+  align-items: start;
   min-height: 42px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  padding: 13px 14px;
+  border-radius: 18px;
   border: 1px dashed rgba(97, 112, 125, 0.18);
-  background: rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 241, 233, 0.8)),
+    rgba(255, 255, 255, 0.72);
   color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .traffic-pane,
@@ -1294,7 +1313,7 @@ h3 {
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
@@ -1634,6 +1653,75 @@ h3 {
   line-height: 1.55;
 }
 
+.state-callout,
+.review-empty-state,
+.traffic-hazard-empty,
+.traffic-road-empty,
+.traffic-reservation-empty {
+  display: grid;
+  gap: 7px;
+  padding: 14px 15px;
+  border-radius: 18px;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 242, 235, 0.88)),
+    rgba(255, 255, 255, 0.8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.state-callout {
+  min-width: 0;
+}
+
+.state-callout-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.state-callout-copy,
+.state-callout-action {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.state-callout-action {
+  font-size: 0.92rem;
+}
+
+.state-callout-loading {
+  border-color: rgba(36, 83, 199, 0.18);
+  background:
+    linear-gradient(135deg, rgba(36, 83, 199, 0.12), rgba(10, 118, 108, 0.06)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 242, 235, 0.9));
+}
+
+.state-callout-warning {
+  border-color: rgba(187, 101, 30, 0.2);
+  background:
+    linear-gradient(135deg, rgba(187, 101, 30, 0.12), rgba(36, 83, 199, 0.04)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 242, 235, 0.9));
+}
+
+.state-callout-error {
+  border-color: rgba(178, 74, 59, 0.22);
+  background:
+    linear-gradient(135deg, rgba(178, 74, 59, 0.14), rgba(187, 101, 30, 0.05)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 242, 235, 0.9));
+}
+
+.state-callout-success {
+  border-color: rgba(10, 118, 108, 0.18);
+  background:
+    linear-gradient(135deg, rgba(10, 118, 108, 0.12), rgba(36, 83, 199, 0.05)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 242, 235, 0.9));
+}
+
 .overview-panel {
   display: grid;
   gap: 14px;
@@ -1759,7 +1847,7 @@ h3 {
 
 .subsection {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .traffic-road-state-pane,
@@ -1767,12 +1855,12 @@ h3 {
 .traffic-reservation-inspection,
 .traffic-hazard-pane {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .analyze-ai-feedback {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .shell-tab-analyze .info-panel.analyze-pane {
@@ -1864,12 +1952,12 @@ h3 {
 
 .analyze-review-stack {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .analyze-review-section {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   padding: 16px;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(97, 112, 125, 0.12);
@@ -2052,12 +2140,7 @@ h3 {
 }
 
 .review-empty-state {
-  padding: 12px 13px;
-  border-radius: 16px;
-  border: 1px dashed rgba(97, 112, 125, 0.18);
-  background: rgba(255, 255, 255, 0.7);
-  color: var(--muted);
-  line-height: 1.5;
+  border-color: rgba(97, 112, 125, 0.16);
 }
 
 .review-metric-grid {
@@ -3301,11 +3384,10 @@ h3 {
 .traffic-hazard-empty,
 .traffic-road-empty,
 .traffic-reservation-empty {
-  display: grid;
-  gap: 4px;
   border-style: dashed;
-  background: rgba(255, 255, 255, 0.72);
-  line-height: 1.5;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 242, 235, 0.82)),
+    rgba(255, 255, 255, 0.72);
 }
 
 .traffic-section-heading {
@@ -3399,6 +3481,7 @@ h3 {
 .traffic-context-strip span {
   color: var(--muted);
   font-size: 0.76rem;
+  line-height: 1.45;
 }
 
 .traffic-road-card-pill,
@@ -3602,5 +3685,5 @@ h3 {
   margin: 0;
   color: var(--muted);
   font-size: 0.8rem;
-  line-height: 1.45;
+  line-height: 1.5;
 }
