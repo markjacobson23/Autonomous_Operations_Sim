@@ -50,6 +50,7 @@ class TrafficRoadState:
     queued_vehicle_ids: tuple[int, ...]
     occupancy_count: int
     min_spacing_m: float | None
+    congestion_intensity: float
     congestion_level: str
 
 
@@ -116,6 +117,11 @@ def sample_traffic_snapshot(
             queue_count=len(queued_vehicle_ids),
             min_spacing_m=min_spacing_m,
         )
+        congestion_intensity = _congestion_intensity(
+            occupancy_count=len(active_vehicle_ids),
+            queue_count=len(queued_vehicle_ids),
+            min_spacing_m=min_spacing_m,
+        )
         road_states.append(
             TrafficRoadState(
                 road_id=road.road_id,
@@ -123,6 +129,7 @@ def sample_traffic_snapshot(
                 queued_vehicle_ids=queued_vehicle_ids,
                 occupancy_count=len(active_vehicle_ids),
                 min_spacing_m=min_spacing_m,
+                congestion_intensity=congestion_intensity,
                 congestion_level=congestion_level,
             )
         )
@@ -174,6 +181,7 @@ def traffic_snapshot_to_dict(snapshot: TrafficSnapshot) -> dict[str, Any]:
                 "queued_vehicle_ids": list(road_state.queued_vehicle_ids),
                 "occupancy_count": road_state.occupancy_count,
                 "min_spacing_m": road_state.min_spacing_m,
+                "congestion_intensity": road_state.congestion_intensity,
                 "congestion_level": road_state.congestion_level,
             }
             for road_state in snapshot.road_states
@@ -358,6 +366,32 @@ def _congestion_level(
     if occupancy_count >= 1:
         return "active"
     return "free"
+
+
+def _congestion_intensity(
+    *,
+    occupancy_count: int,
+    queue_count: int,
+    min_spacing_m: float | None,
+) -> float:
+    if occupancy_count <= 0 and queue_count <= 0:
+        return 0.0
+
+    spacing_pressure = 0.0
+    if min_spacing_m is not None:
+        spacing_pressure = max(0.0, min(1.0, (1.8 - min_spacing_m) / 1.8))
+
+    vehicle_pressure = min(1.0, occupancy_count / 4.0)
+    queue_pressure = min(1.0, queue_count / 3.0)
+    if queue_count > 0:
+        return min(
+            1.0,
+            0.55
+            + (queue_pressure * 0.35)
+            + (vehicle_pressure * 0.1)
+            + (spacing_pressure * 0.2),
+        )
+    return min(1.0, (vehicle_pressure * 0.55) + (spacing_pressure * 0.45))
 
 
 __all__ = [

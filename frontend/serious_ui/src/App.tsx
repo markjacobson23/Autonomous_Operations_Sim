@@ -213,7 +213,29 @@ type MotionSegmentPayload = {
 
 type TrafficBaselinePayload = {
   control_points?: Array<{ edge_id?: number; state?: string }>;
-  queue_records?: Array<{ edge_id?: number; vehicle_ids?: number[] }>;
+  queue_records?: Array<{
+    vehicle_id?: number;
+    node_id?: number;
+    road_id?: string | null;
+    queue_start_s?: number;
+    queue_end_s?: number;
+    reason?: string;
+  }>;
+};
+
+type TrafficRoadStatePayload = {
+  road_id?: string;
+  active_vehicle_ids?: number[];
+  queued_vehicle_ids?: number[];
+  occupancy_count?: number;
+  min_spacing_m?: number | null;
+  congestion_intensity?: number;
+  congestion_level?: string;
+};
+
+type TrafficSnapshotPayload = {
+  timestamp_s?: number;
+  road_states?: TrafficRoadStatePayload[];
 };
 
 type AuthoringPayload = {
@@ -239,6 +261,7 @@ type BundlePayload = {
   render_geometry?: RenderGeometryPayload;
   motion_segments?: MotionSegmentPayload[];
   traffic_baseline?: TrafficBaselinePayload;
+  traffic_snapshot?: TrafficSnapshotPayload;
   authoring?: AuthoringPayload;
   snapshot?: {
     simulated_time_s?: number;
@@ -270,7 +293,7 @@ type SelectedTarget =
   | { kind: "vehicle"; vehicleId: number }
   | { kind: "road"; roadId: string }
   | { kind: "area"; areaId: string }
-  | { kind: "queue"; edgeId: number }
+  | { kind: "queue"; roadId: string }
   | { kind: "hazard"; edgeId: number };
 
 type HoverTarget = {
@@ -522,6 +545,24 @@ function App(): JSX.Element {
   const bundle = applyTransactionToBundle(bootstrap.bundle, draftTransaction);
   const displayedVehicles = sampleDisplayedVehicles(bundle, motionClockS);
   const minDisplayedSpacingM = computeMinDisplayedSpacing(displayedVehicles);
+  const trafficSnapshot = sampleTrafficSnapshot(bundle, motionClockS);
+  const trafficRoadStates = trafficSnapshot.road_states ?? [];
+  const trafficRoadById = new Map(
+    trafficRoadStates
+      .filter((state) => state.road_id)
+      .map((state) => [state.road_id as string, state]),
+  );
+  const queuedVehicleCount = trafficRoadStates.reduce(
+    (count, roadState) => count + (roadState.queued_vehicle_ids?.length ?? 0),
+    0,
+  );
+  const congestedRoadCount = trafficRoadStates.filter(
+    (roadState) => (roadState.congestion_intensity ?? 0) > 0.2,
+  ).length;
+  const peakTrafficIntensity = trafficRoadStates.reduce(
+    (peak, roadState) => Math.max(peak, roadState.congestion_intensity ?? 0),
+    0,
+  );
   const bounds = computeSceneBounds(bundle);
   const routePreviews = bootstrap.commandCenter.route_previews ?? [];
   const inspections = bootstrap.commandCenter.vehicle_inspections ?? [];
@@ -547,6 +588,10 @@ function App(): JSX.Element {
           (road) => road.road_id === selectedTarget.roadId,
         ) ?? null
       : null;
+  const selectedRoadTraffic =
+    selectedRoad?.road_id !== undefined
+      ? trafficRoadById.get(selectedRoad.road_id) ?? null
+      : null;
   const selectedArea =
     selectedTarget?.kind === "area"
       ? (bundle?.render_geometry?.areas ?? []).find(
@@ -556,8 +601,12 @@ function App(): JSX.Element {
   const selectedQueueRecord =
     selectedTarget?.kind === "queue"
       ? (bundle?.traffic_baseline?.queue_records ?? []).find(
-          (record) => record.edge_id === selectedTarget.edgeId,
+          (record) => record.road_id === selectedTarget.roadId,
         ) ?? null
+      : null;
+  const selectedQueueTraffic =
+    selectedQueueRecord?.road_id !== undefined
+      ? trafficRoadById.get(selectedQueueRecord.road_id) ?? null
       : null;
   const selectedHazardEdge =
     selectedTarget?.kind === "hazard"
@@ -656,9 +705,9 @@ function App(): JSX.Element {
     }
   }
 
-  function selectQueue(edgeId: number | undefined): void {
-    if (edgeId !== undefined) {
-      setSelectedTarget({ kind: "queue", edgeId });
+  function selectQueue(roadId: string | undefined): void {
+    if (roadId) {
+      setSelectedTarget({ kind: "queue", roadId });
     }
   }
 
@@ -876,12 +925,12 @@ function App(): JSX.Element {
       <div className="shell-accent shell-accent-right" aria-hidden="true" />
       <header className="masthead panel">
         <div className="masthead-copy">
-          <p className="eyebrow">Step 55 Collision Envelopes and Following Distance</p>
+          <p className="eyebrow">Step 56 Queue Formation and Congestion Baseline</p>
           <h1>Autonomous Ops Command Deck</h1>
           <p className="lede">
-            Collision envelopes and follow distance are now live, so vehicles
-            leave a visible safety gap instead of visually stacking on the
-            same corridor.
+            Queue growth and congestion are now visible in the serious UI, so
+            roads show buildup, release, and intensity instead of flattening
+            traffic into a single static line.
           </p>
         </div>
         <div className="masthead-meta">
@@ -920,6 +969,14 @@ function App(): JSX.Element {
         <div className="metric-pill">
           <span className="metric-label">Min Spacing</span>
           <strong>{formatMeters(minDisplayedSpacingM)}</strong>
+        </div>
+        <div className="metric-pill">
+          <span className="metric-label">Queued Vehicles</span>
+          <strong>{formatMaybeNumber(queuedVehicleCount)}</strong>
+        </div>
+        <div className="metric-pill">
+          <span className="metric-label">Congested Roads</span>
+          <strong>{formatMaybeNumber(congestedRoadCount)}</strong>
         </div>
         <div className="metric-pill">
           <span className="metric-label">Pending Edits</span>
@@ -1067,25 +1124,72 @@ function App(): JSX.Element {
 
                   {layers.roads &&
                     (bundle?.render_geometry?.roads ?? []).map((road, index) => (
-                      <polyline
-                        key={road.road_id ?? `road-${index}`}
-                        points={toPointString(road.centerline)}
-                        className={`scene-road scene-road-${road.road_class ?? "connector"} ${
-                          selectedTarget?.kind === "road" &&
-                          selectedTarget.roadId === road.road_id
-                            ? "selected"
-                            : ""
-                        }`}
-                        strokeWidth={Math.max(road.width_m ?? 1.4, 0.9)}
-                        onClick={() => selectRoad(road.road_id)}
-                        onMouseEnter={() =>
-                          setHoverTarget({
-                            label: road.road_id ?? "road",
-                            detail: `${road.directionality ?? "unknown"} · ${road.lane_count ?? 0} lane(s)`,
-                          })
-                        }
-                      />
+                      <g key={road.road_id ?? `road-${index}`}>
+                        <polyline
+                          points={toPointString(road.centerline)}
+                          className={`scene-road-heatmap scene-road-heatmap-${
+                            trafficRoadById.get(road.road_id ?? "")?.congestion_level ?? "free"
+                          }`}
+                          strokeWidth={Math.max(road.width_m ?? 1.4, 0.9) + 4}
+                          style={{
+                            opacity: Math.max(
+                              0.08,
+                              (trafficRoadById.get(road.road_id ?? "")?.congestion_intensity ?? 0) *
+                                0.7,
+                            ),
+                          }}
+                          aria-hidden="true"
+                        />
+                        <polyline
+                          points={toPointString(road.centerline)}
+                          className={`scene-road scene-road-${road.road_class ?? "connector"} ${
+                            selectedTarget?.kind === "road" &&
+                            selectedTarget.roadId === road.road_id
+                              ? "selected"
+                              : ""
+                          }`}
+                          strokeWidth={Math.max(road.width_m ?? 1.4, 0.9)}
+                          onClick={() => selectRoad(road.road_id)}
+                          onMouseEnter={() => {
+                            const roadTraffic = trafficRoadById.get(road.road_id ?? "");
+                            setHoverTarget({
+                              label: road.road_id ?? "road",
+                              detail: roadTraffic
+                                ? `${road.directionality ?? "unknown"} · ${
+                                    road.lane_count ?? 0
+                                  } lane(s) · ${roadTraffic.congestion_level} · ${
+                                    roadTraffic.queued_vehicle_ids?.length ?? 0
+                                  } queued`
+                                : `${road.directionality ?? "unknown"} · ${road.lane_count ?? 0} lane(s)`,
+                            });
+                          }}
+                        />
+                      </g>
                     ))}
+
+                  {layers.intersections &&
+                    (bundle?.render_geometry?.intersections ?? []).map((intersection, index) => {
+                      const controlPoint = (bundle?.traffic_baseline?.control_points ?? []).find(
+                        (point) => point.node_id === intersection.node_id,
+                      );
+                      return (
+                        <polygon
+                          key={intersection.intersection_id ?? `intersection-${index}`}
+                          points={toPointString(intersection.polygon)}
+                          className="scene-intersection"
+                          onMouseEnter={() =>
+                            setHoverTarget({
+                              label: intersection.intersection_id ?? "intersection",
+                              detail: controlPoint
+                                ? `${controlPoint.control_type} · ${
+                                    controlPoint.controlled_road_ids?.length ?? 0
+                                  } road(s)`
+                                : intersection.intersection_type ?? "intersection",
+                            })
+                          }
+                        />
+                      );
+                    })}
 
                   {layers.roads &&
                     (bundle?.render_geometry?.lanes ?? []).map((lane, index) => (
@@ -1150,15 +1254,6 @@ function App(): JSX.Element {
                       />
                     ))}
 
-                  {layers.intersections &&
-                    (bundle?.render_geometry?.intersections ?? []).map((intersection, index) => (
-                      <polygon
-                        key={intersection.intersection_id ?? `intersection-${index}`}
-                        points={toPointString(intersection.polygon)}
-                        className="scene-intersection"
-                      />
-                    ))}
-
                   {layers.routes &&
                     routePreviews.map((preview, previewIndex) => {
                       const routePoints = buildRoutePreviewPoints(
@@ -1185,37 +1280,32 @@ function App(): JSX.Element {
 
                   {layers.reservations &&
                     (bundle?.traffic_baseline?.queue_records ?? []).map((record, queueIndex) => {
-                      const edge = findEdgeById(
-                        bundle?.map_surface?.edges ?? [],
-                        record.edge_id ?? null,
+                      const road = (bundle?.render_geometry?.roads ?? []).find(
+                        (entry) => entry.road_id === record.road_id,
                       );
-                      const start = edge
-                        ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.start_node_id)
-                        : null;
-                      const end = edge
-                        ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.end_node_id)
-                        : null;
-                      if (!start || !end) {
+                      const roadTraffic =
+                        record.road_id !== undefined
+                          ? trafficRoadById.get(record.road_id) ?? null
+                          : null;
+                      if (!road?.centerline || road.centerline.length < 2) {
                         return null;
                       }
                       return (
-                        <line
+                        <polyline
                           key={`reservation-${queueIndex}`}
-                          x1={start[0]}
-                          y1={start[1]}
-                          x2={end[0]}
-                          y2={end[1]}
-                          className={`scene-reservation ${
+                          points={toPointString(road.centerline)}
+                          className={`scene-reservation scene-queue-overlay ${
                             selectedTarget?.kind === "queue" &&
-                            selectedTarget.edgeId === record.edge_id
+                            selectedTarget.roadId === record.road_id
                               ? "selected"
                               : ""
                           }`}
-                          onClick={() => selectQueue(record.edge_id)}
+                          strokeWidth={Math.max(road.width_m ?? 1.4, 0.9) + 2}
+                          onClick={() => selectQueue(record.road_id ?? undefined)}
                           onMouseEnter={() =>
                             setHoverTarget({
-                              label: `Queue edge ${record.edge_id ?? "?"}`,
-                              detail: `${record.vehicle_ids?.length ?? 0} vehicle(s) queued`,
+                              label: `Queue ${record.road_id ?? "road"}`,
+                              detail: `${roadTraffic?.queued_vehicle_ids?.length ?? 0} vehicle(s) queued`,
                             })
                           }
                         />
@@ -1353,17 +1443,21 @@ function App(): JSX.Element {
                 </svg>
 
                 <div className="focus-card">
-                  <strong>Collision envelopes and follow distance are now live</strong>
+                  <strong>Queue buildup and congestion heatmaps are now live</strong>
                   <p>
-                    Motion playback now follows authored path geometry instead of
-                    only straight edge interpolation, and trailing vehicles now
-                    slow or wait before they visually overlap leaders.
+                    Traffic snapshots now drive animated road heatmaps and queue
+                    overlays, so dense corridors stay legible while still
+                    revealing where vehicles are waiting.
                   </p>
                 </div>
                 <div className="scene-legend">
                   <span className="legend-item">
                     <span className="legend-swatch road" />
                     Roads
+                  </span>
+                  <span className="legend-item">
+                    <span className="legend-swatch traffic" />
+                    Traffic heatmap
                   </span>
                   <span className="legend-item">
                     <span className="legend-swatch vehicle" />
@@ -1633,6 +1727,15 @@ function App(): JSX.Element {
                     <li>Lanes: {formatMaybeNumber(selectedRoad.lane_count ?? null)}</li>
                     <li>Width: {selectedRoad.width_m ?? "pending"}m</li>
                     <li>Edges: {(selectedRoad.edge_ids ?? []).join(", ") || "none"}</li>
+                    <li>Traffic: {selectedRoadTraffic?.congestion_level ?? "free"}</li>
+                    <li>
+                      Intensity: {Math.round((selectedRoadTraffic?.congestion_intensity ?? 0) * 100)}%
+                    </li>
+                    <li>
+                      Queued: {selectedRoadTraffic?.queued_vehicle_ids?.length ?? 0} · Active:{" "}
+                      {selectedRoadTraffic?.active_vehicle_ids?.length ?? 0}
+                    </li>
+                    <li>Min spacing: {formatMeters(selectedRoadTraffic?.min_spacing_m ?? null)}</li>
                   </ul>
                 </article>
               ) : null}
@@ -1660,6 +1763,10 @@ function App(): JSX.Element {
                   <ul className="mini-list">
                     <li>Queued vehicles: {selectedQueueRecord.vehicle_ids?.join(", ") || "none"}</li>
                     <li>Queue length: {selectedQueueRecord.vehicle_ids?.length ?? 0}</li>
+                    <li>Road traffic: {selectedQueueTraffic?.congestion_level ?? "queued"}</li>
+                    <li>Intensity: {Math.round((selectedQueueTraffic?.congestion_intensity ?? 0) * 100)}%</li>
+                    <li>Queue window: {formatSeconds(selectedQueueRecord.queue_start_s ?? null)} to {formatSeconds(selectedQueueRecord.queue_end_s ?? null)}</li>
+                    <li>Reason: {selectedQueueRecord.reason ?? "queued"}</li>
                   </ul>
                 </article>
               ) : null}
@@ -1771,6 +1878,63 @@ function App(): JSX.Element {
               </span>
             </div>
             <div className="section-stack">
+              <div className="subsection">
+                <h3>Traffic Heatmap</h3>
+                <div className="traffic-summary-row">
+                  <span className="traffic-summary-chip">
+                    {formatMaybeNumber(queuedVehicleCount)} queued
+                  </span>
+                  <span className="traffic-summary-chip">
+                    {formatMaybeNumber(congestedRoadCount)} congested roads
+                  </span>
+                  <span className="traffic-summary-chip accent">
+                    Peak {Math.round(peakTrafficIntensity * 100)}%
+                  </span>
+                </div>
+                <ul className="traffic-heatmap-list">
+                  {trafficRoadStates.filter((roadState) => (roadState.congestion_intensity ?? 0) > 0)
+                    .length > 0 ? (
+                    trafficRoadStates
+                      .filter((roadState) => (roadState.congestion_intensity ?? 0) > 0)
+                      .sort(
+                        (left, right) =>
+                          (right.congestion_intensity ?? 0) - (left.congestion_intensity ?? 0),
+                      )
+                      .slice(0, 4)
+                      .map((roadState) => (
+                        <li
+                          key={roadState.road_id ?? "road"}
+                          className="traffic-heatmap-row"
+                        >
+                          <div className="traffic-heatmap-label">
+                            <strong>{roadState.road_id ?? "road"}</strong>
+                            <span>
+                              {roadState.congestion_level ?? "active"} ·{" "}
+                              {roadState.queued_vehicle_ids?.length ?? 0} queued
+                            </span>
+                          </div>
+                          <div className="traffic-heatmap-bar" aria-hidden="true">
+                            <span
+                              style={{
+                                width: `${Math.round((roadState.congestion_intensity ?? 0) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </li>
+                      ))
+                  ) : (
+                    <li className="traffic-heatmap-row">
+                      <div className="traffic-heatmap-label">
+                        <strong>All roads</strong>
+                        <span>No congestion at the current sample</span>
+                      </div>
+                      <div className="traffic-heatmap-bar" aria-hidden="true">
+                        <span style={{ width: "0%" }} />
+                      </div>
+                    </li>
+                  )}
+                </ul>
+              </div>
               <div className="subsection">
                 <h3>Suggestions</h3>
                 <ul className="data-list">
@@ -2242,6 +2406,87 @@ function computeMinDisplayedSpacing(
   return minimum;
 }
 
+function sampleTrafficSnapshot(
+  bundle: BundlePayload | null,
+  motionClockS: number,
+): TrafficSnapshotPayload {
+  const roads = bundle?.render_geometry?.roads ?? [];
+  const motionSegments = [...(bundle?.motion_segments ?? [])].sort(
+    (left, right) =>
+      (left.start_time_s ?? 0) - (right.start_time_s ?? 0) ||
+      (left.segment_index ?? 0) - (right.segment_index ?? 0),
+  );
+  const roadStates: TrafficRoadStatePayload[] = roads.map((road) => {
+    const activeSegments = motionSegments.filter(
+      (segment) =>
+        segment.edge_id !== undefined &&
+        (road.edge_ids ?? []).includes(segment.edge_id) &&
+        (segment.start_time_s ?? 0) < motionClockS &&
+        motionClockS < (segment.end_time_s ?? 0),
+    );
+    const activePositions = activeSegments.map(
+      (segment) => sampleMotionSegmentPayload(segment, motionClockS).position,
+    );
+    const queuedVehicleIds = (bundle?.traffic_baseline?.queue_records ?? [])
+      .filter(
+        (record) =>
+          record.road_id === road.road_id &&
+          (record.queue_start_s ?? 0) <= motionClockS &&
+          motionClockS < (record.queue_end_s ?? 0),
+      )
+      .map((record) => record.vehicle_id)
+      .filter((vehicleId): vehicleId is number => vehicleId !== undefined)
+      .sort((left, right) => left - right);
+    const activeVehicleIds = activeSegments
+      .map((segment) => segment.vehicle_id)
+      .filter((vehicleId): vehicleId is number => vehicleId !== undefined)
+      .sort((left, right) => left - right);
+    const occupancyCount = activeVehicleIds.length;
+    const minSpacingM = computeMinPointSpacing(activePositions);
+    const congestionLevel = trafficCongestionLevel(
+      occupancyCount,
+      queuedVehicleIds.length,
+      minSpacingM,
+    );
+    const congestionIntensity = trafficCongestionIntensity(
+      occupancyCount,
+      queuedVehicleIds.length,
+      minSpacingM,
+    );
+    return {
+      road_id: road.road_id,
+      active_vehicle_ids: activeVehicleIds,
+      queued_vehicle_ids: queuedVehicleIds,
+      occupancy_count: occupancyCount,
+      min_spacing_m: minSpacingM,
+      congestion_intensity: congestionIntensity,
+      congestion_level: congestionLevel,
+    };
+  });
+  return {
+    timestamp_s: motionClockS,
+    road_states: roadStates,
+  };
+}
+
+function computeMinPointSpacing(points: Position3[]): number | null {
+  if (points.length < 2) {
+    return null;
+  }
+  let minimum: number | null = null;
+  for (let index = 0; index < points.length; index += 1) {
+    const left = points[index];
+    for (let inner = index + 1; inner < points.length; inner += 1) {
+      const right = points[inner];
+      const distance = pointDistance(left, right);
+      if (minimum === null || distance < minimum) {
+        minimum = distance;
+      }
+    }
+  }
+  return minimum;
+}
+
 function sampleMotionSegmentPayload(
   segment: MotionSegmentPayload,
   timestampS: number,
@@ -2331,6 +2576,44 @@ function headingAlongPath(points: Position3[], distanceAlongPath: number): numbe
   const start = points[points.length - 2];
   const end = points[points.length - 1];
   return Math.atan2(end[1] - start[1], end[0] - start[0]);
+}
+
+function trafficCongestionLevel(
+  occupancyCount: number,
+  queueCount: number,
+  minSpacingM: number | null,
+): string {
+  if (queueCount > 0) {
+    return "queued";
+  }
+  if (occupancyCount >= 2 && minSpacingM !== null && minSpacingM <= 1.5) {
+    return "congested";
+  }
+  if (occupancyCount >= 1) {
+    return "active";
+  }
+  return "free";
+}
+
+function trafficCongestionIntensity(
+  occupancyCount: number,
+  queueCount: number,
+  minSpacingM: number | null,
+): number {
+  if (occupancyCount <= 0 && queueCount <= 0) {
+    return 0;
+  }
+  const spacingPressure =
+    minSpacingM === null ? 0 : Math.max(0, Math.min(1, (1.8 - minSpacingM) / 1.8));
+  const vehiclePressure = Math.min(1, occupancyCount / 4);
+  const queuePressure = Math.min(1, queueCount / 3);
+  if (queueCount > 0) {
+    return Math.min(
+      1,
+      0.55 + queuePressure * 0.35 + vehiclePressure * 0.1 + spacingPressure * 0.2,
+    );
+  }
+  return Math.min(1, vehiclePressure * 0.55 + spacingPressure * 0.45);
 }
 
 function spacingEnvelopeFromVehicle(
@@ -2591,7 +2874,7 @@ function describeSelectedTarget(
     return `zone ${selectedTarget.areaId}`;
   }
   if (selectedTarget?.kind === "queue") {
-    return `queue edge ${selectedTarget.edgeId}`;
+    return `queue ${selectedTarget.roadId}`;
   }
   if (selectedTarget?.kind === "hazard") {
     return `blocked edge ${selectedTarget.edgeId}`;

@@ -9,7 +9,7 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
         REPO_ROOT / "frontend" / "serious_ui" / "src" / "App.tsx"
     ).read_text(encoding="utf-8")
 
-    assert "Step 55 Collision Envelopes and Following Distance" in app_source
+    assert "Step 56 Queue Formation and Congestion Baseline" in app_source
     assert "Command-Center Region" in app_source
     assert "Inspector Region" in app_source
     assert "Alerts Region" in app_source
@@ -19,7 +19,7 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "Autonomous Ops Command Deck" in app_source
     assert "Fit Scene" in app_source
     assert "Focus Selected" in app_source
-    assert "Collision envelopes and follow distance are now live" in app_source
+    assert "Queue buildup and congestion heatmaps are now live" in app_source
     assert "Save Scenario" in app_source
     assert "Reload Scenario" in app_source
     assert "turn_connectors" in app_source
@@ -30,6 +30,12 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "formatHeadingDegrees" in app_source
     assert "vehicle-envelope" in app_source
     assert "Min Spacing" in app_source
+    assert "Traffic Heatmap" in app_source
+    assert "sampleTrafficSnapshot" in app_source
+    assert "trafficCongestionIntensity" in app_source
+    assert "trafficCongestionLevel" in app_source
+    assert "scene-road-heatmap" in app_source
+    assert "traffic-summary-chip" in app_source
     assert "scene-legend" in app_source
     assert "selectVehicle" in app_source
     assert "selectRoad" in app_source
@@ -61,6 +67,9 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".scene-turn-connector" in css_source
     assert ".scene-stop-line" in css_source
     assert ".scene-merge-zone" in css_source
+    assert ".scene-road-heatmap" in css_source
+    assert ".traffic-summary-chip" in css_source
+    assert ".traffic-heatmap-list" in css_source
     assert ".vehicle-body-haul" in css_source
     assert ".vehicle-body-forklift" in css_source
     assert ".vehicle-body-car" in css_source
@@ -70,4 +79,5 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".scene-road.selected" in css_source
     assert ".scene-reservation.selected" in css_source
     assert ".scene-hazard.selected" in css_source
+    assert "@keyframes traffic-flow" in css_source
     assert "@media (max-width: 980px)" in css_source

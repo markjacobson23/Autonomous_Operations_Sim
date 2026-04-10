@@ -475,6 +475,10 @@ h3 {
   background: rgba(10, 118, 108, 0.95);
 }
 
+.legend-swatch.traffic {
+  background: linear-gradient(90deg, rgba(10, 118, 108, 0.95), rgba(187, 101, 30, 0.95), rgba(178, 74, 59, 0.95));
+}
+
 .legend-swatch.hazard {
   background: rgba(178, 74, 59, 0.9);
 }
@@ -656,6 +660,33 @@ h3 {
   filter: drop-shadow(0 0.12px 0.12px rgba(255, 255, 255, 0.45));
 }
 
+.scene-road-heatmap {
+  fill: none;
+  pointer-events: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  mix-blend-mode: multiply;
+  filter: blur(0.02px);
+  stroke-dasharray: 1.4 0.85;
+  animation: traffic-flow 3.2s linear infinite;
+}
+
+.scene-road-heatmap-free {
+  stroke: rgba(95, 109, 121, 0.12);
+}
+
+.scene-road-heatmap-active {
+  stroke: rgba(36, 83, 199, 0.22);
+}
+
+.scene-road-heatmap-congested {
+  stroke: rgba(187, 101, 30, 0.48);
+}
+
+.scene-road-heatmap-queued {
+  stroke: rgba(178, 74, 59, 0.58);
+}
+
 .scene-lane {
   fill: none;
   stroke: rgba(255, 252, 247, 0.92);
@@ -709,6 +740,10 @@ h3 {
   stroke-width: 0.22;
   stroke-dasharray: 0.4 0.35;
   cursor: pointer;
+}
+
+.scene-queue-overlay {
+  animation-duration: 1.8s;
 }
 
 .scene-hazard {
@@ -828,6 +863,93 @@ h3 {
 
 .scene-edit-handle.area {
   fill: rgba(187, 101, 30, 0.94);
+}
+
+.traffic-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.traffic-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(97, 112, 125, 0.1);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.traffic-summary-chip.accent {
+  background: var(--alert-soft);
+  color: var(--alert);
+}
+
+.traffic-heatmap-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.traffic-heatmap-row {
+  display: grid;
+  gap: 8px;
+}
+
+.traffic-heatmap-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 0.84rem;
+}
+
+.traffic-heatmap-label strong {
+  font-size: 0.82rem;
+}
+
+.traffic-heatmap-label span {
+  color: var(--muted);
+}
+
+.traffic-heatmap-bar {
+  position: relative;
+  height: 0.48rem;
+  border-radius: 999px;
+  background: rgba(97, 112, 125, 0.1);
+  overflow: hidden;
+}
+
+.traffic-heatmap-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(10, 118, 108, 0.9), rgba(187, 101, 30, 0.95), rgba(178, 74, 59, 0.98));
+  box-shadow: 0 0 16px rgba(178, 74, 59, 0.15);
+  animation: traffic-fill 2.8s ease-in-out infinite alternate;
+}
+
+@keyframes traffic-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -2.2;
+  }
+}
+
+@keyframes traffic-fill {
+  from {
+    filter: saturate(0.96);
+  }
+  to {
+    filter: saturate(1.15);
+  }
 }
 
 .minimap {

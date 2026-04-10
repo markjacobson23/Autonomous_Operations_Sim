@@ -126,6 +126,12 @@ def test_traffic_snapshot_reports_active_and_queued_road_states() -> None:
     assert queued_road_states["road-2-3"].queued_vehicle_ids == (202,)
     assert queued_road_states["road-2-3"].occupancy_count == 1
     assert queued_road_states["road-2-3"].congestion_level == "queued"
+    assert queued_road_states["road-2-3"].congestion_intensity > queued_road_states[
+        "road-1-2"
+    ].congestion_intensity
     assert active_road_states["road-2-3"].active_vehicle_ids == (202,)
     assert active_road_states["road-2-3"].queued_vehicle_ids == ()
     assert active_road_states["road-2-3"].congestion_level == "active"
+    assert active_road_states["road-2-3"].congestion_intensity < queued_road_states[
+        "road-2-3"
+    ].congestion_intensity
