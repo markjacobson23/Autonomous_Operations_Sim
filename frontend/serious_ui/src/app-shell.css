@@ -98,6 +98,12 @@ body {
     linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
 }
 
+.shell-editor-focused .masthead {
+  background:
+    linear-gradient(135deg, rgba(10, 118, 108, 0.12), rgba(36, 83, 199, 0.04)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0));
+}
+
 .masthead-copy {
   flex: 1 1 440px;
 }
@@ -285,6 +291,10 @@ h3 {
   cursor: pointer;
 }
 
+.workspace-tab-editor {
+  border-color: rgba(10, 118, 108, 0.16);
+}
+
 .workspace-tab strong {
   font-size: 0.9rem;
   font-family: var(--font-display);
@@ -303,6 +313,25 @@ h3 {
     linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 241, 233, 0.98));
   border-color: rgba(10, 118, 108, 0.28);
   box-shadow: 0 14px 28px rgba(24, 33, 44, 0.14);
+}
+
+.shell-tab-editor .workspace-tabs {
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.9), rgba(247, 241, 233, 0.82));
+  border-color: rgba(10, 118, 108, 0.12);
+  box-shadow: 0 18px 44px rgba(24, 33, 44, 0.08);
+}
+
+.shell-tab-editor .workspace-tab {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(247, 241, 233, 0.92));
+}
+
+.shell-tab-editor .workspace-tab-active {
+  background:
+    linear-gradient(135deg, rgba(10, 118, 108, 0.18), rgba(187, 101, 30, 0.1)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 241, 233, 0.99));
+  border-color: rgba(10, 118, 108, 0.38);
+  box-shadow: 0 16px 32px rgba(24, 33, 44, 0.16);
 }
 
 .shell-tab-operate .editor-pane,
@@ -347,10 +376,205 @@ h3 {
   display: grid;
 }
 
+.shell-tab-editor .editor-pane {
+  background:
+    linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(246, 239, 229, 0.96));
+  border-color: rgba(10, 118, 108, 0.18);
+  box-shadow: 0 30px 72px rgba(24, 33, 44, 0.14);
+}
+
+.shell-tab-editor .editor-pane .status-copy {
+  max-width: 52rem;
+}
+
 .scene-button-primary {
   background: linear-gradient(135deg, rgba(10, 118, 108, 0.18), rgba(36, 83, 199, 0.14));
   border-color: rgba(10, 118, 108, 0.32);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 10px 18px rgba(24, 33, 44, 0.08);
+}
+
+.editor-panel-header {
+  align-items: flex-start;
+}
+
+.editor-header-stack {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+.editor-mode-banner {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(10, 118, 108, 0.14);
+  background:
+    linear-gradient(135deg, rgba(10, 118, 108, 0.08), rgba(187, 101, 30, 0.06)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 241, 234, 0.92));
+}
+
+.editor-mode-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.editor-mode-copy strong {
+  font-size: 0.98rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.editor-mode-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.editor-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.editor-status-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.editor-status-card span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.editor-status-card strong {
+  font-size: 0.96rem;
+  letter-spacing: -0.02em;
+}
+
+.editor-status-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.82rem;
+}
+
+.editor-controls {
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 241, 234, 0.9));
+}
+
+.editor-action-row .scene-button {
+  flex: 1 1 150px;
+}
+
+.subsection-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.editor-detail-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.editor-state-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 245, 238, 0.94));
+}
+
+.editor-state-list {
+  margin-top: 10px;
+}
+
+.editor-message-list,
+.editor-operation-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.editor-validation-item,
+.editor-draft-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.editor-validation-item strong,
+.editor-draft-item strong {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.editor-validation-item p,
+.editor-draft-item p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.editor-validation-item-error {
+  border-color: rgba(178, 74, 59, 0.22);
+  background: linear-gradient(180deg, rgba(255, 246, 245, 0.96), rgba(255, 240, 238, 0.94));
+}
+
+.editor-validation-item-warning {
+  border-color: rgba(187, 101, 30, 0.2);
+  background: linear-gradient(180deg, rgba(255, 250, 244, 0.96), rgba(255, 244, 229, 0.94));
+}
+
+.editor-validation-item-info {
+  border-color: rgba(10, 118, 108, 0.18);
+  background: linear-gradient(180deg, rgba(246, 252, 251, 0.96), rgba(239, 249, 247, 0.94));
+}
+
+.editor-item-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.editor-item-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(97, 112, 125, 0.1);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.editor-empty-state {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px dashed rgba(97, 112, 125, 0.18);
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--muted);
 }
 
 .route-planning-grid {
@@ -696,6 +920,394 @@ h3 {
   gap: 8px;
 }
 
+.shell-tab-analyze .info-panel.analyze-pane {
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(245, 239, 230, 0.96));
+  border-color: rgba(10, 118, 108, 0.14);
+  box-shadow: 0 30px 72px rgba(24, 33, 44, 0.12);
+}
+
+.shell-tab-analyze .analyze-pane {
+  gap: 16px;
+}
+
+.analyze-panel-header {
+  align-items: flex-end;
+}
+
+.analyze-panel-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.analyze-panel-lede {
+  margin: 0;
+  max-width: 44rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.analyze-panel-meta {
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+}
+
+.analyze-summary-strip {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.analysis-chip,
+.analysis-section-chip,
+.review-level-chip,
+.review-target-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.analysis-chip {
+  padding: 7px 11px;
+  border: 1px solid rgba(97, 112, 125, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--muted);
+}
+
+.analysis-chip-alert {
+  background: rgba(178, 74, 59, 0.12);
+  color: var(--alert);
+  border-color: rgba(178, 74, 59, 0.18);
+}
+
+.analysis-chip-action {
+  background: rgba(187, 101, 30, 0.12);
+  color: var(--warm);
+  border-color: rgba(187, 101, 30, 0.2);
+}
+
+.analysis-chip-context {
+  background: rgba(10, 118, 108, 0.12);
+  color: var(--accent);
+  border-color: rgba(10, 118, 108, 0.18);
+}
+
+.analysis-section-chip {
+  padding: 7px 10px;
+  background: rgba(97, 112, 125, 0.1);
+  color: var(--muted);
+  border: 1px solid rgba(97, 112, 125, 0.14);
+}
+
+.analyze-review-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.analyze-review-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 243, 235, 0.9));
+}
+
+.analyze-review-section-urgent {
+  border-color: rgba(178, 74, 59, 0.2);
+  background:
+    linear-gradient(180deg, rgba(255, 247, 245, 0.98), rgba(252, 236, 232, 0.92));
+  box-shadow: inset 4px 0 0 rgba(178, 74, 59, 0.65);
+}
+
+.analyze-review-section-actions {
+  border-color: rgba(187, 101, 30, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 244, 0.98), rgba(250, 241, 228, 0.92));
+  box-shadow: inset 4px 0 0 rgba(187, 101, 30, 0.6);
+}
+
+.analyze-review-section-context {
+  border-color: rgba(10, 118, 108, 0.16);
+  background:
+    linear-gradient(180deg, rgba(246, 252, 251, 0.98), rgba(238, 248, 246, 0.92));
+  box-shadow: inset 4px 0 0 rgba(10, 118, 108, 0.52);
+}
+
+.analyze-section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.analyze-section-header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+  max-width: 46rem;
+}
+
+.analyze-card-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.review-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 15px;
+  border-radius: 18px;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 243, 236, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.review-card-urgent {
+  border-color: rgba(178, 74, 59, 0.2);
+}
+
+.review-card-action {
+  border-color: rgba(187, 101, 30, 0.18);
+}
+
+.review-card-context {
+  border-color: rgba(10, 118, 108, 0.16);
+}
+
+.review-card-critical,
+.review-diagnostic-pill-critical {
+  background:
+    linear-gradient(180deg, rgba(255, 246, 244, 0.99), rgba(252, 234, 231, 0.95));
+}
+
+.review-card-high,
+.review-diagnostic-pill-high {
+  background:
+    linear-gradient(180deg, rgba(255, 248, 241, 0.99), rgba(252, 239, 223, 0.95));
+}
+
+.review-card-warning,
+.review-diagnostic-pill-warning {
+  background:
+    linear-gradient(180deg, rgba(255, 250, 244, 0.99), rgba(252, 243, 229, 0.95));
+}
+
+.review-card-medium,
+.review-card-info,
+.review-diagnostic-pill-info,
+.review-diagnostic-pill-low {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 249, 0.94));
+}
+
+.review-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.review-card-title {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.review-card-title strong {
+  font-size: 0.96rem;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+
+.review-card-title span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.review-card-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.review-level-chip {
+  padding: 6px 10px;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--muted);
+}
+
+.review-level-chip-critical,
+.review-diagnostic-pill-critical strong {
+  color: var(--alert);
+  border-color: rgba(178, 74, 59, 0.22);
+  background: rgba(178, 74, 59, 0.12);
+}
+
+.review-level-chip-high,
+.review-diagnostic-pill-high strong {
+  color: var(--warm);
+  border-color: rgba(187, 101, 30, 0.22);
+  background: rgba(187, 101, 30, 0.12);
+}
+
+.review-level-chip-warning,
+.review-diagnostic-pill-warning strong {
+  color: #98541d;
+  border-color: rgba(187, 101, 30, 0.18);
+  background: rgba(187, 101, 30, 0.1);
+}
+
+.review-level-chip-medium,
+.review-level-chip-info,
+.review-diagnostic-pill-info strong,
+.review-diagnostic-pill-low strong {
+  color: var(--accent);
+  border-color: rgba(10, 118, 108, 0.18);
+  background: rgba(10, 118, 108, 0.1);
+}
+
+.review-target-chip {
+  padding: 6px 10px;
+  border: 1px solid rgba(36, 83, 199, 0.16);
+  background: rgba(36, 83, 199, 0.08);
+  color: var(--accent-2);
+}
+
+.review-card-body {
+  color: var(--ink);
+  line-height: 1.55;
+}
+
+.review-empty-state {
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px dashed rgba(97, 112, 125, 0.18);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.review-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.review-metric {
+  display: grid;
+  gap: 5px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.review-metric span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.review-metric strong {
+  font-size: 0.92rem;
+  letter-spacing: -0.02em;
+}
+
+.review-context-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.review-diagnostic-strip {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.review-diagnostic-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+}
+
+.review-diagnostic-pill strong {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.review-diagnostic-pill span {
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.review-command-list {
+  display: grid;
+  gap: 8px;
+}
+
+.review-command-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 11px;
+  border-radius: 14px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.review-command-kind {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.review-command-summary {
+  line-height: 1.45;
+  font-size: 0.88rem;
+}
+
+.analyze-explanation-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.review-explanation-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 249, 248, 0.92));
+}
+
+.review-explanation-body {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
 .command-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -803,6 +1415,32 @@ h3 {
   .stage-canvas {
     min-height: 380px;
   }
+
+  .analyze-panel-meta {
+    justify-items: start;
+  }
+
+  .analyze-summary-strip {
+    justify-content: flex-start;
+  }
+
+  .review-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .traffic-alert-grid,
+  .traffic-road-card-grid,
+  .traffic-reservation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .traffic-alert-card-header,
+  .traffic-section-heading,
+  .traffic-hazard-focus-header,
+  .traffic-road-card-header,
+  .traffic-reservation-card-header {
+    align-items: flex-start;
+  }
 }
 
 @media (max-width: 720px) {
@@ -817,6 +1455,46 @@ h3 {
 
   .command-grid {
     grid-template-columns: 1fr;
+  }
+
+  .analyze-section-header,
+  .review-card-header {
+    align-items: flex-start;
+  }
+
+  .review-card-meta {
+    justify-content: flex-start;
+  }
+
+  .traffic-summary-row,
+  .traffic-context-strip {
+    gap: 8px;
+  }
+
+  .traffic-alert-card,
+  .traffic-road-card,
+  .traffic-reservation-card {
+    padding: 14px;
+  }
+
+  .traffic-road-card-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .traffic-hazard-focus-meta,
+  .traffic-reservation-meta,
+  .traffic-road-card-footnote {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .traffic-alert-row-header,
+  .traffic-alert-card-header,
+  .traffic-section-heading,
+  .traffic-hazard-focus-header,
+  .traffic-road-card-header,
+  .traffic-reservation-card-header {
+    flex-direction: column;
   }
 }
 
@@ -834,6 +1512,15 @@ h3 {
     right: 18px;
     left: 18px;
     max-width: none;
+  }
+
+  .review-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analyze-summary-strip,
+  .review-card-meta {
+    justify-content: flex-start;
   }
 }
 
@@ -1209,27 +1896,416 @@ h3 {
   fill: rgba(187, 101, 30, 0.94);
 }
 
+.shell-tab-editor .scene-edit-handle {
+  stroke: rgba(255, 255, 255, 0.98);
+  stroke-width: 0.16;
+  cursor: grab;
+  filter:
+    drop-shadow(0 0.5px 0.4px rgba(24, 33, 44, 0.22))
+    drop-shadow(0 0 8px rgba(36, 83, 199, 0.16));
+}
+
+.shell-tab-editor .scene-edit-handle:hover {
+  cursor: grabbing;
+  filter:
+    drop-shadow(0 0.7px 0.5px rgba(24, 33, 44, 0.28))
+    drop-shadow(0 0 10px rgba(10, 118, 108, 0.24));
+}
+
+.shell-tab-editor .scene-edit-handle.node {
+  fill: rgba(36, 83, 199, 0.96);
+}
+
+.shell-tab-editor .scene-edit-handle.road {
+  fill: rgba(10, 118, 108, 0.96);
+}
+
+.shell-tab-editor .scene-edit-handle.area {
+  fill: rgba(187, 101, 30, 0.96);
+}
+
+.shell-tab-traffic .traffic-pane {
+  background:
+    radial-gradient(circle at top right, rgba(178, 74, 59, 0.08), transparent 34%),
+    radial-gradient(circle at top left, rgba(10, 118, 108, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(255, 253, 249, 0.99), rgba(244, 247, 249, 0.97));
+  border-color: rgba(178, 74, 59, 0.16);
+  box-shadow: 0 28px 64px rgba(24, 33, 44, 0.14);
+}
+
+.traffic-panel-header {
+  align-items: flex-end;
+}
+
+.traffic-panel-lede {
+  margin: 0;
+  max-width: 48rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.traffic-panel-status {
+  align-self: flex-start;
+}
+
+.traffic-monitor-stack {
+  gap: 18px;
+}
+
+.traffic-monitor-board {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 247, 249, 0.82)),
+    linear-gradient(135deg, rgba(178, 74, 59, 0.05), rgba(10, 118, 108, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
 .traffic-summary-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .traffic-summary-chip {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 6px 10px;
-  background: rgba(97, 112, 125, 0.1);
+  padding: 6px 11px;
+  border: 1px solid transparent;
+  background: rgba(97, 112, 125, 0.08);
   color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.traffic-summary-chip.critical {
+  background: rgba(178, 74, 59, 0.1);
+  border-color: rgba(178, 74, 59, 0.14);
+  color: var(--danger);
 }
 
 .traffic-summary-chip.accent {
-  background: var(--alert-soft);
-  color: var(--alert);
+  background: rgba(10, 118, 108, 0.1);
+  border-color: rgba(10, 118, 108, 0.14);
+  color: var(--accent);
+}
+
+.traffic-summary-row-monitor {
+  gap: 10px;
+}
+
+.traffic-alert-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.traffic-alert-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 18px 32px rgba(24, 33, 44, 0.08);
+}
+
+.traffic-alert-card-congestion {
+  border-color: rgba(187, 101, 30, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 245, 0.96), rgba(246, 240, 231, 0.92));
+}
+
+.traffic-alert-card-hazard {
+  border-color: rgba(178, 74, 59, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 248, 246, 0.96), rgba(247, 236, 233, 0.92));
+}
+
+.traffic-alert-card-header,
+.traffic-section-heading,
+.traffic-hazard-focus-header,
+.traffic-road-card-header,
+.traffic-reservation-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.traffic-alert-kicker,
+.traffic-road-card-kicker,
+.traffic-reservation-card-kicker {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+.traffic-card-lede,
+.traffic-section-lede,
+.traffic-road-card-summary,
+.traffic-reservation-card-summary {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 0.86rem;
+}
+
+.traffic-alert-badge,
+.traffic-section-badge,
+.traffic-road-card-pill,
+.traffic-reservation-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.traffic-alert-badge-critical {
+  border-color: rgba(178, 74, 59, 0.18);
+  background: rgba(178, 74, 59, 0.1);
+  color: var(--danger);
+}
+
+.traffic-alert-list,
+.traffic-hazard-list,
+.traffic-reservation-grid,
+.traffic-road-card-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.traffic-alert-list {
+  display: grid;
+  gap: 10px;
+}
+
+.traffic-alert-row {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.traffic-alert-row-calm {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.traffic-alert-row-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.traffic-alert-row-header strong {
+  display: block;
+  font-size: 0.88rem;
+}
+
+.traffic-alert-row-header span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.traffic-alert-row-score {
+  color: var(--danger);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.traffic-alert-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.traffic-alert-bar,
+.traffic-road-card-bar {
+  position: relative;
+  height: 0.56rem;
+  border-radius: 999px;
+  background: rgba(97, 112, 125, 0.09);
+  overflow: hidden;
+}
+
+.traffic-alert-bar span,
+.traffic-road-card-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(10, 118, 108, 0.9), rgba(187, 101, 30, 0.95), rgba(178, 74, 59, 0.98));
+  box-shadow: 0 0 16px rgba(178, 74, 59, 0.15);
+  animation: traffic-fill 2.8s ease-in-out infinite alternate;
+}
+
+.traffic-hazard-focus {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(178, 74, 59, 0.16);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.traffic-hazard-focus-meta,
+.traffic-reservation-meta,
+.traffic-road-card-footnote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.traffic-hazard-list {
+  display: grid;
+  gap: 10px;
+}
+
+.traffic-hazard-card,
+.traffic-hazard-empty,
+.traffic-road-empty,
+.traffic-reservation-empty {
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--muted);
+}
+
+.traffic-hazard-card {
+  display: grid;
+  gap: 4px;
+}
+
+.traffic-hazard-empty,
+.traffic-road-empty,
+.traffic-reservation-empty {
+  display: grid;
+  gap: 4px;
+  border-style: dashed;
+}
+
+.traffic-section-heading {
+  align-items: flex-end;
+}
+
+.traffic-section-lede {
+  max-width: 46rem;
+}
+
+.traffic-road-card-grid,
+.traffic-reservation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.traffic-road-card,
+.traffic-reservation-card {
+  display: grid;
+  gap: 10px;
+  padding: 15px;
+  border-radius: 18px;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 14px 26px rgba(24, 33, 44, 0.06);
+}
+
+.traffic-road-card-spotlight,
+.traffic-reservation-card-spotlight {
+  padding: 18px;
+  border-color: rgba(178, 74, 59, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 240, 233, 0.92));
+}
+
+.traffic-road-card.selected,
+.traffic-reservation-card.selected {
+  border-color: rgba(10, 118, 108, 0.3);
+  box-shadow: 0 18px 34px rgba(10, 118, 108, 0.12);
+}
+
+.traffic-road-card-hot {
+  border-color: rgba(178, 74, 59, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 248, 0.95), rgba(248, 236, 233, 0.92));
+}
+
+.traffic-road-card-queued {
+  border-color: rgba(187, 101, 30, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 247, 0.95), rgba(247, 242, 232, 0.92));
+}
+
+.traffic-road-card-calm {
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.traffic-road-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.traffic-road-card-metrics strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.traffic-reservation-meta {
+  row-gap: 10px;
+}
+
+.traffic-context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.traffic-context-strip span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.traffic-road-card-pill,
+.traffic-reservation-badge {
+  background: rgba(10, 118, 108, 0.08);
+  color: var(--accent);
 }
 
 .traffic-heatmap-list {

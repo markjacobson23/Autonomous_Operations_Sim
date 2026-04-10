@@ -705,6 +705,11 @@ function App(): JSX.Element {
       .filter((state) => state.road_id)
       .map((state) => [state.road_id as string, state]),
   );
+  const trafficRoadStatesRanked = [...trafficRoadStates].sort(
+    (left, right) =>
+      trafficRoadPressureScore(right) - trafficRoadPressureScore(left) ||
+      (left.road_id ?? "").localeCompare(right.road_id ?? ""),
+  );
   const queuedVehicleCount = trafficRoadStates.reduce(
     (count, roadState) => count + (roadState.queued_vehicle_ids?.length ?? 0),
     0,
@@ -782,6 +787,27 @@ function App(): JSX.Element {
   const selectedVehicleInspections = inspections.filter((inspection) =>
     effectiveSelectedVehicleIds.includes(inspection.vehicle_id ?? -1),
   );
+  const reviewAnomalies = [...anomalies].sort(
+    (left, right) =>
+      reviewSeverityRank(left.severity) - reviewSeverityRank(right.severity) ||
+      (left.summary ?? "").localeCompare(right.summary ?? "") ||
+      (left.anomaly_id ?? "").localeCompare(right.anomaly_id ?? ""),
+  );
+  const reviewSuggestions = [...suggestions].sort(
+    (left, right) =>
+      reviewPriorityRank(left.priority) - reviewPriorityRank(right.priority) ||
+      (left.kind ?? "").localeCompare(right.kind ?? "") ||
+      (left.summary ?? "").localeCompare(right.summary ?? "") ||
+      (left.suggestion_id ?? "").localeCompare(right.suggestion_id ?? ""),
+  );
+  const reviewExplanations = [...explanations].sort(
+    (left, right) =>
+      Number((left.vehicle_id ?? Number.MAX_SAFE_INTEGER) === selectedVehicleId) -
+        Number((right.vehicle_id ?? Number.MAX_SAFE_INTEGER) === selectedVehicleId) ||
+      (left.vehicle_id ?? Number.MAX_SAFE_INTEGER) - (right.vehicle_id ?? Number.MAX_SAFE_INTEGER) ||
+      (left.summary ?? "").localeCompare(right.summary ?? ""),
+  );
+  const reviewRecentCommands = recentCommands.slice(0, 4);
   const selectedRoad =
     selectedTarget?.kind === "road"
       ? (bundle?.render_geometry?.roads ?? []).find(
@@ -812,10 +838,69 @@ function App(): JSX.Element {
     selectedTarget?.kind === "hazard"
       ? findEdgeById(bundle?.map_surface?.edges ?? [], selectedTarget.edgeId)
       : null;
+  const blockedEdgeIds = [...(bootstrap.bundle?.snapshot?.blocked_edge_ids ?? [])].sort(
+    (left, right) => left - right,
+  );
+  const trafficFocusRoadState =
+    selectedRoadTraffic ?? trafficRoadStatesRanked[0] ?? null;
+  const trafficFocusRoad =
+    trafficFocusRoadState?.road_id !== undefined
+      ? (bundle?.render_geometry?.roads ?? []).find(
+          (road) => road.road_id === trafficFocusRoadState.road_id,
+        ) ?? selectedRoad
+      : selectedRoad;
+  const trafficMonitoringRoadStates = (() => {
+    const states: TrafficRoadStatePayload[] = [];
+    const seenRoadIds = new Set<string>();
+    if (trafficFocusRoadState?.road_id) {
+      states.push(trafficFocusRoadState);
+      seenRoadIds.add(trafficFocusRoadState.road_id);
+    }
+    for (const roadState of trafficRoadStatesRanked) {
+      if (!roadState.road_id || seenRoadIds.has(roadState.road_id)) {
+        continue;
+      }
+      states.push(roadState);
+      seenRoadIds.add(roadState.road_id);
+      if (states.length >= 5) {
+        break;
+      }
+    }
+    return states;
+  })();
+  const trafficQueueRecords = [...(bundle?.traffic_baseline?.queue_records ?? [])].sort(
+    (left, right) => {
+      const leftRoadState =
+        typeof left.road_id === "string" ? trafficRoadById.get(left.road_id) ?? null : null;
+      const rightRoadState =
+        typeof right.road_id === "string" ? trafficRoadById.get(right.road_id) ?? null : null;
+      const leftVehicleCount =
+        left.vehicle_ids?.length ?? (left.vehicle_id !== undefined ? 1 : 0);
+      const rightVehicleCount =
+        right.vehicle_ids?.length ?? (right.vehicle_id !== undefined ? 1 : 0);
+      return (
+        trafficRoadPressureScore(rightRoadState) +
+        rightVehicleCount * 10 -
+        (trafficRoadPressureScore(leftRoadState) + leftVehicleCount * 10) ||
+        (left.road_id ?? "").localeCompare(right.road_id ?? "") ||
+        (left.node_id ?? 0) - (right.node_id ?? 0)
+      );
+    },
+  );
   const authoring = bootstrap.bundle?.authoring;
   const sessionControl = bootstrap.bundle?.session_control ?? null;
   const liveSessionPlaying = sessionControl?.play_state === "playing";
   const editCount = draftTransaction.operations.length;
+  const hasDraftEdits = editCount > 0;
+  const validationBlocked = validationMessages.length > 0;
+  const editorModeLabel = editorEnabled ? "Edit mode on" : "Edit mode off";
+  const draftStatusLabel = hasDraftEdits
+    ? `${editCount} staged edit${editCount === 1 ? "" : "s"}`
+    : "No draft edits";
+  const validationStatusLabel = validationBlocked ? "Validation blocked" : "Validation clean";
+  const workingScenarioPath = authoring?.working_scenario_path ?? "unavailable";
+  const sourceScenarioPath = authoring?.source_scenario_path ?? "unavailable";
+  const authoringModeLabel = authoring?.mode ?? "authoring";
 
   function applyLoadedBundle(
     bundlePayload: BundlePayload,
@@ -1547,7 +1632,7 @@ function App(): JSX.Element {
   };
 
   return (
-    <div className={`shell shell-tab-${activeTab}`}>
+    <div className={`shell shell-tab-${activeTab} ${activeTab === "editor" ? "shell-editor-focused" : ""}`}>
       <div className="shell-accent shell-accent-left" aria-hidden="true" />
       <div className="shell-accent shell-accent-right" aria-hidden="true" />
       <header className="masthead panel">
@@ -1626,7 +1711,7 @@ function App(): JSX.Element {
         {workspaceTabs.map((tab) => (
           <button
             key={tab.id}
-            className={`workspace-tab ${activeTab === tab.id ? "workspace-tab-active" : ""}`}
+            className={`workspace-tab workspace-tab-${tab.id} ${activeTab === tab.id ? "workspace-tab-active" : ""}`}
             type="button"
             onClick={() => setActiveTab(tab.id)}
             aria-pressed={activeTab === tab.id}
@@ -2479,25 +2564,84 @@ function App(): JSX.Element {
 
         <aside className="sidebar">
           <section className="panel info-panel editor-pane" aria-labelledby="editor-title">
-            <div className="panel-header compact">
+            <div className="panel-header compact editor-panel-header">
               <div>
                 <p className="eyebrow">Authoring Region</p>
                 <h2 id="editor-title">Scenario Authoring</h2>
+                <p className="status-copy">
+                  Dedicated controls for the working scenario, staged geometry, and validation
+                  live here.
+                </p>
               </div>
-              <span className="status-pill secondary">{editCount} staged</span>
+              <div className="editor-header-stack" aria-label="Editor mode summary">
+                <span className={`status-pill ${editorEnabled ? "accent" : "secondary"}`}>
+                  {editorModeLabel}
+                </span>
+                <span className={`status-pill ${hasDraftEdits ? "accent" : "secondary"}`}>
+                  {draftStatusLabel}
+                </span>
+                <span className={`status-pill ${validationBlocked ? "secondary" : "accent"}`}>
+                  {validationStatusLabel}
+                </span>
+              </div>
             </div>
             <div className="section-stack">
-              <div className="subsection">
-                <h3>Draft Operations</h3>
-                <div className="action-row">
-                  <button className="scene-button" type="button" onClick={toggleEditMode}>
+              <div className="editor-mode-banner">
+                <div className="editor-mode-copy">
+                  <p className="eyebrow">Working Scenario</p>
+                  <strong>{workingScenarioPath}</strong>
+                  <p>
+                    Source: {sourceScenarioPath} · Mode: {authoringModeLabel} · Save endpoint{" "}
+                    {authoring?.save_endpoint ? "ready" : "unavailable"}
+                  </p>
+                </div>
+                <div className="editor-status-grid">
+                  <div className="editor-status-card">
+                    <span>Edit mode</span>
+                    <strong>{editorModeLabel}</strong>
+                    <p>
+                      {editorEnabled
+                        ? "Handles are active and geometry moves will stage into the draft."
+                        : "Turn edit mode on to stage geometry changes and reveal the authoring handles."}
+                    </p>
+                  </div>
+                  <div className="editor-status-card">
+                    <span>Draft edits</span>
+                    <strong>{draftStatusLabel}</strong>
+                    <p>
+                      {hasDraftEdits
+                        ? "Save to persist the staged geometry or reload to discard it."
+                        : "No staged geometry edits are present yet."}
+                    </p>
+                  </div>
+                  <div className="editor-status-card">
+                    <span>Validation</span>
+                    <strong>{validationStatusLabel}</strong>
+                    <p>
+                      {validationBlocked
+                        ? "Resolve the messages below before saving."
+                        : "Draft validation is clean and the working scenario is ready."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="subsection editor-controls">
+                <div className="subsection-header">
+                  <h3>Authoring Controls</h3>
+                  <span className={`status-pill ${editorEnabled ? "accent" : "secondary"}`}>
+                    {editorEnabled ? "Ready to author" : "Edit mode paused"}
+                  </span>
+                </div>
+                <div className="action-row editor-action-row">
+                  <button className="scene-button scene-button-primary" type="button" onClick={toggleEditMode}>
                     {editorEnabled ? "Pause Edit Mode" : "Edit Scene"}
                   </button>
                   <button
-                    className="scene-button"
+                    className="scene-button scene-button-primary"
                     type="button"
                     onClick={saveScenario}
-                    disabled={!authoring?.save_endpoint || editCount === 0}
+                    disabled={!authoring?.save_endpoint || !hasDraftEdits}
                   >
                     Save Scenario
                   </button>
@@ -2513,46 +2657,93 @@ function App(): JSX.Element {
                 <p className="status-copy">{editorMessage}</p>
               </div>
 
-              <div className="overview-card">
-                <p className="eyebrow">Authoring State</p>
-                <ul className="mini-list">
-                  <li>{editorEnabled ? "Edit mode is active" : "Edit mode is paused"}</li>
-                  <li>Working copy: {authoring?.working_scenario_path ?? "unavailable"}</li>
-                  <li>Nodes: {formatMaybeNumber(authoring?.editable_node_count ?? null)}</li>
-                  <li>Roads: {formatMaybeNumber(authoring?.editable_road_count ?? null)}</li>
-                  <li>Zones: {formatMaybeNumber(authoring?.editable_area_count ?? null)}</li>
-                </ul>
-              </div>
+              <div className="editor-detail-grid">
+                <div className="overview-card editor-state-card">
+                  <div className="subsection-header">
+                    <p className="eyebrow">Authoring State</p>
+                    <span className={`status-pill ${validationBlocked ? "secondary" : "accent"}`}>
+                      {validationStatusLabel}
+                    </span>
+                  </div>
+                  <ul className="mini-list editor-state-list">
+                    <li>{editorEnabled ? "Edit mode is active" : "Edit mode is paused"}</li>
+                    <li>Working copy: {workingScenarioPath}</li>
+                    <li>Source scenario: {sourceScenarioPath}</li>
+                    <li>
+                      Geometry: {formatMaybeNumber(authoring?.editable_node_count ?? null)} nodes ·{" "}
+                      {formatMaybeNumber(authoring?.editable_road_count ?? null)} roads ·{" "}
+                      {formatMaybeNumber(authoring?.editable_area_count ?? null)} zones
+                    </li>
+                  </ul>
+                </div>
 
-              <div className="subsection">
-                <h3>Validation Messages</h3>
-                <ul className="data-list">
-                  {validationMessages.length > 0 ? (
-                    validationMessages.map((message, index) => (
-                      <li key={`${message.code ?? "validation"}-${index}`}>
-                        {(message.severity ?? "info").toUpperCase()} ·{" "}
-                        {message.message ?? "No validation message"}
-                      </li>
-                    ))
-                  ) : (
-                    <li>No validation issues are currently blocking the draft.</li>
-                  )}
-                </ul>
-              </div>
+                <div className="subsection editor-validation-card">
+                  <div className="subsection-header">
+                    <h3>Validation Messages</h3>
+                    <span className={`status-pill ${validationBlocked ? "secondary" : "accent"}`}>
+                      {validationStatusLabel}
+                    </span>
+                  </div>
+                  <ul className="editor-message-list">
+                    {validationMessages.length > 0 ? (
+                      validationMessages.map((message, index) => {
+                        const severity = (message.severity ?? "info").toLowerCase();
+                        return (
+                          <li
+                            key={`${message.code ?? "validation"}-${index}`}
+                            className={`editor-validation-item editor-validation-item-${severity}`}
+                          >
+                            <div className="editor-item-heading">
+                              <strong>{message.code ?? severity.toUpperCase()}</strong>
+                              <span className="editor-item-chip">
+                                {message.target_kind ?? "global"}
+                                {message.target_id !== undefined && message.target_id !== null
+                                  ? ` · ${message.target_id}`
+                                  : ""}
+                              </span>
+                            </div>
+                            <p>{message.message ?? "No validation message"}</p>
+                          </li>
+                        );
+                      })
+                    ) : (
+                      <li className="editor-empty-state">No validation issues are currently blocking the draft.</li>
+                    )}
+                  </ul>
+                </div>
 
-              <div className="subsection">
-                <h3>Draft Operations</h3>
-                <ul className="data-list">
-                  {draftTransaction.operations.length > 0 ? (
-                    draftTransaction.operations.map((operation, index) => (
-                      <li key={`${operation.kind}-${operation.target_id}-${index}`}>
-                        {describeOperation(operation)}
-                      </li>
-                    ))
-                  ) : (
-                    <li>No geometry edits are staged yet.</li>
-                  )}
-                </ul>
+                <div className="subsection editor-draft-card">
+                  <div className="subsection-header">
+                    <h3>Draft Operations</h3>
+                    <span className={`status-pill ${hasDraftEdits ? "accent" : "secondary"}`}>
+                      {draftStatusLabel}
+                    </span>
+                  </div>
+                  <ul className="editor-operation-list">
+                    {draftTransaction.operations.length > 0 ? (
+                      draftTransaction.operations.map((operation, index) => (
+                        <li
+                          key={`${operation.kind}-${operation.target_id}-${index}`}
+                          className="editor-draft-item"
+                        >
+                          <div className="editor-item-heading">
+                            <strong>{operation.kind.split("_").join(" ")}</strong>
+                            <span className="editor-item-chip">
+                              {operation.kind === "move_node"
+                                ? `node ${operation.target_id}`
+                                : operation.kind === "set_road_centerline"
+                                  ? `road ${operation.target_id}`
+                                  : `zone ${operation.target_id}`}
+                            </span>
+                          </div>
+                          <p>{describeOperation(operation)}</p>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="editor-empty-state">No geometry edits are staged yet.</li>
+                    )}
+                  </ul>
+                </div>
               </div>
             </div>
           </section>
@@ -2859,20 +3050,24 @@ function App(): JSX.Element {
           </section>
 
           <section className="panel info-panel traffic-pane" aria-labelledby="traffic-title">
-            <div className="panel-header compact">
+            <div className="panel-header compact traffic-panel-header">
               <div>
-                <p className="eyebrow">Traffic Region</p>
-                <h2 id="traffic-title">Traffic Monitoring</h2>
+                <p className="eyebrow">Traffic Control Room</p>
+                <h2 id="traffic-title">Traffic Control</h2>
+                <p className="traffic-panel-lede">
+                  Urgent congestion, blocked edges, queue reservations, and road-state cards are
+                  ranked so the highest-pressure issues stay at the top.
+                </p>
               </div>
-              <span className="status-pill secondary">
-                {formatMaybeNumber(bootstrap.blockedEdgeCount)} blocked edges
+              <span className="status-pill secondary traffic-panel-status">
+                {formatMaybeNumber(blockedEdgeIds.length)} blocked edges
               </span>
             </div>
-            <div className="section-stack">
-              <div className="subsection traffic-heatmap-pane">
-                <h3>Traffic Heatmap</h3>
-                <div className="traffic-summary-row">
-                  <span className="traffic-summary-chip">
+
+            <div className="section-stack traffic-monitor-stack">
+              <div className="subsection traffic-monitor-board">
+                <div className="traffic-summary-row traffic-summary-row-monitor">
+                  <span className="traffic-summary-chip critical">
                     {formatMaybeNumber(queuedVehicleCount)} queued
                   </span>
                   <span className="traffic-summary-chip">
@@ -2881,305 +3076,718 @@ function App(): JSX.Element {
                   <span className="traffic-summary-chip accent">
                     Peak {Math.round(peakTrafficIntensity * 100)}%
                   </span>
-                  <span className="traffic-summary-chip">
-                    {formatMaybeNumber(bootstrap.blockedEdgeCount)} blocked edges
+                  <span className="traffic-summary-chip critical">
+                    {formatMaybeNumber(blockedEdgeIds.length)} blocked edges
                   </span>
                 </div>
-                <ul className="traffic-heatmap-list">
-                  {trafficRoadStates.filter((roadState) => (roadState.congestion_intensity ?? 0) > 0)
-                    .length > 0 ? (
-                    trafficRoadStates
-                      .filter((roadState) => (roadState.congestion_intensity ?? 0) > 0)
-                      .sort(
-                        (left, right) =>
-                          (right.congestion_intensity ?? 0) - (left.congestion_intensity ?? 0),
-                      )
-                      .slice(0, 4)
-                      .map((roadState) => (
-                        <li
-                          key={roadState.road_id ?? "road"}
-                          className="traffic-heatmap-row"
-                        >
-                          <div className="traffic-heatmap-label">
-                            <strong>{roadState.road_id ?? "road"}</strong>
-                            <span>
-                              {roadState.congestion_level ?? "active"} ·{" "}
-                              {roadState.queued_vehicle_ids?.length ?? 0} queued
-                            </span>
+                <div className="traffic-alert-grid">
+                  <article className="traffic-alert-card traffic-alert-card-congestion">
+                    <div className="traffic-alert-card-header">
+                      <div>
+                        <p className="traffic-alert-kicker">Urgent traffic issues</p>
+                        <h3>Congestion Overview</h3>
+                        <p className="traffic-card-lede">
+                          Roads with the highest pressure appear first, followed by the rest of the
+                          monitored road set.
+                        </p>
+                      </div>
+                      <span className="traffic-alert-badge">
+                        {formatMaybeNumber(congestedRoadCount)} active
+                      </span>
+                    </div>
+                    <ul className="traffic-alert-list">
+                      {trafficMonitoringRoadStates.filter(
+                        (roadState) => trafficRoadPressureScore(roadState) > 0,
+                      ).length > 0 ? (
+                        trafficMonitoringRoadStates
+                          .filter((roadState) => trafficRoadPressureScore(roadState) > 0)
+                          .slice(0, 3)
+                          .map((roadState) => (
+                            <li
+                              key={`traffic-urgent-${roadState.road_id ?? "road"}`}
+                              className="traffic-alert-row"
+                            >
+                              <div className="traffic-alert-row-header">
+                                <div>
+                                  <strong>Road {roadState.road_id ?? "unknown"}</strong>
+                                  <span>
+                                    {roadState.congestion_level ?? "active"} · {roadState.control_state ?? "free_flow"}
+                                  </span>
+                                </div>
+                                <span className="traffic-alert-row-score">
+                                  {Math.round((roadState.congestion_intensity ?? 0) * 100)}%
+                                </span>
+                              </div>
+                              <div className="traffic-alert-bar" aria-hidden="true">
+                                <span
+                                  style={{
+                                    width: `${Math.round(
+                                      (roadState.congestion_intensity ?? 0) * 100,
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
+                              <div className="traffic-alert-row-meta">
+                                <span>Queued {formatMaybeNumber(roadState.queued_vehicle_ids?.length ?? 0)}</span>
+                                <span>Occupancy {formatMaybeNumber(roadState.occupancy_count ?? null)}</span>
+                                <span>Min spacing {formatMeters(roadState.min_spacing_m ?? null)}</span>
+                              </div>
+                            </li>
+                          ))
+                      ) : (
+                        <li className="traffic-alert-row traffic-alert-row-calm">
+                          <div className="traffic-alert-row-header">
+                            <div>
+                              <strong>All monitored roads</strong>
+                              <span>No congestion at the current sample</span>
+                            </div>
+                            <span className="traffic-alert-row-score">0%</span>
                           </div>
-                          <div className="traffic-heatmap-bar" aria-hidden="true">
-                            <span
-                              style={{
-                                width: `${Math.round((roadState.congestion_intensity ?? 0) * 100)}%`,
-                              }}
-                            />
+                          <div className="traffic-alert-bar" aria-hidden="true">
+                            <span style={{ width: "0%" }} />
                           </div>
                         </li>
-                      ))
-                  ) : (
-                    <li className="traffic-heatmap-row">
-                      <div className="traffic-heatmap-label">
-                        <strong>All roads</strong>
-                        <span>No congestion at the current sample</span>
+                      )}
+                    </ul>
+                  </article>
+
+                  <article className="traffic-alert-card traffic-alert-card-hazard">
+                    <div className="traffic-alert-card-header">
+                      <div>
+                        <p className="traffic-alert-kicker">Hazard watch</p>
+                        <h3>Blocked Edge Watch</h3>
+                        <p className="traffic-card-lede">
+                          Blocked edges are surfaced before neutral traffic data so closures and
+                          hazards stay obvious.
+                        </p>
                       </div>
-                      <div className="traffic-heatmap-bar" aria-hidden="true">
-                        <span style={{ width: "0%" }} />
+                      <span className="traffic-alert-badge traffic-alert-badge-critical">
+                        {formatMaybeNumber(blockedEdgeIds.length)} blocked
+                      </span>
+                    </div>
+                    {selectedTarget?.kind === "hazard" && selectedHazardEdge ? (
+                      <div className="traffic-hazard-focus">
+                        <div className="traffic-hazard-focus-header">
+                          <strong>Selected blocked edge {selectedHazardEdge.edge_id ?? "?"}</strong>
+                          <span>{selectedHazardEdge.distance ?? "pending"} distance</span>
+                        </div>
+                        <div className="traffic-hazard-focus-meta">
+                          <span>Start node {formatMaybeNumber(selectedHazardEdge.start_node_id ?? null)}</span>
+                          <span>End node {formatMaybeNumber(selectedHazardEdge.end_node_id ?? null)}</span>
+                          <span>Speed limit {selectedHazardEdge.speed_limit ?? "pending"}</span>
+                        </div>
                       </div>
-                    </li>
-                  )}
-                </ul>
+                    ) : blockedEdgeIds.length > 0 ? (
+                      <ul className="traffic-hazard-list">
+                        {blockedEdgeIds.slice(0, 5).map((edgeId) => (
+                          <li key={`blocked-${edgeId}`} className="traffic-hazard-card">
+                            <strong>Edge {edgeId}</strong>
+                            <span>Blocked edge under active monitoring</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="traffic-hazard-empty">
+                        <strong>No blocked edges</strong>
+                        <span>Hazard watch is clear at the current sample.</span>
+                      </div>
+                    )}
+                  </article>
+                </div>
               </div>
+
               <div className="subsection traffic-road-state-pane">
-                <h3>Road State Inspection</h3>
-                <ul className="data-list">
-                  {selectedTarget?.kind === "road" && selectedRoad ? (
-                    <>
-                      <li>
-                        {selectedRoad.road_id ?? "road"} · {selectedRoad.road_class ?? "connector"} ·{" "}
-                        {selectedRoadTraffic?.congestion_level ?? "free"}
-                      </li>
-                      <li>
-                        Directionality: {selectedRoad.directionality ?? "unknown"} · Lanes:{" "}
-                        {formatMaybeNumber(selectedRoad.lane_count ?? null)} · Width:{" "}
-                        {selectedRoad.width_m ?? "pending"}m
-                      </li>
-                      <li>
-                        Queued: {selectedRoadTraffic?.queued_vehicle_ids?.length ?? 0} · Active:{" "}
-                        {selectedRoadTraffic?.active_vehicle_ids?.length ?? 0}
-                      </li>
-                      <li>
-                        Control: {selectedRoadTraffic?.control_state ?? "free_flow"} · Min spacing:{" "}
-                        {formatMeters(selectedRoadTraffic?.min_spacing_m ?? null)}
-                      </li>
-                      <li>
-                        Stop lines: {selectedRoadTraffic?.stop_line_ids?.join(", ") || "none"}
-                      </li>
-                      <li>
-                        Protected areas:{" "}
-                        {selectedRoadTraffic?.protected_conflict_zone_ids?.join(", ") || "none"}
-                      </li>
-                    </>
-                  ) : trafficRoadStates.length > 0 ? (
-                    trafficRoadStates
-                      .slice(0, 4)
-                      .map((roadState) => (
-                        <li key={roadState.road_id ?? "road-state"}>
-                          Road {roadState.road_id ?? "unknown"} · {roadState.congestion_level ?? "free"} ·{" "}
-                          queued {roadState.queued_vehicle_ids?.length ?? 0} · active{" "}
-                          {roadState.active_vehicle_ids?.length ?? 0}
-                        </li>
-                      ))
-                  ) : (
-                    <li>No traffic road-state samples are currently attached.</li>
-                  )}
-                </ul>
+                <div className="traffic-section-heading">
+                  <div>
+                    <h3>Active Road Conditions</h3>
+                    <p className="traffic-section-lede">
+                      Road-state cards surface congestion intensity, occupancy, queued vehicles,
+                      and control state in a scan-friendly order.
+                    </p>
+                  </div>
+                  <span className="traffic-section-badge">
+                    {formatMaybeNumber(trafficRoadStatesRanked.length)} roads sampled
+                  </span>
+                </div>
+                {trafficFocusRoadState ? (
+                  <article
+                    className={`traffic-road-card traffic-road-card-spotlight ${
+                      trafficFocusRoadState.road_id &&
+                      selectedRoadTraffic?.road_id === trafficFocusRoadState.road_id
+                        ? "selected"
+                        : ""
+                    }`}
+                  >
+                    <div className="traffic-road-card-header">
+                      <div>
+                        <p className="traffic-road-card-kicker">Road focus</p>
+                        <h4>Road {trafficFocusRoadState.road_id ?? "unknown"}</h4>
+                        <p className="traffic-road-card-summary">
+                          {trafficFocusRoad?.road_class ?? "connector"} ·{" "}
+                          {trafficFocusRoad?.directionality ?? "unknown"} ·{" "}
+                          {formatMaybeNumber(trafficFocusRoad?.lane_count ?? null)} lanes ·{" "}
+                          {trafficFocusRoad?.width_m ?? "pending"}m width
+                        </p>
+                      </div>
+                      <span className="traffic-road-card-pill">
+                        {trafficFocusRoadState.congestion_level ?? "free"} ·{" "}
+                        {trafficFocusRoadState.control_state ?? "free_flow"}
+                      </span>
+                    </div>
+                    <div className="traffic-road-card-metrics">
+                      <span>
+                        Intensity <strong>{Math.round((trafficFocusRoadState.congestion_intensity ?? 0) * 100)}%</strong>
+                      </span>
+                      <span>
+                        Occupancy <strong>{formatMaybeNumber(trafficFocusRoadState.occupancy_count ?? null)}</strong>
+                      </span>
+                      <span>
+                        Queued <strong>{formatMaybeNumber(trafficFocusRoadState.queued_vehicle_ids?.length ?? 0)}</strong>
+                      </span>
+                      <span>
+                        Control <strong>{trafficFocusRoadState.control_state ?? "free_flow"}</strong>
+                      </span>
+                      <span>
+                        Min spacing <strong>{formatMeters(trafficFocusRoadState.min_spacing_m ?? null)}</strong>
+                      </span>
+                    </div>
+                    <div className="traffic-road-card-bar" aria-hidden="true">
+                      <span
+                        style={{
+                          width: `${Math.round((trafficFocusRoadState.congestion_intensity ?? 0) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="traffic-road-card-footnote">
+                      <span>
+                        Stop lines {trafficFocusRoadState.stop_line_ids?.join(", ") || "none"}
+                      </span>
+                      <span>
+                        Protected zones{" "}
+                        {trafficFocusRoadState.protected_conflict_zone_ids?.join(", ") || "none"}
+                      </span>
+                    </div>
+                  </article>
+                ) : null}
+                <div className="traffic-road-card-grid">
+                  {trafficMonitoringRoadStates.slice(trafficFocusRoadState ? 1 : 0).map((roadState) => (
+                    <article
+                      key={`road-state-${roadState.road_id ?? "road"}`}
+                      className={`traffic-road-card ${
+                        (roadState.congestion_intensity ?? 0) > 0.65
+                          ? "traffic-road-card-hot"
+                          : (roadState.queued_vehicle_ids?.length ?? 0) > 0
+                            ? "traffic-road-card-queued"
+                            : "traffic-road-card-calm"
+                      }`}
+                    >
+                      <div className="traffic-road-card-header">
+                        <div>
+                          <p className="traffic-road-card-kicker">
+                            Road {roadState.road_id ?? "unknown"}
+                          </p>
+                          <h4>{roadState.congestion_level ?? "free"} traffic</h4>
+                        </div>
+                        <span className="traffic-road-card-pill">
+                          {roadState.control_state ?? "free_flow"}
+                        </span>
+                      </div>
+                      <div className="traffic-road-card-metrics">
+                        <span>
+                          Intensity <strong>{Math.round((roadState.congestion_intensity ?? 0) * 100)}%</strong>
+                        </span>
+                        <span>
+                          Occupancy <strong>{formatMaybeNumber(roadState.occupancy_count ?? null)}</strong>
+                        </span>
+                        <span>
+                          Queued <strong>{formatMaybeNumber(roadState.queued_vehicle_ids?.length ?? 0)}</strong>
+                        </span>
+                        <span>
+                          Control <strong>{roadState.control_state ?? "free_flow"}</strong>
+                        </span>
+                      </div>
+                      <div className="traffic-road-card-bar" aria-hidden="true">
+                        <span
+                          style={{
+                            width: `${Math.round((roadState.congestion_intensity ?? 0) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="traffic-road-card-footnote">
+                        <span>
+                          Active {formatMaybeNumber(roadState.active_vehicle_ids?.length ?? 0)}
+                        </span>
+                        <span>Min spacing {formatMeters(roadState.min_spacing_m ?? null)}</span>
+                      </div>
+                    </article>
+                  ))}
+                  {trafficMonitoringRoadStates.length === 0 ? (
+                    <div className="traffic-road-empty">
+                      No traffic road-state samples are currently attached.
+                    </div>
+                  ) : null}
+                </div>
               </div>
+
               <div className="subsection traffic-reservation-inspection">
-                <h3>Reservation & Conflict Inspection</h3>
-                <ul className="data-list">
-                  {(bundle?.traffic_baseline?.queue_records ?? []).length > 0 ? (
-                    (bundle?.traffic_baseline?.queue_records ?? []).slice(0, 5).map((record, index) => {
-                      const roadTraffic =
-                        typeof record.road_id === "string"
-                          ? trafficRoadById.get(record.road_id) ?? null
-                          : null;
-                      const queuedVehicleCount =
-                        record.vehicle_ids?.length ?? (record.vehicle_id !== undefined ? 1 : 0);
-                      return (
-                        <li key={`${record.road_id ?? "queue"}-${index}`}>
-                          Road {record.road_id ?? "unknown"} · {queuedVehicleCount} vehicle(s)
-                          · {roadTraffic?.control_state ?? "yield"} ·{" "}
-                          {roadTraffic?.congestion_level ?? "free"} · {record.reason ?? "queued"}
-                        </li>
-                      );
-                    })
+                <div className="traffic-section-heading">
+                  <div>
+                    <h3>Queue & Reservation Detail</h3>
+                    <p className="traffic-section-lede">
+                      Queue records are linked to the road they affect so reservation pressure is
+                      easy to follow.
+                    </p>
+                  </div>
+                  <span className="traffic-section-badge">
+                    {formatMaybeNumber(trafficQueueRecords.length)} reservations
+                  </span>
+                </div>
+                {selectedQueueRecord ? (
+                  <article className="traffic-reservation-card traffic-reservation-card-spotlight">
+                    <div className="traffic-reservation-card-header">
+                      <div>
+                        <p className="traffic-reservation-card-kicker">Selected queue</p>
+                        <h4>Road {selectedQueueRecord.road_id ?? "unknown"}</h4>
+                        <p className="traffic-reservation-card-summary">
+                          Node {formatMaybeNumber(selectedQueueRecord.node_id ?? null)} ·{" "}
+                          {selectedQueueRecord.reason ?? "queued"}
+                        </p>
+                      </div>
+                      <span className="traffic-reservation-badge">
+                        {selectedQueueRecord.vehicle_ids?.length ??
+                          (selectedQueueRecord.vehicle_id !== undefined ? 1 : 0)}{" "}
+                        vehicle(s)
+                      </span>
+                    </div>
+                    <div className="traffic-reservation-meta">
+                      <span>
+                        Control {selectedQueueTraffic?.control_state ?? "yield"}
+                      </span>
+                      <span>
+                        Congestion {selectedQueueTraffic?.congestion_level ?? "free"}
+                      </span>
+                      <span>
+                        Queued {selectedQueueTraffic?.queued_vehicle_ids?.length ?? 0}
+                      </span>
+                      <span>
+                        Occupancy {formatMaybeNumber(selectedQueueTraffic?.occupancy_count ?? null)}
+                      </span>
+                    </div>
+                  </article>
+                ) : null}
+                <div className="traffic-reservation-grid">
+                  {trafficQueueRecords.length > 0 ? (
+                    trafficQueueRecords
+                      .filter((record) => record !== selectedQueueRecord)
+                      .slice(0, 4)
+                      .map((record, index) => {
+                        const roadTraffic =
+                          typeof record.road_id === "string"
+                            ? trafficRoadById.get(record.road_id) ?? null
+                            : null;
+                        const queuedVehicleCount =
+                          record.vehicle_ids?.length ?? (record.vehicle_id !== undefined ? 1 : 0);
+                        return (
+                          <article
+                            key={`${record.road_id ?? "queue"}-${index}`}
+                            className="traffic-reservation-card"
+                          >
+                            <div className="traffic-reservation-card-header">
+                              <div>
+                                <p className="traffic-reservation-card-kicker">
+                                  Road {record.road_id ?? "unknown"}
+                                </p>
+                                <h4>{record.reason ?? "Queued reservation"}</h4>
+                              </div>
+                              <span className="traffic-reservation-badge">
+                                {queuedVehicleCount} vehicle(s)
+                              </span>
+                            </div>
+                            <div className="traffic-reservation-meta">
+                              <span>
+                                Control {roadTraffic?.control_state ?? "yield"}
+                              </span>
+                              <span>
+                                Congestion {roadTraffic?.congestion_level ?? "free"}
+                              </span>
+                              <span>
+                                Occupancy {formatMaybeNumber(roadTraffic?.occupancy_count ?? null)}
+                              </span>
+                              <span>
+                                Node {formatMaybeNumber(record.node_id ?? null)}
+                              </span>
+                            </div>
+                          </article>
+                        );
+                      })
                   ) : (
-                    <li>No queue reservations are currently active.</li>
+                    <div className="traffic-reservation-empty">No queue reservations are currently active.</div>
                   )}
-                </ul>
-                <ul className="mini-list">
-                  <li>Selected route conflicts: {selectedRoutePreview?.reason ?? "none"}</li>
-                  <li>
-                    Route preview roads:{" "}
+                </div>
+                <div className="traffic-context-strip">
+                  <span>Selected route conflicts {selectedRoutePreview?.reason ?? "none"}</span>
+                  <span>
+                    Route preview roads{" "}
                     {selectedRoutePreviewRoadIds.size > 0
                       ? Array.from(selectedRoutePreviewRoadIds).join(", ")
                       : "none"}
-                  </li>
-                  <li>
-                    Blocked edges: {(bootstrap.bundle?.snapshot?.blocked_edge_ids ?? []).join(", ") || "none"}
-                  </li>
-                </ul>
-              </div>
-              <div className="subsection traffic-hazard-pane">
-                <h3>Blocked Edges and Hazards</h3>
-                <ul className="data-list">
-                  {selectedTarget?.kind === "hazard" && selectedHazardEdge ? (
-                    <>
-                      <li>
-                        Blocked edge {selectedHazardEdge.edge_id ?? "?"} · distance{" "}
-                        {selectedHazardEdge.distance ?? "pending"}
-                      </li>
-                      <li>
-                        Start node: {formatMaybeNumber(selectedHazardEdge.start_node_id ?? null)} · End node:{" "}
-                        {formatMaybeNumber(selectedHazardEdge.end_node_id ?? null)}
-                      </li>
-                      <li>Speed limit: {selectedHazardEdge.speed_limit ?? "pending"}</li>
-                    </>
-                  ) : (bootstrap.bundle?.snapshot?.blocked_edge_ids ?? []).length > 0 ? (
-                    (bootstrap.bundle?.snapshot?.blocked_edge_ids ?? []).slice(0, 5).map((edgeId) => (
-                      <li key={`blocked-${edgeId}`}>Blocked edge {edgeId}</li>
-                    ))
-                  ) : (
-                    <li>No blocked edges are currently visible.</li>
-                  )}
-                </ul>
+                  </span>
+                  <span>
+                    Blocked edges{" "}
+                    {blockedEdgeIds.length > 0 ? blockedEdgeIds.join(", ") : "none"}
+                  </span>
+                </div>
               </div>
             </div>
           </section>
 
           <section className="panel info-panel analyze-pane" aria-labelledby="inspector-title">
-            <div className="panel-header compact">
-              <div>
+            <div className="panel-header compact analyze-panel-header">
+              <div className="analyze-panel-copy">
                 <p className="eyebrow">Inspector Region</p>
                 <h2 id="inspector-title">Diagnostics and AI Review</h2>
+                <p className="analyze-panel-lede">
+                  Urgent issues first, recommended actions second, and supporting context last.
+                </p>
               </div>
-              <span className="status-pill secondary">
-                {selectedTarget ? describeSelectedBadge(selectedTarget) : `${inspections.length} records`}
-              </span>
+              <div className="analyze-panel-meta">
+                <span className="status-pill secondary">
+                  {selectedTarget ? describeSelectedBadge(selectedTarget) : `${inspections.length} records`}
+                </span>
+                <div className="analyze-summary-strip" aria-label="Analyze summary">
+                  <span className="analysis-chip analysis-chip-alert">
+                    {reviewAnomalies.length} urgent issue{reviewAnomalies.length === 1 ? "" : "s"}
+                  </span>
+                  <span className="analysis-chip analysis-chip-action">
+                    {reviewSuggestions.length} action{reviewSuggestions.length === 1 ? "" : "s"}
+                  </span>
+                  <span className="analysis-chip analysis-chip-context">
+                    {reviewExplanations.length} explanation{reviewExplanations.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="section-stack">
-              {selectedInspection ? (
-                <article className="inspection-card">
-                  <div className="inspection-header">
-                    <strong>
-                      {displayedSelectedVehicle?.display_name ?? "Vehicle"}{" "}
-                      {formatMaybeNumber(selectedInspection.vehicle_id ?? null)}
-                    </strong>
-                    <span>
-                      {displayedSelectedVehicle?.role_label ??
-                        selectedInspection.operational_state ??
-                        "unknown_state"}
+
+            <div className="analyze-review-stack">
+              <section className="subsection analyze-ai-feedback analyze-review-section analyze-review-section-urgent">
+                <div className="analyze-section-header">
+                  <div>
+                    <h3>Urgent issues</h3>
+                    <p>Escalations and anomalies are surfaced first for immediate review.</p>
+                  </div>
+                  <span className="analysis-section-chip">
+                    {reviewAnomalies.length > 0 ? "highest severity" : "no active anomalies"}
+                  </span>
+                </div>
+                <div className="analyze-card-stack">
+                  {reviewAnomalies.length > 0 ? (
+                    reviewAnomalies.map((anomaly) => {
+                      const anomalyVehicle = findDisplayedVehicleById(
+                        displayedVehicles,
+                        anomaly.vehicle_id ?? null,
+                      );
+                      const anomalyTargetLabel =
+                        anomaly.vehicle_id !== undefined
+                          ? `Vehicle ${formatMaybeNumber(anomaly.vehicle_id)}${
+                              anomalyVehicle?.display_name ? ` · ${anomalyVehicle.display_name}` : ""
+                            }`
+                          : null;
+                      const severityLabel = normalizeReviewLevel(anomaly.severity, "info");
+                      return (
+                        <article
+                          key={anomaly.anomaly_id ?? anomaly.summary ?? "anomaly"}
+                          className={`review-card review-card-urgent review-card-${severityLabel}`}
+                        >
+                          <div className="review-card-header">
+                            <div className="review-card-title">
+                              <strong>{anomaly.summary ?? "No anomaly summary"}</strong>
+                              <span>Anomaly review item</span>
+                            </div>
+                            <div className="review-card-meta">
+                              <span className={`review-level-chip review-level-chip-${severityLabel}`}>
+                                {severityLabel.toUpperCase()}
+                              </span>
+                              {anomalyTargetLabel ? (
+                                <span className="review-target-chip">{anomalyTargetLabel}</span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="review-card-body">
+                            {anomaly.vehicle_id !== undefined
+                              ? "This anomaly is tied to a specific vehicle and should be reviewed before the next action."
+                              : "This anomaly is not tied to a vehicle target."}
+                          </div>
+                        </article>
+                      );
+                    })
+                  ) : (
+                    <div className="review-empty-state">No anomalies are currently attached.</div>
+                  )}
+                </div>
+              </section>
+
+              <section className="subsection analyze-ai-feedback analyze-review-section analyze-review-section-actions">
+                <div className="analyze-section-header">
+                  <div>
+                    <h3>Suggestions</h3>
+                    <p>Recommended actions are ordered by priority and linked to their target when possible.</p>
+                  </div>
+                  <span className="analysis-section-chip">
+                    {reviewSuggestions.length > 0 ? "actionable review" : "no recommendations"}
+                  </span>
+                </div>
+                <div className="analyze-card-stack">
+                  {reviewSuggestions.length > 0 ? (
+                    reviewSuggestions.map((suggestion) => {
+                      const suggestionVehicle = findDisplayedVehicleById(
+                        displayedVehicles,
+                        suggestion.target_vehicle_id ?? null,
+                      );
+                      const suggestionTargetLabel =
+                        suggestion.target_vehicle_id !== undefined && suggestion.target_vehicle_id !== null
+                          ? `Vehicle ${formatMaybeNumber(suggestion.target_vehicle_id)}${
+                              suggestionVehicle?.display_name ? ` · ${suggestionVehicle.display_name}` : ""
+                            }`
+                          : suggestion.target_edge_id !== undefined
+                            ? describeEdgeTargetLabel(
+                                suggestion.target_edge_id ?? undefined,
+                                bundle?.render_geometry?.roads ?? [],
+                              )
+                            : null;
+                      const priorityLabel = normalizeReviewLevel(suggestion.priority, "medium");
+                      return (
+                        <article
+                          key={suggestion.suggestion_id ?? suggestion.summary ?? "suggestion"}
+                          className={`review-card review-card-action review-card-${priorityLabel}`}
+                        >
+                          <div className="review-card-header">
+                            <div className="review-card-title">
+                              <strong>{suggestion.summary ?? "No summary"}</strong>
+                              <span>{suggestion.kind ?? "suggestion"}</span>
+                            </div>
+                            <div className="review-card-meta">
+                              <span className={`review-level-chip review-level-chip-${priorityLabel}`}>
+                                {priorityLabel.toUpperCase()}
+                              </span>
+                              {suggestionTargetLabel ? (
+                                <span className="review-target-chip">{suggestionTargetLabel}</span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="review-card-body">
+                            {suggestion.target_vehicle_id !== undefined ||
+                            suggestion.target_edge_id !== undefined
+                              ? "This action is tied to a concrete target and can be executed or inspected directly."
+                              : "This action is general guidance without a specific target."}
+                          </div>
+                        </article>
+                      );
+                    })
+                  ) : (
+                    <div className="review-empty-state">No actionable suggestions are currently attached.</div>
+                  )}
+                </div>
+              </section>
+
+              <section className="subsection analyze-ai-feedback analyze-review-section analyze-review-section-context">
+                <div className="analyze-section-header">
+                  <div>
+                    <h3>Explanations</h3>
+                    <p>Supporting context stays compact so the key review items remain easy to scan.</p>
+                  </div>
+                  <span className="analysis-section-chip">
+                    {reviewRecentCommands.length > 0 ? `${reviewRecentCommands.length} recent commands` : "context only"}
+                  </span>
+                </div>
+
+                {selectedInspection ? (
+                  <article className="review-card review-card-context analyze-context-card">
+                    <div className="review-card-header">
+                      <div className="review-card-title">
+                        <strong>
+                          {displayedSelectedVehicle?.display_name ?? "Vehicle"}{" "}
+                          {formatMaybeNumber(selectedInspection.vehicle_id ?? null)}
+                        </strong>
+                        <span>
+                          {displayedSelectedVehicle?.role_label ??
+                            selectedInspection.operational_state ??
+                            "unknown_state"}
+                        </span>
+                      </div>
+                      <span className="review-level-chip review-level-chip-info">Current target</span>
+                    </div>
+                    <div className="review-metric-grid" aria-label="Inspection metrics">
+                      <div className="review-metric">
+                        <span>Node</span>
+                        <strong>{formatMaybeNumber(selectedInspection.current_node_id ?? null)}</strong>
+                      </div>
+                      <div className="review-metric">
+                        <span>ETA</span>
+                        <strong>{formatSeconds(selectedInspection.eta_s ?? null)}</strong>
+                      </div>
+                      <div className="review-metric">
+                        <span>Job</span>
+                        <strong>{selectedInspection.current_job_id ?? "none"}</strong>
+                      </div>
+                      <div className="review-metric">
+                        <span>Wait</span>
+                        <strong>{selectedInspection.wait_reason ?? "none"}</strong>
+                      </div>
+                      <div className="review-metric">
+                        <span>Type</span>
+                        <strong>{displayedSelectedVehicle?.vehicle_type ?? "GENERIC"}</strong>
+                      </div>
+                      <div className="review-metric">
+                        <span>Control</span>
+                        <strong>{selectedInspection.traffic_control_state ?? "none"}</strong>
+                      </div>
+                    </div>
+                    <ul className="review-context-list">
+                      <li>
+                        Lane:{" "}
+                        {displayedSelectedVehicle?.lane_id
+                          ? `${displayedSelectedVehicle.lane_id} · ${
+                              displayedSelectedVehicle.lane_role ?? "travel"
+                            }`
+                          : "unassigned"}
+                      </li>
+                      <li>
+                        Lane direction: {displayedSelectedVehicle?.lane_directionality ?? "unknown"}
+                      </li>
+                      <li>
+                        Lane note: {displayedSelectedVehicle?.lane_selection_reason ?? "none"}
+                      </li>
+                      <li>
+                        Spacing: {formatMeters(displayedSelectedVehicle?.spacing_envelope_m ?? null)}
+                      </li>
+                      <li>Heading: {formatHeadingDegrees(displayedSelectedVehicle?.heading_rad ?? null)}</li>
+                      <li>{selectedInspection.traffic_control_detail ?? "No control detail"}</li>
+                    </ul>
+                    <div className="review-diagnostic-strip">
+                      {(selectedInspection.diagnostics ?? []).length > 0 ? (
+                        (selectedInspection.diagnostics ?? []).map((diagnostic, diagIndex) => {
+                          const diagnosticSeverity = normalizeReviewLevel(diagnostic.severity, "info");
+                          return (
+                            <span
+                              key={`${diagnostic.code ?? "diag"}-${diagIndex}`}
+                              className={`diagnostic-pill review-diagnostic-pill review-diagnostic-pill-${diagnosticSeverity}`}
+                            >
+                              <strong>{diagnosticSeverity.toUpperCase()}</strong>
+                              <span>{diagnostic.code ?? "diagnostic"}</span>
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span className="review-empty-state">No diagnostics are currently attached.</span>
+                      )}
+                    </div>
+                  </article>
+                ) : null}
+
+                {effectiveSelectedVehicleIds.length > 1 ? (
+                  <article className="review-card review-card-context">
+                    <div className="review-card-header">
+                      <div className="review-card-title">
+                        <strong>Fleet Selection</strong>
+                        <span>multi-select</span>
+                      </div>
+                      <span className="review-level-chip review-level-chip-info">
+                        {effectiveSelectedVehicleIds.length} vehicles
+                      </span>
+                    </div>
+                    <ul className="review-context-list">
+                      <li>Vehicles: {effectiveSelectedVehicleIds.join(", ")}</li>
+                      <li>Selected records: {selectedVehicleInspections.length}</li>
+                      <li>
+                        Route previews:{" "}
+                        {
+                          routePreviews.filter((preview) =>
+                            effectiveSelectedVehicleIds.includes(preview.vehicle_id ?? -1),
+                          ).length
+                        }
+                      </li>
+                      <li>Batch commands: assign and reposition apply to every selected vehicle.</li>
+                    </ul>
+                  </article>
+                ) : null}
+
+                {selectedTarget?.kind === "area" && selectedArea ? (
+                  <article className="review-card review-card-context">
+                    <div className="review-card-header">
+                      <div className="review-card-title">
+                        <strong>{selectedArea.label ?? selectedArea.area_id ?? "zone"}</strong>
+                        <span>{selectedArea.kind ?? "area"}</span>
+                      </div>
+                      <span className="review-level-chip review-level-chip-info">Geometry target</span>
+                    </div>
+                    <ul className="review-context-list">
+                      <li>Polygon vertices: {selectedArea.polygon?.length ?? 0}</li>
+                      <li>Area id: {selectedArea.area_id ?? "unknown"}</li>
+                      <li>Editing target: zone polygon</li>
+                    </ul>
+                  </article>
+                ) : null}
+
+                <article className="review-card review-card-context analyze-command-card">
+                  <div className="review-card-header">
+                    <div className="review-card-title">
+                      <strong>Recent command trace</strong>
+                      <span>Latest operator actions</span>
+                    </div>
+                    <span className="review-level-chip review-level-chip-info">
+                      {reviewRecentCommands.length} shown
                     </span>
                   </div>
-                  <ul className="mini-list">
-                    <li>Node: {formatMaybeNumber(selectedInspection.current_node_id ?? null)}</li>
-                    <li>ETA: {formatSeconds(selectedInspection.eta_s ?? null)}</li>
-                    <li>Job: {selectedInspection.current_job_id ?? "none"}</li>
-                    <li>Wait: {selectedInspection.wait_reason ?? "none"}</li>
-                    <li>Type: {displayedSelectedVehicle?.vehicle_type ?? "GENERIC"}</li>
-                    <li>
-                      Lane:{" "}
-                      {displayedSelectedVehicle?.lane_id
-                        ? `${displayedSelectedVehicle.lane_id} · ${
-                            displayedSelectedVehicle.lane_role ?? "travel"
-                          }`
-                        : "unassigned"}
-                    </li>
-                    <li>
-                      Lane direction: {displayedSelectedVehicle?.lane_directionality ?? "unknown"}
-                    </li>
-                    <li>
-                      Lane note: {displayedSelectedVehicle?.lane_selection_reason ?? "none"}
-                    </li>
-                    <li>Spacing: {formatMeters(displayedSelectedVehicle?.spacing_envelope_m ?? null)}</li>
-                    <li>Heading: {formatHeadingDegrees(displayedSelectedVehicle?.heading_rad ?? null)}</li>
-                    <li>Control: {selectedInspection.traffic_control_state ?? "none"}</li>
-                    <li>{selectedInspection.traffic_control_detail ?? "No control detail"}</li>
-                  </ul>
-                  <div className="diagnostic-row">
-                    {(selectedInspection.diagnostics ?? []).slice(0, 3).map((diagnostic, diagIndex) => (
-                      <span
-                        key={`${diagnostic.code ?? "diag"}-${diagIndex}`}
-                        className="diagnostic-pill"
-                      >
-                        {(diagnostic.severity ?? "info").toUpperCase()}:{" "}
-                        {diagnostic.code ?? "diagnostic"}
-                      </span>
-                    ))}
+                  <div className="review-command-list">
+                    {reviewRecentCommands.length > 0 ? (
+                      reviewRecentCommands.map((command, commandIndex) => (
+                        <div key={`${command.command_type ?? "command"}-${commandIndex}`} className="review-command-item">
+                          <span className="review-command-kind">{command.command_type ?? "command"}</span>
+                          <span className="review-command-summary">{describeRecentCommand(command)}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="review-empty-state">No recent commands are currently attached.</div>
+                    )}
                   </div>
                 </article>
-              ) : null}
 
-              {effectiveSelectedVehicleIds.length > 1 ? (
-                <article className="inspection-card">
-                  <div className="inspection-header">
-                    <strong>Fleet Selection</strong>
-                    <span>multi-select</span>
-                  </div>
-                  <ul className="mini-list">
-                    <li>Vehicles: {effectiveSelectedVehicleIds.join(", ")}</li>
-                    <li>Selected records: {selectedVehicleInspections.length}</li>
-                    <li>
-                      Route previews:{" "}
-                      {
-                        routePreviews.filter((preview) =>
-                          effectiveSelectedVehicleIds.includes(preview.vehicle_id ?? -1),
-                        ).length
-                      }
-                    </li>
-                    <li>Batch commands: assign and reposition apply to every selected vehicle.</li>
-                  </ul>
-                </article>
-              ) : null}
-
-              {selectedTarget?.kind === "area" && selectedArea ? (
-                <article className="inspection-card">
-                  <div className="inspection-header">
-                    <strong>{selectedArea.label ?? selectedArea.area_id ?? "zone"}</strong>
-                    <span>{selectedArea.kind ?? "area"}</span>
-                  </div>
-                  <ul className="mini-list">
-                    <li>Polygon vertices: {selectedArea.polygon?.length ?? 0}</li>
-                    <li>Area id: {selectedArea.area_id ?? "unknown"}</li>
-                    <li>Editing target: zone polygon</li>
-                  </ul>
-                </article>
-              ) : null}
-
-              <div className="subsection analyze-ai-feedback">
-                <h3>Suggestions</h3>
-                <ul className="data-list">
-                  {suggestions.length > 0 ? (
-                    suggestions.slice(0, 3).map((suggestion) => (
-                      <li key={suggestion.suggestion_id ?? suggestion.summary ?? "suggestion"}>
-                        {suggestion.kind ?? "suggestion"} · {suggestion.summary ?? "No summary"}
-                      </li>
-                    ))
+                <div className="analyze-explanation-grid">
+                  {reviewExplanations.length > 0 ? (
+                    reviewExplanations.slice(0, 3).map((explanation, index) => {
+                      const explanationVehicle = findDisplayedVehicleById(
+                        displayedVehicles,
+                        explanation.vehicle_id ?? null,
+                      );
+                      return (
+                        <article
+                          key={`${explanation.vehicle_id ?? "explanation"}-${index}`}
+                          className="review-card review-card-context review-explanation-card"
+                        >
+                          <div className="review-card-header">
+                            <div className="review-card-title">
+                              <strong>
+                                Vehicle {formatMaybeNumber(explanation.vehicle_id ?? null)}
+                              </strong>
+                              <span>
+                                {explanationVehicle?.display_name ??
+                                  explanationVehicle?.role_label ??
+                                  "explanation"}
+                              </span>
+                            </div>
+                            <span className="review-level-chip review-level-chip-info">Explanation</span>
+                          </div>
+                          <div className="review-card-body review-explanation-body">
+                            {explanation.summary ?? "No explanation summary"}
+                          </div>
+                        </article>
+                      );
+                    })
                   ) : (
-                    <li>No actionable suggestions are currently attached.</li>
+                    <div className="review-empty-state">No AI explanations are currently attached.</div>
                   )}
-                </ul>
-              </div>
-              <div className="subsection analyze-ai-feedback">
-                <h3>Anomalies</h3>
-                <ul className="data-list">
-                  {anomalies.length > 0 ? (
-                    anomalies.slice(0, 3).map((anomaly) => (
-                      <li key={anomaly.anomaly_id ?? anomaly.summary ?? "anomaly"}>
-                        {(anomaly.severity ?? "info").toUpperCase()} ·{" "}
-                        {anomaly.summary ?? "No anomaly summary"}
-                      </li>
-                    ))
-                  ) : (
-                    <li>No anomalies are currently attached.</li>
-                  )}
-                </ul>
-              </div>
-              <div className="subsection analyze-ai-feedback">
-                <h3>Explanations</h3>
-                <ul className="data-list">
-                  {explanations.length > 0 ? (
-                    explanations.slice(0, 2).map((explanation, index) => (
-                      <li key={`${explanation.vehicle_id ?? "explanation"}-${index}`}>
-                        Vehicle {formatMaybeNumber(explanation.vehicle_id ?? null)} ·{" "}
-                        {explanation.summary ?? "No explanation summary"}
-                      </li>
-                    ))
-                  ) : (
-                    <li>No AI explanations are currently attached.</li>
-                  )}
-                </ul>
-              </div>
+                </div>
+              </section>
             </div>
           </section>
         </aside>
@@ -3875,6 +4483,26 @@ function trafficCongestionIntensity(
   return Math.min(1, vehiclePressure * 0.55 + spacingPressure * 0.45);
 }
 
+function trafficRoadPressureScore(roadState: TrafficRoadStatePayload | null): number {
+  if (!roadState) {
+    return 0;
+  }
+  const intensity = roadState.congestion_intensity ?? 0;
+  const queuedVehicleCount = roadState.queued_vehicle_ids?.length ?? 0;
+  const occupancyCount = roadState.occupancy_count ?? 0;
+  const controlState = roadState.control_state ?? "";
+  let score = intensity * 100;
+  score += queuedVehicleCount * 16;
+  score += occupancyCount * 6;
+  if (controlState !== "free_flow") {
+    score += 8;
+  }
+  if (controlState === "blocked" || controlState === "stop" || controlState === "yield") {
+    score += 8;
+  }
+  return score;
+}
+
 function spacingEnvelopeFromVehicle(
   vehicle: Pick<VehicleSnapshotPayload, "body_length_m" | "body_width_m">,
 ): number {
@@ -4254,6 +4882,56 @@ function describeSelectedBadge(selectedTarget: SelectedTarget): string {
     return "queue";
   }
   return "hazard";
+}
+
+function normalizeReviewLevel(value: string | undefined, fallback = "info"): string {
+  return (value ?? fallback).trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function reviewSeverityRank(value: string | undefined): number {
+  switch (normalizeReviewLevel(value)) {
+    case "critical":
+    case "error":
+      return 0;
+    case "high":
+      return 1;
+    case "warning":
+      return 2;
+    case "medium":
+      return 3;
+    case "low":
+      return 4;
+    default:
+      return 5;
+  }
+}
+
+function reviewPriorityRank(value: string | undefined): number {
+  switch (normalizeReviewLevel(value, "medium")) {
+    case "critical":
+    case "urgent":
+      return 0;
+    case "high":
+      return 1;
+    case "medium":
+      return 2;
+    case "normal":
+    case "low":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+function describeEdgeTargetLabel(edgeId: number | undefined, roads: RoadPayload[]): string | null {
+  if (edgeId === undefined) {
+    return null;
+  }
+  const road = roads.find((entry) => (entry.edge_ids ?? []).includes(edgeId));
+  if (road?.road_id) {
+    return `Edge ${edgeId} · Road ${road.road_id}`;
+  }
+  return `Edge ${edgeId}`;
 }
 
 function describeOperation(operation: EditOperation): string {
