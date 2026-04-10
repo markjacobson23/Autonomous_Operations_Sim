@@ -596,6 +596,416 @@ h3 {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 246, 247, 0.82));
 }
 
+.shell-tab-fleet .fleet-pane {
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(245, 238, 227, 0.96));
+  border-color: rgba(10, 118, 108, 0.16);
+  box-shadow: 0 30px 72px rgba(24, 33, 44, 0.14);
+}
+
+.fleet-panel-header {
+  align-items: flex-start;
+}
+
+.fleet-panel-meta {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+.fleet-panel-lede,
+.fleet-card-lede {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+  max-width: 56rem;
+}
+
+.fleet-control-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.fleet-card {
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  box-shadow: 0 16px 34px rgba(24, 33, 44, 0.09);
+  display: grid;
+  gap: 14px;
+}
+
+.fleet-summary-card {
+  background:
+    linear-gradient(135deg, rgba(10, 118, 108, 0.12), rgba(36, 83, 199, 0.08)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 244, 238, 0.94));
+}
+
+.fleet-batch-card {
+  background:
+    linear-gradient(135deg, rgba(36, 83, 199, 0.08), rgba(187, 101, 30, 0.06)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(248, 244, 238, 0.94));
+}
+
+.fleet-admin-card {
+  background:
+    linear-gradient(135deg, rgba(187, 101, 30, 0.08), rgba(10, 118, 108, 0.05)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(248, 243, 236, 0.94));
+}
+
+.fleet-inspection-card {
+  background:
+    linear-gradient(135deg, rgba(10, 118, 108, 0.08), rgba(24, 33, 44, 0.03)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(246, 242, 235, 0.94));
+}
+
+.fleet-card-header {
+  align-items: flex-start;
+}
+
+.fleet-card-badge,
+.fleet-batch-chip,
+.fleet-inspection-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(97, 112, 125, 0.1);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fleet-summary-grid,
+.fleet-inspection-metric-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fleet-summary-metric,
+.fleet-inspection-metric {
+  display: grid;
+  gap: 6px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.fleet-summary-metric span,
+.fleet-inspection-metric span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.fleet-summary-metric strong,
+.fleet-inspection-metric strong {
+  font-size: 0.96rem;
+  letter-spacing: -0.02em;
+}
+
+.fleet-summary-metric p,
+.fleet-inspection-metric p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.84rem;
+}
+
+.fleet-state-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fleet-state-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: rgba(0, 108, 103, 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(10, 118, 108, 0.12);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.fleet-selection-strip {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.64);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.fleet-vehicle-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.fleet-vehicle-pill {
+  min-width: 180px;
+  flex: 1 1 180px;
+  display: grid;
+  gap: 3px;
+  align-items: start;
+  text-align: left;
+  border: 1px solid rgba(97, 112, 125, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(246, 242, 235, 0.92));
+  color: var(--ink);
+  border-radius: 18px;
+  padding: 11px 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+}
+
+.fleet-vehicle-pill-primary {
+  border-color: rgba(10, 118, 108, 0.34);
+  background:
+    linear-gradient(135deg, rgba(10, 118, 108, 0.14), rgba(36, 83, 199, 0.08)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 242, 235, 0.96));
+  box-shadow: 0 12px 24px rgba(24, 33, 44, 0.1);
+}
+
+.fleet-vehicle-pill-id,
+.fleet-vehicle-pill-state {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.fleet-vehicle-pill-detail {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.fleet-vehicle-pill-route {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.fleet-batch-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fleet-selection-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fleet-admin-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.fleet-admin-group {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.fleet-admin-group-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.fleet-admin-group-header h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  font-size: 0.92rem;
+}
+
+.fleet-admin-group-header span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.fleet-command-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fleet-command-grid-vehicle {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.fleet-command-grid-job,
+.fleet-command-grid-hazard {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fleet-action-row {
+  margin-top: 2px;
+}
+
+.fleet-inspection-spotlight {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 242, 235, 0.92));
+}
+
+.fleet-inspection-spotlight-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.fleet-inspection-spotlight-header strong {
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.fleet-inspection-spotlight-header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.fleet-inspection-context-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.55;
+  display: grid;
+  gap: 4px;
+}
+
+.fleet-inspection-diagnostic-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fleet-inspection-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 12px;
+}
+
+.fleet-inspection-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.fleet-inspection-panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.fleet-inspection-panel-header h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  font-size: 0.92rem;
+}
+
+.fleet-inspection-panel-header span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+}
+
+.fleet-inspection-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.fleet-inspection-list li {
+  display: grid;
+  gap: 6px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.fleet-inspection-row-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fleet-inspection-row-header strong {
+  font-size: 0.84rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fleet-inspection-row-header span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fleet-inspection-list p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 0.86rem;
+}
+
+.fleet-command-list {
+  margin-top: 0;
+  padding-left: 18px;
+}
+
+.fleet-empty-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px dashed rgba(97, 112, 125, 0.18);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+}
+
 .traffic-pane,
 .fleet-pane,
 .editor-pane,
@@ -1386,6 +1796,12 @@ h3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .fleet-summary-grid,
+  .fleet-inspection-metric-grid,
+  .fleet-command-grid-vehicle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .health-pill {
     justify-self: start;
   }
@@ -1434,6 +1850,16 @@ h3 {
     grid-template-columns: 1fr;
   }
 
+  .fleet-summary-grid,
+  .fleet-inspection-metric-grid,
+  .fleet-inspection-grid,
+  .fleet-command-grid,
+  .fleet-command-grid-vehicle,
+  .fleet-command-grid-job,
+  .fleet-command-grid-hazard {
+    grid-template-columns: 1fr;
+  }
+
   .traffic-alert-card-header,
   .traffic-section-heading,
   .traffic-hazard-focus-header,
@@ -1454,6 +1880,16 @@ h3 {
   }
 
   .command-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fleet-summary-grid,
+  .fleet-inspection-metric-grid,
+  .fleet-inspection-grid,
+  .fleet-command-grid,
+  .fleet-command-grid-vehicle,
+  .fleet-command-grid-job,
+  .fleet-command-grid-hazard {
     grid-template-columns: 1fr;
   }
 

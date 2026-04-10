@@ -19,6 +19,12 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "Compact Session Status" in app_source
     assert "Traffic Control Room" in app_source
     assert "Fleet Control" in app_source
+    assert "Current Controlled Fleet" in app_source
+    assert "Batch Selection" in app_source
+    assert "Runtime Admin Actions" in app_source
+    assert "Inspection and Support Context" in app_source
+    assert "Selected Vehicle Roster" in app_source
+    assert "Recent Command Trace" in app_source
     assert "Scenario Authoring" in app_source
     assert "Dedicated controls for the working scenario" in app_source
     assert "Authoring Controls" in app_source
@@ -86,6 +92,15 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "editor-mode-banner" in app_source
     assert "editor-status-grid" in app_source
     assert "editor-detail-grid" in app_source
+    assert "fleet-control-grid" in app_source
+    assert "fleet-summary-card" in app_source
+    assert "fleet-batch-card" in app_source
+    assert "fleet-admin-card" in app_source
+    assert "fleet-inspection-card" in app_source
+    assert "fleet-vehicle-pill" in app_source
+    assert "fleet-inspection-spotlight" in app_source
+    assert "fleet-inspection-grid" in app_source
+    assert "fleet-empty-state" in app_source
     assert "scene-road-heatmap" in app_source
     assert "scene-route-endpoint" in app_source
     assert "scene-destination-threshold" in app_source
@@ -119,6 +134,7 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".shell-tab-operate .sidebar" in css_source
     assert ".shell-tab-traffic .workspace" in css_source
     assert ".shell-tab-fleet .workspace" in css_source
+    assert ".shell-tab-fleet .fleet-pane" in css_source
     assert ".shell-tab-editor .workspace" in css_source
     assert ".shell-tab-analyze .workspace" in css_source
     assert ".stage-grid" in css_source
@@ -141,6 +157,24 @@ def test_step_45_app_shell_styles_define_responsive_multi_panel_layout() -> None
     assert ".scene-rim" in css_source
     assert ".scene-legend" in css_source
     assert ".action-row" in css_source
+    assert ".fleet-control-grid" in css_source
+    assert ".fleet-summary-card" in css_source
+    assert ".fleet-batch-card" in css_source
+    assert ".fleet-admin-card" in css_source
+    assert ".fleet-inspection-card" in css_source
+    assert ".fleet-summary-grid" in css_source
+    assert ".fleet-state-pill" in css_source
+    assert ".fleet-vehicle-pill" in css_source
+    assert ".fleet-admin-grid" in css_source
+    assert ".fleet-admin-group" in css_source
+    assert ".fleet-command-grid-vehicle" in css_source
+    assert ".fleet-command-grid-job" in css_source
+    assert ".fleet-command-grid-hazard" in css_source
+    assert ".fleet-inspection-spotlight" in css_source
+    assert ".fleet-inspection-grid" in css_source
+    assert ".fleet-inspection-panel" in css_source
+    assert ".fleet-inspection-list" in css_source
+    assert ".fleet-empty-state" in css_source
     assert ".scene-lane" in css_source
     assert ".scene-turn-connector" in css_source
     assert ".scene-stop-line" in css_source
