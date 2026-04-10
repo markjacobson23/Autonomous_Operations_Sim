@@ -27,10 +27,11 @@ type BundleSummaryPayload = {
 
 type CommandCenterPayload = {
   selected_vehicle_ids?: number[];
-  recent_commands?: string[];
+  recent_commands?: RecentCommandPayload[];
   route_previews?: RoutePreviewPayload[];
   vehicle_inspections?: VehicleInspectionPayload[];
   ai_assist?: AIAssistPayload;
+  session_control?: SessionControlPayload;
 };
 
 type RoutePreviewPayload = {
@@ -50,7 +51,19 @@ type VehicleInspectionPayload = {
   current_job_id?: string | null;
   wait_reason?: string | null;
   eta_s?: number | null;
+  traffic_control_state?: string | null;
+  traffic_control_detail?: string | null;
+  route_ahead_node_ids?: number[];
+  route_ahead_edge_ids?: number[];
   diagnostics?: DiagnosticPayload[];
+};
+
+type RecentCommandPayload = {
+  command_type?: string;
+  edge_id?: number;
+  vehicle_id?: number;
+  node_id?: number;
+  destination_node_id?: number;
 };
 
 type DiagnosticPayload = {
@@ -275,6 +288,13 @@ type AuthoringPayload = {
   editable_area_count?: number;
 };
 
+type SessionControlPayload = {
+  play_state?: "paused" | "playing" | string;
+  step_seconds?: number;
+  command_endpoint?: string;
+  session_control_endpoint?: string;
+};
+
 type BundlePayload = {
   metadata?: { surface_name?: string };
   seed?: number;
@@ -288,6 +308,7 @@ type BundlePayload = {
   traffic_baseline?: TrafficBaselinePayload;
   traffic_snapshot?: TrafficSnapshotPayload;
   authoring?: AuthoringPayload;
+  session_control?: SessionControlPayload;
   snapshot?: {
     simulated_time_s?: number;
     blocked_edge_ids?: number[];
@@ -368,6 +389,14 @@ type EditTransaction = {
   operations: EditOperation[];
 };
 
+type LiveCommandDraft = {
+  vehicleId: string;
+  destinationNodeId: string;
+  edgeId: string;
+  nodeId: string;
+  stepSeconds: string;
+};
+
 type DragState =
   | { kind: "node"; nodeId: number; z: number }
   | { kind: "road-point"; roadId: string; pointIndex: number; z: number }
@@ -411,6 +440,17 @@ function App(): JSX.Element {
   const [draftTransaction, setDraftTransaction] = useState<EditTransaction>(emptyTransaction);
   const [validationMessages, setValidationMessages] = useState<ValidationMessage[]>([]);
   const [editorMessage, setEditorMessage] = useState("Authoring surface is standing by.");
+  const [liveCommandMessage, setLiveCommandMessage] = useState(
+    "Live command controls are standing by.",
+  );
+  const [bundlePath, setBundlePath] = useState<string | null>(null);
+  const [liveCommandDraft, setLiveCommandDraft] = useState<LiveCommandDraft>({
+    vehicleId: "",
+    destinationNodeId: "",
+    edgeId: "",
+    nodeId: "",
+    stepSeconds: "0.5",
+  });
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [bootstrap, setBootstrap] = useState<BootstrapSummary>({
     loadState: "idle",
@@ -443,6 +483,8 @@ function App(): JSX.Element {
     if (!bundlePath) {
       return;
     }
+
+    setBundlePath(bundlePath);
 
     let cancelled = false;
     setBootstrap((current) => ({
@@ -493,6 +535,41 @@ function App(): JSX.Element {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const sessionControl = bootstrap.bundle?.session_control;
+    if (sessionControl?.play_state !== "playing" || !bundlePath) {
+      return;
+    }
+
+    let cancelled = false;
+    const refresh = () => {
+      void fetch(bundlePath)
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`Bundle request failed with ${response.status}`);
+          }
+          return response.json() as Promise<BundlePayload>;
+        })
+        .then((bundle) => {
+          if (!cancelled) {
+            setBootstrap((current) => buildBootstrapSummary(bundle, current.message));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setLiveCommandMessage("Live bundle refresh failed.");
+          }
+        });
+    };
+
+    const intervalId = window.setInterval(refresh, 2000);
+    refresh();
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [bundlePath, bootstrap.bundle?.session_control?.play_state]);
 
   useEffect(() => {
     const motionEndTimeS = maxMotionTime(bootstrap.bundle);
@@ -638,14 +715,32 @@ function App(): JSX.Element {
       ? findEdgeById(bundle?.map_surface?.edges ?? [], selectedTarget.edgeId)
       : null;
   const authoring = bootstrap.bundle?.authoring;
+  const sessionControl = bootstrap.bundle?.session_control ?? null;
+  const liveSessionPlaying = sessionControl?.play_state === "playing";
   const editCount = draftTransaction.operations.length;
 
-  function applyLoadedBundle(bundlePayload: BundlePayload, message: string): void {
-    const nextViewport = fitViewportToBundle(bundlePayload);
-    setViewport(nextViewport);
-    setDraftTransaction(emptyTransaction);
-    setValidationMessages([]);
-    setDragState(null);
+  function applyLoadedBundle(
+    bundlePayload: BundlePayload,
+    message: string,
+    options: {
+      refitViewport?: boolean;
+      resetDraft?: boolean;
+      resetValidation?: boolean;
+      resetDrag?: boolean;
+    } = {},
+  ): void {
+    if (options.refitViewport ?? true) {
+      setViewport(fitViewportToBundle(bundlePayload));
+    }
+    if (options.resetDraft ?? true) {
+      setDraftTransaction(emptyTransaction);
+    }
+    if (options.resetValidation ?? true) {
+      setValidationMessages([]);
+    }
+    if (options.resetDrag ?? true) {
+      setDragState(null);
+    }
     setBootstrap(buildBootstrapSummary(bundlePayload, message));
   }
 
@@ -811,6 +906,213 @@ function App(): JSX.Element {
         const message = error instanceof Error ? error.message : "Reload request failed";
         setEditorMessage(message);
       });
+  }
+
+  useEffect(() => {
+    setLiveCommandDraft((current) => ({
+      vehicleId:
+        current.vehicleId ||
+        (selectedVehicleId !== null ? String(selectedVehicleId) : current.vehicleId),
+      destinationNodeId:
+        current.destinationNodeId ||
+        (routePreviews[0]?.destination_node_id !== undefined
+          ? String(routePreviews[0].destination_node_id)
+          : current.destinationNodeId),
+      edgeId:
+        current.edgeId ||
+        (selectedTarget?.kind === "hazard"
+          ? String(selectedTarget.edgeId)
+          : selectedRoad?.edge_ids?.[0] !== undefined
+            ? String(selectedRoad.edge_ids[0])
+            : current.edgeId),
+      nodeId:
+        current.nodeId ||
+        (selectedInspection?.current_node_id !== undefined
+          ? String(selectedInspection.current_node_id)
+          : current.nodeId),
+      stepSeconds:
+        current.stepSeconds || String(sessionControl?.step_seconds ?? 0.5),
+    }));
+  }, [
+    routePreviews,
+    selectedInspection?.current_node_id,
+    selectedRoad?.edge_ids,
+    selectedTarget?.kind,
+    selectedTarget?.kind === "hazard" ? selectedTarget.edgeId : undefined,
+    selectedVehicleId,
+    sessionControl?.step_seconds,
+  ]);
+
+  function parseDraftInteger(value: string): number | null {
+    if (!value.trim()) {
+      return null;
+    }
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function parseDraftFloat(value: string): number | null {
+    if (!value.trim()) {
+      return null;
+    }
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function submitLiveCommand(commandPayload: Record<string, unknown>): void {
+    const endpoint = sessionControl?.command_endpoint ?? "/api/live/command";
+    setLiveCommandMessage("Sending live command to the Python session...");
+    void fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...commandPayload,
+        selected_vehicle_ids: selectedVehicleId !== null ? [selectedVehicleId] : [],
+      }),
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          command_result?: { message?: string | null };
+          bundle?: BundlePayload;
+          message?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.message ?? `Command request failed with ${response.status}`);
+        }
+        return payload;
+      })
+      .then((payload) => {
+        if (payload.bundle) {
+          refreshLiveBundle(
+            payload.bundle,
+            payload.ok ? "Live command applied." : "Live command response returned.",
+          );
+        }
+        setLiveCommandMessage(
+          payload.command_result?.message ?? (payload.ok ? "Command accepted." : "Command rejected."),
+        );
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "Command request failed";
+        setLiveCommandMessage(message);
+      });
+  }
+
+  function controlLiveSession(action: "play" | "pause" | "step"): void {
+    const endpoint = sessionControl?.session_control_endpoint ?? "/api/live/session/control";
+    const stepSeconds = parseDraftFloat(liveCommandDraft.stepSeconds) ?? sessionControl?.step_seconds ?? 0.5;
+    setLiveCommandMessage(
+      action === "step"
+        ? "Advancing the live session by one explicit step..."
+        : action === "play"
+          ? "Setting live session refresh to play mode..."
+          : "Pausing live session refresh...",
+    );
+    void fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action,
+        delta_s: stepSeconds,
+        selected_vehicle_ids: selectedVehicleId !== null ? [selectedVehicleId] : [],
+      }),
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          bundle?: BundlePayload;
+          message?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.message ?? `Session control failed with ${response.status}`);
+        }
+        return payload;
+      })
+      .then((payload) => {
+        if (payload.bundle) {
+          refreshLiveBundle(
+            payload.bundle,
+            action === "step" ? "Live session advanced by one step." : "Session control updated.",
+          );
+        }
+        setLiveCommandMessage(
+          action === "step"
+            ? "Single-step completed."
+            : action === "play"
+              ? "Session refresh set to play mode."
+              : "Session refresh paused.",
+        );
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "Session control failed";
+        setLiveCommandMessage(message);
+      });
+  }
+
+  function assignDestinationFromDraft(): void {
+    const vehicleId = parseDraftInteger(liveCommandDraft.vehicleId);
+    const destinationNodeId = parseDraftInteger(liveCommandDraft.destinationNodeId);
+    if (vehicleId === null || destinationNodeId === null) {
+      setLiveCommandMessage("Enter a valid vehicle id and destination node id first.");
+      return;
+    }
+    submitLiveCommand({
+      command_type: "assign_vehicle_destination",
+      vehicle_id: vehicleId,
+      destination_node_id: destinationNodeId,
+    });
+  }
+
+  function repositionVehicleFromDraft(): void {
+    const vehicleId = parseDraftInteger(liveCommandDraft.vehicleId);
+    const nodeId = parseDraftInteger(liveCommandDraft.nodeId);
+    if (vehicleId === null || nodeId === null) {
+      setLiveCommandMessage("Enter a valid vehicle id and node id first.");
+      return;
+    }
+    submitLiveCommand({
+      command_type: "reposition_vehicle",
+      vehicle_id: vehicleId,
+      node_id: nodeId,
+    });
+  }
+
+  function blockRoadFromDraft(): void {
+    const edgeId = parseDraftInteger(liveCommandDraft.edgeId);
+    if (edgeId === null) {
+      setLiveCommandMessage("Enter a valid edge id first.");
+      return;
+    }
+    submitLiveCommand({
+      command_type: "block_edge",
+      edge_id: edgeId,
+    });
+  }
+
+  function unblockRoadFromDraft(): void {
+    const edgeId = parseDraftInteger(liveCommandDraft.edgeId);
+    if (edgeId === null) {
+      setLiveCommandMessage("Enter a valid edge id first.");
+      return;
+    }
+    submitLiveCommand({
+      command_type: "unblock_edge",
+      edge_id: edgeId,
+    });
+  }
+
+  function refreshLiveBundle(bundlePayload: BundlePayload, message: string): void {
+    applyLoadedBundle(bundlePayload, message, {
+      refitViewport: false,
+      resetDraft: false,
+      resetValidation: false,
+      resetDrag: false,
+    });
   }
 
   function upsertOperation(nextOperation: EditOperation): void {
@@ -1696,16 +1998,179 @@ function App(): JSX.Element {
                 <h2 id="command-center-title">Fleet Actions</h2>
               </div>
               <span className="status-pill secondary">
-                {formatMaybeNumber(bootstrap.selectedVehicleCount)} selected
+                {formatMaybeNumber(bootstrap.selectedVehicleCount)} selected ·{" "}
+                {liveSessionPlaying ? "playing" : "paused"}
               </span>
             </div>
             <div className="section-stack">
+              <div className="subsection">
+                <h3>Live Command Console</h3>
+                <div className="command-grid">
+                  <label className="form-field">
+                    <span>Vehicle ID</span>
+                    <input
+                      type="number"
+                      value={liveCommandDraft.vehicleId}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          vehicleId: event.target.value,
+                        }))
+                      }
+                      placeholder={selectedVehicleId !== null ? String(selectedVehicleId) : "77"}
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Destination Node</span>
+                    <input
+                      type="number"
+                      value={liveCommandDraft.destinationNodeId}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          destinationNodeId: event.target.value,
+                        }))
+                      }
+                      placeholder={
+                        routePreviews[0]?.destination_node_id !== undefined
+                          ? String(routePreviews[0].destination_node_id)
+                          : "3"
+                      }
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Edge ID</span>
+                    <input
+                      type="number"
+                      value={liveCommandDraft.edgeId}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          edgeId: event.target.value,
+                        }))
+                      }
+                      placeholder={
+                        selectedTarget?.kind === "hazard"
+                          ? String(selectedTarget.edgeId)
+                          : selectedRoad?.edge_ids?.[0] !== undefined
+                            ? String(selectedRoad.edge_ids[0])
+                            : "2"
+                      }
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Reposition Node</span>
+                    <input
+                      type="number"
+                      value={liveCommandDraft.nodeId}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          nodeId: event.target.value,
+                        }))
+                      }
+                      placeholder={
+                        selectedInspection?.current_node_id !== undefined
+                          ? String(selectedInspection.current_node_id)
+                          : "1"
+                      }
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Step Seconds</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={liveCommandDraft.stepSeconds}
+                      onChange={(event) =>
+                        setLiveCommandDraft((current) => ({
+                          ...current,
+                          stepSeconds: event.target.value,
+                        }))
+                      }
+                      placeholder={String(sessionControl?.step_seconds ?? 0.5)}
+                    />
+                  </label>
+                </div>
+                <div className="action-row">
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={assignDestinationFromDraft}
+                    disabled={!sessionControl?.command_endpoint}
+                  >
+                    Assign Destination
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={repositionVehicleFromDraft}
+                    disabled={!sessionControl?.command_endpoint}
+                  >
+                    Reposition Vehicle
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={blockRoadFromDraft}
+                    disabled={!sessionControl?.command_endpoint}
+                  >
+                    Block Road
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={unblockRoadFromDraft}
+                    disabled={!sessionControl?.command_endpoint}
+                  >
+                    Unblock Road
+                  </button>
+                </div>
+              </div>
+
+              <div className="subsection">
+                <h3>Session Control</h3>
+                <div className="action-row">
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={() => controlLiveSession("play")}
+                    disabled={!sessionControl?.session_control_endpoint}
+                  >
+                    Play
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={() => controlLiveSession("pause")}
+                    disabled={!sessionControl?.session_control_endpoint}
+                  >
+                    Pause
+                  </button>
+                  <button
+                    className="scene-button"
+                    type="button"
+                    onClick={() => controlLiveSession("step")}
+                    disabled={!sessionControl?.session_control_endpoint}
+                  >
+                    Single-Step
+                  </button>
+                </div>
+                <ul className="mini-list">
+                  <li>Mode: {sessionControl?.play_state ?? "paused"}</li>
+                  <li>Step size: {formatSeconds(sessionControl?.step_seconds ?? null)}</li>
+                </ul>
+                <p className="status-copy">{liveCommandMessage}</p>
+              </div>
+
               <div className="subsection">
                 <h3>Recent Commands</h3>
                 <ul className="data-list">
                   {recentCommands.length > 0 ? (
                     recentCommands.slice(0, 4).map((command, index) => (
-                      <li key={`${command}-${index}`}>{command}</li>
+                      <li key={`${command.command_type ?? "command"}-${index}`}>
+                        {describeRecentCommand(command)}
+                      </li>
                     ))
                   ) : (
                     <li>No command history is available yet.</li>
@@ -2983,6 +3448,20 @@ function describeOperation(operation: EditOperation): string {
     return `edit road ${operation.target_id} with ${operation.points.length} centerline point(s)`;
   }
   return `edit zone ${operation.target_id} with ${operation.points.length} polygon vertex/vertices`;
+}
+
+function describeRecentCommand(command: RecentCommandPayload): string {
+  const commandType = command.command_type ?? "command";
+  if (commandType === "assign_vehicle_destination") {
+    return `assign_vehicle_destination · vehicle ${formatMaybeNumber(command.vehicle_id ?? null)} → node ${formatMaybeNumber(command.destination_node_id ?? null)}`;
+  }
+  if (commandType === "reposition_vehicle") {
+    return `reposition_vehicle · vehicle ${formatMaybeNumber(command.vehicle_id ?? null)} → node ${formatMaybeNumber(command.node_id ?? null)}`;
+  }
+  if (commandType === "block_edge" || commandType === "unblock_edge") {
+    return `${commandType} · edge ${formatMaybeNumber(command.edge_id ?? null)}`;
+  }
+  return commandType;
 }
 
 function deepClone<T>(value: T): T {

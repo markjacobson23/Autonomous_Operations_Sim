@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import field
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -12,8 +13,10 @@ from urllib.parse import quote, urlparse
 import webbrowser
 
 from autonomous_ops_sim.api import (
+    apply_command_with_result,
     build_live_session_bundle,
     live_session_bundle_to_dict,
+    simulation_command_result_to_dict,
 )
 from autonomous_ops_sim.authoring import (
     apply_geometry_edit_transaction,
@@ -23,14 +26,24 @@ from autonomous_ops_sim.authoring import (
     validation_message_to_dict,
 )
 from autonomous_ops_sim.io.scenario_loader import load_scenario
-from autonomous_ops_sim.simulation import LiveSimulationSession
+from autonomous_ops_sim.simulation import (
+    AssignVehicleDestinationCommand,
+    BlockEdgeCommand,
+    LiveSimulationSession,
+    RepositionVehicleCommand,
+    SimulationCommand,
+    UnblockEdgeCommand,
+)
 from autonomous_ops_sim.simulation.scenario_executor import build_scenario_engine
+from autonomous_ops_sim.simulation.live_session import session_advance_to_dict
 from autonomous_ops_sim.visualization import export_serious_viewer_html
+from autonomous_ops_sim.visualization.command_center import RoutePreviewRequest
 
 
 DEFAULT_LIVE_OUTPUT_DIRECTORY = Path("live_output")
 DEFAULT_LIVE_FRONTEND_DIST_DIRECTORY = Path("frontend/serious_ui/dist")
 DEFAULT_LIVE_HOST = "127.0.0.1"
+DEFAULT_LIVE_SESSION_STEP_SECONDS = 0.5
 
 
 @dataclass(frozen=True)
@@ -55,6 +68,130 @@ class LiveAppLaunchResult:
     served: bool
 
 
+@dataclass
+class LiveSessionRuntime:
+    """Mutable live session state backing the serious UI command transport."""
+
+    artifacts: LiveAppArtifacts
+    session: LiveSimulationSession
+    play_state: str = "paused"
+    lock: threading.RLock = field(default_factory=threading.RLock)
+
+    @classmethod
+    def from_artifacts(cls, artifacts: LiveAppArtifacts) -> "LiveSessionRuntime":
+        scenario = load_scenario(artifacts.working_scenario_path)
+        session = LiveSimulationSession(build_scenario_engine(scenario))
+        return cls(artifacts=artifacts, session=session)
+
+    def refresh_bundle(
+        self,
+        *,
+        selected_vehicle_ids: tuple[int, ...] | list[int] = (),
+        route_preview_requests: tuple[RoutePreviewRequest, ...]
+        | list[RoutePreviewRequest] = (),
+    ) -> dict[str, object]:
+        with self.lock:
+            bundle = _build_live_bundle_record(
+                session=self.session,
+                source_scenario_path=self.artifacts.scenario_path,
+                working_scenario_path=self.artifacts.working_scenario_path,
+                selected_vehicle_ids=selected_vehicle_ids,
+                route_preview_requests=route_preview_requests,
+                play_state=self.play_state,
+            )
+            self._write_bundle(bundle)
+            return bundle
+
+    def apply_command(
+        self,
+        command: SimulationCommand,
+        *,
+        selected_vehicle_ids: tuple[int, ...] | list[int] = (),
+        route_preview_requests: tuple[RoutePreviewRequest, ...]
+        | list[RoutePreviewRequest] = (),
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        with self.lock:
+            result = apply_command_with_result(self.session, command)
+            bundle = self._refresh_locked(
+                selected_vehicle_ids=selected_vehicle_ids,
+                route_preview_requests=route_preview_requests,
+            )
+            return simulation_command_result_to_dict(result), bundle
+
+    def advance_session(
+        self,
+        *,
+        delta_s: float,
+        selected_vehicle_ids: tuple[int, ...] | list[int] = (),
+        route_preview_requests: tuple[RoutePreviewRequest, ...]
+        | list[RoutePreviewRequest] = (),
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        with self.lock:
+            record = self.session.advance_by(delta_s)
+            bundle = self._refresh_locked(
+                selected_vehicle_ids=selected_vehicle_ids,
+                route_preview_requests=route_preview_requests,
+            )
+            return session_advance_to_dict(record), bundle
+
+    def set_play_state(
+        self,
+        play_state: str,
+        *,
+        selected_vehicle_ids: tuple[int, ...] | list[int] = (),
+        route_preview_requests: tuple[RoutePreviewRequest, ...]
+        | list[RoutePreviewRequest] = (),
+    ) -> dict[str, object]:
+        if play_state not in {"paused", "playing"}:
+            raise ValueError(f"Unknown play_state: {play_state}")
+        with self.lock:
+            self.play_state = play_state
+            return self._refresh_locked(
+                selected_vehicle_ids=selected_vehicle_ids,
+                route_preview_requests=route_preview_requests,
+            )
+
+    def reload_working_scenario(
+        self,
+        *,
+        selected_vehicle_ids: tuple[int, ...] | list[int] = (),
+        route_preview_requests: tuple[RoutePreviewRequest, ...]
+        | list[RoutePreviewRequest] = (),
+    ) -> dict[str, object]:
+        with self.lock:
+            scenario = load_scenario(self.artifacts.working_scenario_path)
+            self.session = LiveSimulationSession(build_scenario_engine(scenario))
+            self.play_state = "paused"
+            return self._refresh_locked(
+                selected_vehicle_ids=selected_vehicle_ids,
+                route_preview_requests=route_preview_requests,
+            )
+
+    def _refresh_locked(
+        self,
+        *,
+        selected_vehicle_ids: tuple[int, ...] | list[int] = (),
+        route_preview_requests: tuple[RoutePreviewRequest, ...]
+        | list[RoutePreviewRequest] = (),
+    ) -> dict[str, object]:
+        bundle = _build_live_bundle_record(
+            session=self.session,
+            source_scenario_path=self.artifacts.scenario_path,
+            working_scenario_path=self.artifacts.working_scenario_path,
+            selected_vehicle_ids=selected_vehicle_ids,
+            route_preview_requests=route_preview_requests,
+            play_state=self.play_state,
+        )
+        self._write_bundle(bundle)
+        return bundle
+
+    def _write_bundle(self, bundle: dict[str, object]) -> None:
+        self.artifacts.live_session_bundle_path.write_text(
+            json.dumps(bundle, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+
 class LiveAppServer:
     """Serve one prepared live app directory for browser access."""
 
@@ -63,13 +200,16 @@ class LiveAppServer:
         directory: Path,
         *,
         artifacts: LiveAppArtifacts,
+        runtime: LiveSessionRuntime | None = None,
         host: str = DEFAULT_LIVE_HOST,
         port: int = 0,
     ) -> None:
+        session_runtime = runtime or LiveSessionRuntime.from_artifacts(artifacts)
         handler = partial(
             LiveAppRequestHandler,
             directory=str(directory),
             artifacts=artifacts,
+            runtime=session_runtime,
         )
         self._server = ThreadingHTTPServer((host, port), handler)
         self._thread = threading.Thread(
@@ -103,9 +243,11 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
         *args,
         directory: str,
         artifacts: LiveAppArtifacts,
+        runtime: LiveSessionRuntime,
         **kwargs,
     ) -> None:
         self._artifacts = artifacts
+        self._runtime = runtime
         super().__init__(*args, directory=directory, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802
@@ -115,7 +257,7 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
                 200,
                 {
                     "ok": True,
-                    "bundle": _refresh_live_bundle(self._artifacts),
+                    "bundle": self._runtime.reload_working_scenario(),
                     "working_scenario_path": str(self._artifacts.working_scenario_path),
                 },
             )
@@ -127,18 +269,69 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
         if parsed.path not in {
             "/api/authoring/validate",
             "/api/authoring/save",
+            "/api/live/command",
+            "/api/live/session/control",
         }:
             self.send_error(404, "Unknown live authoring endpoint.")
             return
 
         try:
             payload = self._read_json_payload()
-            transaction = geometry_edit_transaction_from_dict(payload)
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
             self._write_json_response(
                 400,
                 {
                     "ok": False,
+                    "message": str(exc),
+                    "validation_messages": [
+                        {
+                            "severity": "error",
+                            "code": "invalid_request",
+                            "message": str(exc),
+                        }
+                    ],
+                },
+            )
+            return
+
+        if parsed.path == "/api/authoring/validate":
+            self._handle_authoring_validate(payload)
+            return
+        if parsed.path == "/api/authoring/save":
+            self._handle_authoring_save(payload)
+            return
+        if parsed.path == "/api/live/command":
+            self._handle_live_command(payload)
+            return
+        if parsed.path == "/api/live/session/control":
+            self._handle_live_session_control(payload)
+            return
+
+    def _read_json_payload(self) -> dict[str, object]:
+        content_length = int(self.headers.get("Content-Length", "0"))
+        raw_body = self.rfile.read(content_length)
+        payload = json.loads(raw_body.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("Authoring request payload must be a JSON object.")
+        return payload
+
+    def _write_json_response(self, status_code: int, payload: dict[str, object]) -> None:
+        response_body = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(response_body)))
+        self.end_headers()
+        self.wfile.write(response_body)
+
+    def _handle_authoring_validate(self, payload: dict[str, object]) -> None:
+        try:
+            transaction = geometry_edit_transaction_from_dict(payload)
+        except ValueError as exc:
+            self._write_json_response(
+                400,
+                {
+                    "ok": False,
+                    "message": str(exc),
                     "validation_messages": [
                         {
                             "severity": "error",
@@ -152,18 +345,38 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
 
         scenario_data = _read_json_object(self._artifacts.working_scenario_path)
         messages = validate_geometry_edit_transaction(scenario_data, transaction)
-        if parsed.path == "/api/authoring/validate":
+        self._write_json_response(
+            200,
+            {
+                "ok": len(messages) == 0,
+                "validation_messages": [
+                    validation_message_to_dict(message) for message in messages
+                ],
+            },
+        )
+
+    def _handle_authoring_save(self, payload: dict[str, object]) -> None:
+        try:
+            transaction = geometry_edit_transaction_from_dict(payload)
+        except ValueError as exc:
             self._write_json_response(
-                200,
+                400,
                 {
-                    "ok": len(messages) == 0,
+                    "ok": False,
+                    "message": str(exc),
                     "validation_messages": [
-                        validation_message_to_dict(message) for message in messages
+                        {
+                            "severity": "error",
+                            "code": "invalid_request",
+                            "message": str(exc),
+                        }
                     ],
                 },
             )
             return
 
+        scenario_data = _read_json_object(self._artifacts.working_scenario_path)
+        messages = validate_geometry_edit_transaction(scenario_data, transaction)
         if messages:
             self._write_json_response(
                 200,
@@ -181,7 +394,7 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
             export_scenario_json(updated_scenario),
             encoding="utf-8",
         )
-        refreshed_bundle = _refresh_live_bundle(self._artifacts)
+        refreshed_bundle = self._runtime.reload_working_scenario()
         self._write_json_response(
             200,
             {
@@ -192,21 +405,102 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
             },
         )
 
-    def _read_json_payload(self) -> dict[str, object]:
-        content_length = int(self.headers.get("Content-Length", "0"))
-        raw_body = self.rfile.read(content_length)
-        payload = json.loads(raw_body.decode("utf-8"))
-        if not isinstance(payload, dict):
-            raise ValueError("Authoring request payload must be a JSON object.")
-        return payload
+    def _handle_live_command(self, payload: dict[str, object]) -> None:
+        try:
+            command = _simulation_command_from_payload(payload)
+        except (KeyError, TypeError, ValueError) as exc:
+            self._write_json_response(
+                400,
+                {
+                    "ok": False,
+                    "message": str(exc),
+                    "validation_messages": [],
+                },
+            )
+            return
 
-    def _write_json_response(self, status_code: int, payload: dict[str, object]) -> None:
-        response_body = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
-        self.send_response(status_code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(response_body)))
-        self.end_headers()
-        self.wfile.write(response_body)
+        selected_vehicle_ids, route_preview_requests = _selection_requests_from_payload(
+            payload
+        )
+        command_result, bundle = self._runtime.apply_command(
+            command,
+            selected_vehicle_ids=selected_vehicle_ids,
+            route_preview_requests=route_preview_requests,
+        )
+        self._write_json_response(
+            200,
+            {
+                "ok": command_result["status"] == "accepted",
+                "command_result": command_result,
+                "bundle": bundle,
+                "working_scenario_path": str(self._artifacts.working_scenario_path),
+            },
+        )
+
+    def _handle_live_session_control(self, payload: dict[str, object]) -> None:
+        action = str(payload.get("action", "")).strip().lower()
+        selected_vehicle_ids, route_preview_requests = _selection_requests_from_payload(
+            payload
+        )
+        try:
+            if action == "step":
+                delta_s_value = payload.get("delta_s", DEFAULT_LIVE_SESSION_STEP_SECONDS)
+                if not isinstance(delta_s_value, (int, float, str)):
+                    raise TypeError("delta_s must be numeric")
+                delta_s = float(delta_s_value)
+                session_advance, bundle = self._runtime.advance_session(
+                    delta_s=delta_s,
+                    selected_vehicle_ids=selected_vehicle_ids,
+                    route_preview_requests=route_preview_requests,
+                )
+                self._write_json_response(
+                    200,
+                    {
+                        "ok": True,
+                        "session_advance": session_advance,
+                        "bundle": bundle,
+                        "working_scenario_path": str(
+                            self._artifacts.working_scenario_path
+                        ),
+                    },
+                )
+                return
+            if action in {"play", "pause"}:
+                bundle = self._runtime.set_play_state(
+                    "playing" if action == "play" else "paused",
+                    selected_vehicle_ids=selected_vehicle_ids,
+                    route_preview_requests=route_preview_requests,
+                )
+                self._write_json_response(
+                    200,
+                    {
+                        "ok": True,
+                        "bundle": bundle,
+                        "working_scenario_path": str(
+                            self._artifacts.working_scenario_path
+                        ),
+                    },
+                )
+                return
+        except (TypeError, ValueError) as exc:
+            self._write_json_response(
+                400,
+                {
+                    "ok": False,
+                    "message": str(exc),
+                    "validation_messages": [],
+                },
+            )
+            return
+
+        self._write_json_response(
+            400,
+            {
+                "ok": False,
+                "message": f"Unknown session control action: {action}",
+                "validation_messages": [],
+            },
+        )
 
 
 def export_live_app_artifacts(
@@ -225,10 +519,21 @@ def export_live_app_artifacts(
     shutil.copyfile(scenario_file, working_scenario_path)
 
     live_session_bundle_path = output_root / "live_session_bundle.json"
+    initial_session = LiveSessionRuntime.from_artifacts(
+        LiveAppArtifacts(
+            output_directory=output_root,
+            scenario_path=scenario_file,
+            working_scenario_path=working_scenario_path,
+            live_session_bundle_path=live_session_bundle_path,
+            launch_path=output_root / "placeholder",
+            launch_mode="frontend_dist",
+            launch_relative_url="/",
+        )
+    )
     live_session_bundle_path.write_text(
         json.dumps(
             _build_live_bundle_record(
-                scenario_path=working_scenario_path,
+                session=initial_session.session,
                 source_scenario_path=scenario_file,
                 working_scenario_path=working_scenario_path,
             ),
@@ -259,7 +564,7 @@ def export_live_app_artifacts(
     launch_path = output_root / "live_session.viewer.html"
     export_serious_viewer_html(
         _build_live_bundle_record(
-            scenario_path=working_scenario_path,
+            session=initial_session.session,
             source_scenario_path=scenario_file,
             working_scenario_path=working_scenario_path,
         ),
@@ -335,13 +640,21 @@ def build_live_app_url(artifacts: LiveAppArtifacts, *, host: str, port: int) -> 
 
 def _build_live_bundle_record(
     *,
-    scenario_path: Path,
+    session: LiveSimulationSession,
     source_scenario_path: Path,
     working_scenario_path: Path,
+    selected_vehicle_ids: tuple[int, ...] | list[int] = (),
+    route_preview_requests: tuple[RoutePreviewRequest, ...]
+    | list[RoutePreviewRequest] = (),
+    play_state: str = "paused",
 ) -> dict[str, object]:
-    scenario = load_scenario(scenario_path)
-    session = LiveSimulationSession(build_scenario_engine(scenario))
-    bundle = live_session_bundle_to_dict(build_live_session_bundle(session))
+    bundle = live_session_bundle_to_dict(
+        build_live_session_bundle(
+            session,
+            selected_vehicle_ids=selected_vehicle_ids,
+            route_preview_requests=route_preview_requests,
+        )
+    )
     bundle["authoring"] = {
         "mode": "live_geometry_editing",
         "save_endpoint": "/api/authoring/save",
@@ -353,19 +666,12 @@ def _build_live_bundle_record(
         "editable_road_count": len(bundle.get("render_geometry", {}).get("roads", [])),
         "editable_area_count": len(bundle.get("render_geometry", {}).get("areas", [])),
     }
-    return bundle
-
-
-def _refresh_live_bundle(artifacts: LiveAppArtifacts) -> dict[str, object]:
-    bundle = _build_live_bundle_record(
-        scenario_path=artifacts.working_scenario_path,
-        source_scenario_path=artifacts.scenario_path,
-        working_scenario_path=artifacts.working_scenario_path,
-    )
-    artifacts.live_session_bundle_path.write_text(
-        json.dumps(bundle, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    bundle["session_control"] = {
+        "play_state": play_state,
+        "step_seconds": DEFAULT_LIVE_SESSION_STEP_SECONDS,
+        "command_endpoint": "/api/live/command",
+        "session_control_endpoint": "/api/live/session/control",
+    }
     return bundle
 
 
@@ -374,6 +680,65 @@ def _read_json_object(path: Path) -> dict[str, object]:
     if not isinstance(data, dict):
         raise ValueError(f"Expected JSON object at {path}.")
     return data
+
+
+def _selection_requests_from_payload(
+    payload: dict[str, object],
+) -> tuple[tuple[int, ...], tuple[RoutePreviewRequest, ...]]:
+    selected_vehicle_ids_payload = payload.get("selected_vehicle_ids", ())
+    if isinstance(selected_vehicle_ids_payload, list):
+        selected_vehicle_ids = tuple(
+            int(vehicle_id)
+            for vehicle_id in selected_vehicle_ids_payload
+            if isinstance(vehicle_id, (int, float))
+        )
+    else:
+        selected_vehicle_ids = ()
+
+    route_preview_requests_payload = payload.get("route_preview_requests", ())
+    if not isinstance(route_preview_requests_payload, list):
+        return selected_vehicle_ids, ()
+
+    route_preview_requests = tuple(
+        RoutePreviewRequest(
+            vehicle_id=int(vehicle_id),
+            destination_node_id=int(destination_node_id),
+        )
+        for request in route_preview_requests_payload
+        if isinstance(request, dict)
+        and isinstance((vehicle_id := request.get("vehicle_id")), (int, float))
+        and isinstance(
+            (destination_node_id := request.get("destination_node_id")),
+            (int, float),
+        )
+    )
+    return selected_vehicle_ids, route_preview_requests
+
+
+def _payload_int(payload: dict[str, object], key: str) -> int:
+    value = payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise ValueError(f"{key} must be numeric")
+    return int(value)
+
+
+def _simulation_command_from_payload(payload: dict[str, object]) -> SimulationCommand:
+    command_type = str(payload.get("command_type", "")).strip()
+    if command_type == "block_edge":
+        return BlockEdgeCommand(edge_id=_payload_int(payload, "edge_id"))
+    if command_type == "unblock_edge":
+        return UnblockEdgeCommand(edge_id=_payload_int(payload, "edge_id"))
+    if command_type == "reposition_vehicle":
+        return RepositionVehicleCommand(
+            vehicle_id=_payload_int(payload, "vehicle_id"),
+            node_id=_payload_int(payload, "node_id"),
+        )
+    if command_type == "assign_vehicle_destination":
+        return AssignVehicleDestinationCommand(
+            vehicle_id=_payload_int(payload, "vehicle_id"),
+            destination_node_id=_payload_int(payload, "destination_node_id"),
+        )
+    raise ValueError(f"Unknown command_type: {command_type}")
 
 
 __all__ = [

@@ -22,6 +22,13 @@ def test_step_45_app_shell_source_includes_required_operator_regions() -> None:
     assert "Stop lines and yield controls are now live" in app_source
     assert "Save Scenario" in app_source
     assert "Reload Scenario" in app_source
+    assert "Live Command Console" in app_source
+    assert "Session Control" in app_source
+    assert "Assign Destination" in app_source
+    assert "Single-Step" in app_source
+    assert "command_endpoint" in app_source
+    assert "session_control_endpoint" in app_source
+    assert "play_state" in app_source
     assert "turn_connectors" in app_source
     assert "stop_lines" in app_source
     assert "merge_zones" in app_source

@@ -152,3 +152,100 @@ def test_live_app_frontend_server_supports_validate_save_and_reload_authoring_ap
         ]
     finally:
         server.stop()
+
+
+def test_live_app_frontend_server_supports_live_commands_and_session_control(
+    tmp_path,
+) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
+    edge_id = bundle["map_surface"]["edges"][0]["edge_id"]
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        command_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/command",
+                data=json.dumps(
+                    {
+                        "command_type": "block_edge",
+                        "edge_id": edge_id,
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        command_payload = json.loads(command_response.read().decode("utf-8"))
+        assert command_payload["ok"] is True
+        assert command_payload["command_result"]["status"] == "accepted"
+        assert command_payload["bundle"]["command_center"]["recent_commands"][0][
+            "command_type"
+        ] == "block_edge"
+        assert command_payload["bundle"]["command_center"]["recent_commands"][0][
+            "edge_id"
+        ] == edge_id
+        assert command_payload["bundle"]["session_control"]["play_state"] == "paused"
+
+        step_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/session/control",
+                data=json.dumps(
+                    {
+                        "action": "step",
+                        "delta_s": 0.5,
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        step_payload = json.loads(step_response.read().decode("utf-8"))
+        assert step_payload["ok"] is True
+        assert step_payload["session_advance"]["completed_at_s"] == 0.5
+        assert step_payload["bundle"]["simulated_time_s"] == 0.5
+        assert step_payload["bundle"]["session_control"]["step_seconds"] == 0.5
+
+        play_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/session/control",
+                data=json.dumps(
+                    {
+                        "action": "play",
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        play_payload = json.loads(play_response.read().decode("utf-8"))
+        assert play_payload["ok"] is True
+        assert play_payload["bundle"]["session_control"]["play_state"] == "playing"
+
+        pause_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/session/control",
+                data=json.dumps(
+                    {
+                        "action": "pause",
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        pause_payload = json.loads(pause_response.read().decode("utf-8"))
+        assert pause_payload["ok"] is True
+        assert pause_payload["bundle"]["session_control"]["play_state"] == "paused"
+    finally:
+        server.stop()

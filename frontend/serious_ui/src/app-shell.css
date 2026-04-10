@@ -552,6 +552,36 @@ h3 {
   gap: 8px;
 }
 
+.command-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.form-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.form-field input {
+  width: 100%;
+  border: 1px solid rgba(97, 112, 125, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  padding: 10px 12px;
+  font: inherit;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.form-field input:focus {
+  outline: 2px solid rgba(10, 118, 108, 0.24);
+  border-color: rgba(10, 118, 108, 0.35);
+}
+
 .inspection-header {
   display: flex;
   justify-content: space-between;
@@ -572,6 +602,10 @@ h3 {
 @media (max-width: 1180px) {
   .session-bar {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .command-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .health-pill {
@@ -609,6 +643,10 @@ h3 {
   .session-bar,
   .timeline-metrics {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .command-grid {
+    grid-template-columns: 1fr;
   }
 }
 
