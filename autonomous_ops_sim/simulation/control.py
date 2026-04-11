@@ -93,12 +93,15 @@ class SimulationController:
             self._apply_declare_temporary_hazard(command)
         elif isinstance(command, ClearTemporaryHazardCommand):
             self._apply_clear_temporary_hazard(command)
-        else:
+        elif isinstance(command, AssignVehicleDestinationCommand):
+            # Step 60: Proper routed execution (no teleport)
             vehicle = self.engine.get_vehicle(command.vehicle_id)
             self.engine.execute_vehicle_route(
                 vehicle=vehicle,
                 destination_node_id=command.destination_node_id,
             )
+        else:
+            raise TypeError(f"Unhandled command type: {type(command)}")
 
         record = CommandApplicationRecord(
             sequence=len(self._history),
