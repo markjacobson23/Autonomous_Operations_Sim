@@ -1417,6 +1417,12 @@ h3 {
     0 10px 18px rgba(24, 33, 44, 0.08);
 }
 
+.scene-button-active {
+  background: linear-gradient(180deg, rgba(97, 112, 125, 0.18), rgba(97, 112, 125, 0.1));
+  color: var(--ink);
+  border-color: rgba(66, 78, 88, 0.24);
+}
+
 .action-row {
   display: flex;
   gap: 10px;
@@ -1444,14 +1450,29 @@ h3 {
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   background:
-    radial-gradient(circle at 20% 18%, rgba(10, 118, 108, 0.08), transparent 18%),
-    radial-gradient(circle at 78% 26%, rgba(36, 83, 199, 0.06), transparent 14%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(237, 231, 223, 0.96)),
-    linear-gradient(90deg, rgba(97, 112, 125, 0.045) 1px, transparent 1px),
-    linear-gradient(rgba(97, 112, 125, 0.045) 1px, transparent 1px);
+    radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.16), transparent 18%),
+    radial-gradient(circle at 78% 26%, rgba(255, 255, 255, 0.08), transparent 14%),
+    linear-gradient(180deg, rgba(246, 244, 241, 0.96), rgba(224, 221, 215, 0.98)),
+    linear-gradient(90deg, rgba(97, 112, 125, 0.04) 1px, transparent 1px),
+    linear-gradient(rgba(97, 112, 125, 0.04) 1px, transparent 1px);
   background-size: auto, 64px 64px, 64px 64px;
   background-blend-mode: normal, normal, normal, multiply, multiply;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+.scene-canvas-iso {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+    inset 0 -18px 40px rgba(24, 33, 44, 0.08);
+}
+
+.scene-surface {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.scene-surface-iso {
+  filter: saturate(0.84);
 }
 
 .scene-rim {
@@ -1628,19 +1649,19 @@ h3 {
 }
 
 .legend-swatch.vehicle {
-  background: rgba(10, 118, 108, 0.95);
+  background: rgba(104, 112, 120, 0.95);
 }
 
 .legend-swatch.traffic {
-  background: linear-gradient(90deg, rgba(10, 118, 108, 0.95), rgba(187, 101, 30, 0.95), rgba(178, 74, 59, 0.95));
+  background: linear-gradient(90deg, rgba(104, 112, 120, 0.95), rgba(128, 136, 144, 0.95), rgba(154, 160, 166, 0.95));
 }
 
 .legend-swatch.hazard {
-  background: rgba(178, 74, 59, 0.9);
+  background: rgba(96, 64, 64, 0.9);
 }
 
 .legend-swatch.handle {
-  background: rgba(36, 83, 199, 0.9);
+  background: rgba(96, 104, 112, 0.9);
 }
 
 .focus-card p,
@@ -2622,36 +2643,36 @@ h3 {
 }
 
 .scene-backdrop {
-  fill: rgba(255, 255, 255, 0.22);
+  fill: rgba(239, 236, 230, 0.9);
 }
 
 .scene-area {
-  fill: rgba(97, 112, 125, 0.11);
-  stroke: rgba(97, 112, 125, 0.2);
+  fill: rgba(156, 162, 168, 0.16);
+  stroke: rgba(110, 118, 125, 0.22);
   stroke-width: 0.08;
   stroke-linejoin: round;
 }
 
 .scene-area-depot,
 .scene-area-loading_bay {
-  fill: rgba(0, 108, 103, 0.16);
+  fill: rgba(141, 149, 155, 0.2);
 }
 
 .scene-area-building,
 .scene-area-no_go_zone {
-  fill: rgba(201, 106, 24, 0.12);
+  fill: rgba(130, 136, 142, 0.18);
 }
 
 .scene-area.selected {
-  fill: rgba(36, 83, 199, 0.15);
-  stroke: rgba(36, 83, 199, 0.62);
+  fill: rgba(99, 108, 117, 0.2);
+  stroke: rgba(66, 78, 88, 0.54);
   stroke-width: 0.11;
-  filter: drop-shadow(0 0 0.14px rgba(36, 83, 199, 0.18));
+  filter: drop-shadow(0 0 0.14px rgba(66, 78, 88, 0.18));
 }
 
 .scene-road {
   fill: none;
-  stroke: rgba(56, 62, 68, 0.82);
+  stroke: rgba(54, 60, 66, 0.88);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-miterlimit: 1.4;
@@ -2659,7 +2680,7 @@ h3 {
   vector-effect: non-scaling-stroke;
   shape-rendering: geometricPrecision;
   cursor: pointer;
-  filter: drop-shadow(0 0.06px 0.08px rgba(255, 255, 255, 0.28));
+  filter: drop-shadow(0 0.06px 0.08px rgba(255, 255, 255, 0.2));
 }
 
 .scene-road-heatmap {
@@ -2674,19 +2695,19 @@ h3 {
 }
 
 .scene-road-heatmap-free {
-  stroke: rgba(95, 109, 121, 0.05);
+  stroke: rgba(95, 109, 121, 0.04);
 }
 
 .scene-road-heatmap-active {
-  stroke: rgba(36, 83, 199, 0.12);
+  stroke: rgba(97, 112, 125, 0.1);
 }
 
 .scene-road-heatmap-congested {
-  stroke: rgba(187, 101, 30, 0.22);
+  stroke: rgba(66, 78, 88, 0.14);
 }
 
 .scene-road-heatmap-queued {
-  stroke: rgba(178, 74, 59, 0.28);
+  stroke: rgba(66, 78, 88, 0.18);
 }
 
 .scene-lane {
@@ -2703,29 +2724,29 @@ h3 {
 
 .scene-turn-connector {
   fill: none;
-  stroke: rgba(36, 83, 199, 0.48);
+  stroke: rgba(101, 109, 117, 0.42);
   stroke-width: 0.13;
   stroke-dasharray: 0.45 0.3;
 }
 
 .scene-stop-line {
-  stroke: rgba(178, 74, 59, 0.78);
+  stroke: rgba(93, 99, 106, 0.76);
   stroke-width: 0.16;
 }
 
 .scene-merge-zone {
-  fill: rgba(36, 83, 199, 0.06);
-  stroke: rgba(36, 83, 199, 0.18);
+  fill: rgba(115, 123, 130, 0.08);
+  stroke: rgba(115, 123, 130, 0.18);
   stroke-width: 0.08;
 }
 
 .scene-road-primary {
-  stroke: rgba(29, 78, 216, 0.78);
+  stroke: rgba(62, 72, 82, 0.78);
 }
 
 .scene-intersection {
-  fill: rgba(29, 78, 216, 0.12);
-  stroke: rgba(29, 78, 216, 0.25);
+  fill: rgba(125, 134, 142, 0.16);
+  stroke: rgba(88, 96, 104, 0.24);
   stroke-width: 0.06;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -2736,7 +2757,7 @@ h3 {
 
 .scene-route-preview {
   fill: none;
-  stroke: rgba(0, 108, 103, 0.66);
+  stroke: rgba(66, 78, 88, 0.62);
   stroke-width: 0.24;
   stroke-dasharray: 0.96 0.5;
   stroke-linecap: round;
@@ -2745,11 +2766,11 @@ h3 {
   paint-order: stroke fill;
   vector-effect: non-scaling-stroke;
   shape-rendering: geometricPrecision;
-  filter: drop-shadow(0 0 0.12px rgba(10, 118, 108, 0.3));
+  filter: drop-shadow(0 0 0.12px rgba(66, 78, 88, 0.24));
 }
 
 .scene-route-preview.selected {
-  stroke: rgba(201, 106, 24, 0.98);
+  stroke: rgba(89, 96, 104, 0.92);
   stroke-width: 0.34;
   stroke-dasharray: 0.84 0.34;
 }
@@ -2760,31 +2781,31 @@ h3 {
 }
 
 .scene-destination-threshold {
-  fill: rgba(0, 108, 103, 0.06);
-  stroke: rgba(0, 108, 103, 0.26);
+  fill: rgba(110, 118, 125, 0.08);
+  stroke: rgba(110, 118, 125, 0.26);
   stroke-dasharray: 0.22 0.18;
   stroke-width: 0.06;
 }
 
 .scene-destination-core {
-  fill: rgba(255, 251, 246, 0.92);
-  stroke: rgba(0, 108, 103, 0.82);
+  fill: rgba(248, 246, 242, 0.94);
+  stroke: rgba(72, 80, 88, 0.82);
   stroke-width: 0.08;
 }
 
 .scene-route-endpoint.selected .scene-destination-threshold {
-  fill: rgba(201, 106, 24, 0.12);
-  stroke: rgba(201, 106, 24, 0.5);
+  fill: rgba(95, 103, 111, 0.14);
+  stroke: rgba(72, 80, 88, 0.5);
   stroke-dasharray: 0.16 0.12;
 }
 
 .scene-route-endpoint.selected .scene-destination-core {
-  fill: rgba(255, 247, 235, 0.98);
-  stroke: rgba(201, 106, 24, 0.96);
+  fill: rgba(248, 247, 244, 0.98);
+  stroke: rgba(72, 80, 88, 0.96);
 }
 
 .scene-reservation {
-  stroke: rgba(29, 78, 216, 0.3);
+  stroke: rgba(96, 104, 112, 0.28);
   stroke-width: 0.14;
   stroke-dasharray: 0.6 0.38;
   stroke-linecap: round;
@@ -2800,12 +2821,12 @@ h3 {
 }
 
 .scene-queue-overlay.preview {
-  stroke: rgba(201, 106, 24, 0.74);
+  stroke: rgba(88, 96, 104, 0.72);
   stroke-dasharray: 0.48 0.3;
 }
 
 .scene-hazard {
-  stroke: rgba(182, 75, 58, 0.72);
+  stroke: rgba(96, 64, 64, 0.72);
   stroke-width: 0.38;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -2813,7 +2834,7 @@ h3 {
   vector-effect: non-scaling-stroke;
   shape-rendering: geometricPrecision;
   cursor: pointer;
-  filter: drop-shadow(0 0 0.14px rgba(178, 74, 59, 0.34));
+  filter: drop-shadow(0 0 0.14px rgba(96, 64, 64, 0.28));
 }
 
 .scene-vehicle {
@@ -2854,8 +2875,8 @@ h3 {
 }
 
 .vehicle-envelope {
-  fill: rgba(201, 106, 24, 0.035);
-  stroke: rgba(201, 106, 24, 0.2);
+  fill: rgba(102, 112, 120, 0.03);
+  stroke: rgba(102, 112, 120, 0.18);
   stroke-dasharray: 0.18 0.18;
   stroke-width: 0.045;
   opacity: 0.9;
@@ -2868,65 +2889,65 @@ h3 {
 }
 
 .vehicle-fork {
-  stroke: rgba(215, 245, 239, 0.98);
+  stroke: rgba(238, 240, 242, 0.98);
   stroke-width: 0.065;
   stroke-linecap: round;
 }
 
 .vehicle-wheel {
-  fill: rgba(34, 42, 49, 0.96);
-  stroke: rgba(255, 255, 255, 0.34);
+  fill: rgba(42, 48, 54, 0.96);
+  stroke: rgba(255, 255, 255, 0.3);
   stroke-width: 0.04;
 }
 
 .vehicle-body-haul {
-  fill: rgba(174, 96, 33, 0.96);
+  fill: rgba(126, 131, 137, 0.96);
 }
 
 .vehicle-cab-haul {
-  fill: rgba(248, 221, 184, 0.96);
+  fill: rgba(220, 223, 226, 0.96);
 }
 
 .vehicle-body-forklift {
-  fill: rgba(12, 104, 96, 0.96);
+  fill: rgba(102, 108, 114, 0.96);
 }
 
 .vehicle-cab-forklift {
-  fill: rgba(227, 248, 243, 0.96);
+  fill: rgba(236, 238, 240, 0.96);
 }
 
 .vehicle-body-car {
-  fill: rgba(41, 79, 180, 0.96);
+  fill: rgba(115, 121, 128, 0.96);
 }
 
 .vehicle-cab-car {
-  fill: rgba(220, 229, 255, 0.96);
+  fill: rgba(228, 231, 234, 0.96);
 }
 
 .vehicle-body-generic {
-  fill: rgba(95, 109, 121, 0.96);
+  fill: rgba(134, 140, 146, 0.96);
 }
 
 .vehicle-heading {
-  fill: rgba(0, 108, 103, 0.94);
-  stroke: rgba(255, 255, 255, 0.96);
+  fill: rgba(89, 96, 104, 0.94);
+  stroke: rgba(255, 255, 255, 0.95);
   stroke-width: 0.055;
   stroke-linejoin: round;
 }
 
 .vehicle-motion-trail {
-  stroke: rgba(201, 106, 24, 0.22);
+  stroke: rgba(96, 104, 112, 0.22);
   stroke-width: 0.06;
   stroke-linecap: round;
   stroke-dasharray: 0.16 0.1;
 }
 
 .vehicle-selection-ring {
-  fill: rgba(255, 255, 255, 0.12);
-  stroke: rgba(201, 106, 24, 0.72);
+  fill: rgba(255, 255, 255, 0.1);
+  stroke: rgba(72, 80, 88, 0.72);
   stroke-width: 0.08;
   stroke-dasharray: 0.24 0.14;
-  filter: drop-shadow(0 0 0.18px rgba(201, 106, 24, 0.28));
+  filter: drop-shadow(0 0 0.18px rgba(72, 80, 88, 0.24));
 }
 
 .vehicle-label {
@@ -3040,24 +3061,24 @@ h3 {
 }
 
 .scene-vehicle.selected .vehicle-envelope {
-  fill: rgba(201, 106, 24, 0.08);
-  stroke: rgba(201, 106, 24, 0.38);
+  fill: rgba(89, 96, 104, 0.08);
+  stroke: rgba(72, 80, 88, 0.38);
   stroke-width: 0.06;
 }
 
 .scene-vehicle.selected.moving .vehicle-envelope {
-  fill: rgba(201, 106, 24, 0.11);
-  stroke: rgba(201, 106, 24, 0.5);
+  fill: rgba(89, 96, 104, 0.11);
+  stroke: rgba(72, 80, 88, 0.5);
 }
 
 .scene-vehicle.selected .vehicle-label-bg {
   fill: rgba(255, 250, 244, 0.98);
-  stroke: rgba(201, 106, 24, 0.28);
+  stroke: rgba(72, 80, 88, 0.28);
 }
 
 .scene-vehicle.selected.moving .vehicle-label-bg {
   fill: rgba(255, 246, 237, 0.99);
-  stroke: rgba(201, 106, 24, 0.34);
+  stroke: rgba(72, 80, 88, 0.34);
 }
 
 .scene-vehicle.selected.moving .vehicle-selection-ring {
@@ -3066,12 +3087,12 @@ h3 {
 }
 
 .scene-vehicle.selected .vehicle-heading {
-  fill: rgba(201, 106, 24, 0.96);
+  fill: rgba(72, 80, 88, 0.96);
   stroke: rgba(255, 255, 255, 0.98);
 }
 
 .scene-vehicle.selected.moving .vehicle-heading {
-  fill: rgba(201, 106, 24, 0.99);
+  fill: rgba(72, 80, 88, 0.99);
 }
 
 .scene-vehicle.moving .vehicle-motion-trail {
@@ -3079,7 +3100,7 @@ h3 {
 }
 
 .scene-vehicle.selected .vehicle-motion-trail {
-  stroke: rgba(201, 106, 24, 0.35);
+  stroke: rgba(72, 80, 88, 0.35);
   stroke-width: 0.07;
 }
 
@@ -3088,21 +3109,21 @@ h3 {
 }
 
 .scene-vehicle.route-following.selected .vehicle-label-secondary {
-  fill: rgba(0, 108, 103, 0.98);
+  fill: rgba(95, 109, 121, 0.98);
 }
 
 .scene-vehicle.route-following.selected .vehicle-selection-ring {
-  stroke: rgba(0, 108, 103, 0.78);
+  stroke: rgba(72, 80, 88, 0.78);
 }
 
 .scene-vehicle.waiting .vehicle-label-bg {
   fill: rgba(255, 248, 239, 0.98);
-  stroke: rgba(201, 106, 24, 0.24);
+  stroke: rgba(72, 80, 88, 0.24);
 }
 
 .scene-vehicle.moving .vehicle-label-bg {
   fill: rgba(255, 250, 244, 0.98);
-  stroke: rgba(10, 118, 108, 0.2);
+  stroke: rgba(72, 80, 88, 0.2);
 }
 
 @keyframes vehicle-selection-pulse {

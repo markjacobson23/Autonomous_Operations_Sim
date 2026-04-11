@@ -770,20 +770,38 @@ describe("serious ui behavior", () => {
       expect(screen.getByText("Proof-of-Life City Street")).toBeInTheDocument(),
     );
     await waitFor(() =>
-      expect(
-        screen.getByText(/Proof-of-life scene: 6 vehicles, 2 moving, 1 waiting/i),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/Quiet projected map/i)).toBeInTheDocument(),
     );
-    expect(screen.getAllByText("Market Square").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Library Plaza").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Clinic Corner/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Courier 201 · en route to Clinic Corner/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Clinic Corner · node 122/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Fleet 6 · Moving 2/i)).toBeVisible();
+    const sceneSvg = screen.getByLabelText("Simulation scene graph");
+    expect(document.querySelectorAll(".scene-place-label")).toHaveLength(0);
+    expect(document.querySelectorAll(".vehicle-label")).toHaveLength(0);
+    expect(document.querySelectorAll(".scene-destination-label")).toHaveLength(0);
+    expect(sceneSvg).toHaveClass("scene-canvas-birdseye");
+
+    const birdseyeButton = screen.getByRole("button", { name: "Birdseye" });
+    const isoButton = screen.getByRole("button", { name: "Iso" });
+    expect(birdseyeButton).toHaveAttribute("aria-pressed", "true");
+    expect(isoButton).toHaveAttribute("aria-pressed", "false");
+
+    const roadPath = document.querySelector(".scene-road");
+    expect(roadPath).not.toBeNull();
+    if (!roadPath) {
+      throw new Error("Expected a road path");
+    }
+    fireEvent.mouseEnter(roadPath);
+    expect(screen.getByRole("status")).toHaveTextContent(/north avenue/i);
+
+    await user.click(isoButton);
+    expect(sceneSvg).toHaveClass("scene-canvas-iso");
+    expect(isoButton).toHaveAttribute("aria-pressed", "true");
+    expect(birdseyeButton).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(birdseyeButton);
+    expect(sceneSvg).toHaveClass("scene-canvas-birdseye");
 
     await user.click(screen.getByRole("button", { name: "Fit Scene" }));
     await waitFor(() =>
-      expect(screen.getByText(/current camera frame, with selected vehicles and destination markers/i)).toBeInTheDocument(),
+      expect(screen.getByText(/quiet projected map/i)).toBeInTheDocument(),
     );
   });
 

@@ -2,7 +2,6 @@ import type { Dispatch, MouseEvent, Ref, RefObject, SetStateAction } from "react
 
 import {
   buildRoutePreviewPoints,
-  buildScenePlaceLabels,
   clientPointToScene,
   computeSceneBounds,
   describeSelectedTarget,
@@ -10,6 +9,7 @@ import {
   describeRoutePreviewDestination,
   describeVehicleName,
   describeVehicleOperationalSummary,
+  describeSceneViewMode,
   findEdgeById,
   findNodePosition,
   findVehicleById,
@@ -25,6 +25,8 @@ import {
   renderVehicleGlyph,
   sampleDisplayedVehicles,
   sampleTrafficSnapshot,
+  sceneProjectionTransform,
+  sceneViewModes,
   scaleX,
   scaleY,
   toPointString,
@@ -42,6 +44,7 @@ import type {
   Position3,
   RouteDestinationMarker,
   SelectedTarget,
+  SceneViewMode,
   ViewportState,
 } from "../types";
 
@@ -84,6 +87,8 @@ type SceneViewportProps = {
     pointIndex: number,
     z: number,
   ) => void;
+  sceneViewMode: SceneViewMode;
+  onSceneViewModeChange: (mode: SceneViewMode) => void;
 };
 
 export function SceneViewport({
@@ -115,6 +120,8 @@ export function SceneViewport({
   onBeginNodeDrag,
   onBeginRoadPointDrag,
   onBeginAreaPointDrag,
+  sceneViewMode,
+  onSceneViewModeChange,
 }: SceneViewportProps): JSX.Element {
   const bounds = computeSceneBounds(bundle);
   const displayedVehicles = sampleDisplayedVehicles(bundle, motionClockS);
@@ -163,14 +170,12 @@ export function SceneViewport({
     (left, right) => left - right,
   );
   const routePreviews = bundle?.command_center?.route_previews ?? [];
-  const scenePlaceLabels = buildScenePlaceLabels(bundle);
   const movingVehicleCount = displayedVehicles.filter(
     (vehicle) => (vehicle.speed ?? 0) > 0.05 || vehicle.operational_state === "moving",
   ).length;
   const waitingVehicleCount = displayedVehicles.filter(
     (vehicle) => vehicle.operational_state === "waiting" || vehicle.operational_state === "queued",
   ).length;
-  const namedPlaceCount = scenePlaceLabels.length;
   const selectedRoutePreviewRoadIds = new Set(
     (bundle?.render_geometry?.roads ?? [])
       .filter((road) =>
@@ -247,6 +252,53 @@ export function SceneViewport({
   const selectedRoutePreviewSummary = describeRoutePreviewDestination(bundle, selectedRoutePreview, {
     includeNodeId: true,
   });
+  const sceneSelectionHoverTarget = (() => {
+    if (!selectedTarget) {
+      return null;
+    }
+    if (selectedTarget.kind === "vehicle") {
+      return {
+        label: describeVehicleName(selectedVehicle),
+        detail: selectedVehicleStatusSummary,
+      };
+    }
+    if (selectedTarget.kind === "road") {
+      return {
+        label: humanizeIdentifier(selectedTarget.roadId),
+        detail:
+          selectedRoad !== null
+            ? `${selectedRoad.road_class ?? "road"} · ${selectedRoad.directionality ?? "unknown"} · ${
+                selectedRoad.lane_count ?? 0
+              } lane(s)`
+            : "Road selected",
+      };
+    }
+    if (selectedTarget.kind === "area") {
+      return {
+        label: humanizeIdentifier(selectedArea?.area_id ?? selectedTarget.areaId),
+        detail: selectedArea?.kind ?? "area",
+      };
+    }
+    if (selectedTarget.kind === "queue") {
+      return {
+        label: `Queue ${humanizeIdentifier(selectedTarget.roadId)}`,
+        detail: `${selectedQueueRecord?.vehicle_ids?.length ?? 0} vehicle(s) queued`,
+      };
+    }
+    if (selectedTarget.kind === "hazard") {
+      return {
+        label: `Blocked edge ${selectedTarget.edgeId}`,
+        detail:
+          selectedHazardEdge !== null
+            ? `Edge ${selectedHazardEdge.edge_id} · temporary closure`
+            : "Conflict / hazard overlay",
+      };
+    }
+    return null;
+  })();
+  const sceneFocusTarget = hoverTarget ?? sceneSelectionHoverTarget;
+  const sceneSurfaceTransform = sceneProjectionTransform(sceneViewMode, bounds);
+  const sceneModeSummary = describeSceneViewMode(sceneViewMode);
 
   const minimapRect = {
     x: ((viewport.x - bounds.minX) / bounds.width) * 100,
@@ -354,12 +406,12 @@ export function SceneViewport({
         eyebrow="Scene Region"
         title="Operations Viewport"
         titleId="scene-title"
-        lede="Scene layers, route previews, and live vehicle state stay layered into one operator view."
+        lede="Projected scene surface with quiet defaults. Hover or select a surface for detail."
         meta={
           <div className="status-stack">
-            <span className="status-pill">Camera controls active</span>
-            <span className="status-pill secondary">Selection active</span>
-            <span className="status-pill accent">Layer toggles active</span>
+            <span className="status-pill">{sceneModeSummary}</span>
+            <span className="status-pill secondary">Hover for detail</span>
+            <span className="status-pill accent">Selection stays explicit</span>
           </div>
         }
       />
@@ -398,6 +450,21 @@ export function SceneViewport({
             Focus Selected
           </button>
         </div>
+        <div className="tool-group" aria-label="Scene projection modes">
+          {sceneViewModes.map((mode) => (
+            <button
+              key={mode.id}
+              className={`scene-button scene-button-mode ${
+                sceneViewMode === mode.id ? "scene-button-active" : ""
+              }`}
+              type="button"
+              aria-pressed={sceneViewMode === mode.id}
+              onClick={() => onSceneViewModeChange(mode.id)}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="layer-toolbar" aria-label="Layer toggles">
@@ -419,7 +486,7 @@ export function SceneViewport({
           <div className="scene-rim scene-rim-bottom" aria-hidden="true" />
           <svg
             ref={sceneRef as unknown as Ref<SVGSVGElement>}
-            className="stage-canvas"
+            className={`stage-canvas scene-canvas scene-canvas-${sceneViewMode}`}
             viewBox={`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`}
             aria-label="Simulation scene graph"
             onMouseLeave={() => {
@@ -430,517 +497,422 @@ export function SceneViewport({
             onMouseMove={onSceneMouseMove}
             onMouseUp={onSceneMouseUp}
           >
-            <rect
-              x={bounds.minX}
-              y={bounds.minY}
-              width={bounds.width}
-              height={bounds.height}
-              className="scene-backdrop"
-            />
+            <g className={`scene-surface scene-surface-${sceneViewMode}`} transform={sceneSurfaceTransform || undefined}>
+              <rect
+                x={bounds.minX}
+                y={bounds.minY}
+                width={bounds.width}
+                height={bounds.height}
+                className="scene-backdrop"
+              />
 
-            {layers.areas &&
-              (bundle?.render_geometry?.areas ?? []).map((area, index) => (
-                <polygon
-                  key={area.area_id ?? `area-${index}`}
-                  points={toPointString(area.polygon)}
-                  className={`scene-area scene-area-${area.kind ?? "generic"} ${
-                    selectedTarget?.kind === "area" && selectedTarget.areaId === area.area_id
-                      ? "selected"
-                      : ""
-                  }`}
-                  onClick={() => onSelectArea(area.area_id)}
-                  onMouseEnter={() =>
-                    setHoverTarget({
-                      label: area.label ?? area.area_id ?? "zone",
-                      detail: area.kind ?? "zone",
-                    })
-                  }
-                />
-              ))}
-
-            {layers.roads &&
-              (bundle?.render_geometry?.roads ?? []).map((road, index) => {
-                const roadPath = toSmoothPathString(road.centerline);
-                if (!roadPath) {
-                  return null;
-                }
-                const roadWidth = Math.min(Math.max((road.width_m ?? 1.4) * 0.34, 0.4), 1.72);
-                const roadTraffic = trafficRoadById.get(road.road_id ?? "");
-                return (
-                  <g key={road.road_id ?? `road-${index}`}>
-                    <path
-                      d={roadPath}
-                      className={`scene-road-heatmap scene-road-heatmap-${
-                        roadTraffic?.congestion_level ?? "free"
-                      }`}
-                      strokeWidth={roadWidth + 0.34}
-                      style={{
-                        opacity: Math.max(0.05, (roadTraffic?.congestion_intensity ?? 0) * 0.38),
-                      }}
-                      aria-hidden="true"
-                    />
-                    <path
-                      d={roadPath}
-                      className={`scene-road scene-road-${road.road_class ?? "connector"} ${
-                        selectedTarget?.kind === "road" && selectedTarget.roadId === road.road_id
-                          ? "selected"
-                          : ""
-                      }`}
-                      strokeWidth={roadWidth}
-                      onClick={() => onSelectRoad(road.road_id)}
-                      onMouseEnter={() => {
-                        setHoverTarget({
-                          label: humanizeIdentifier(road.road_id),
-                          detail: roadTraffic
-                            ? `${road.directionality ?? "unknown"} · ${
-                                road.lane_count ?? 0
-                              } lane(s) · ${roadTraffic.congestion_level} · ${
-                                roadTraffic.queued_vehicle_ids?.length ?? 0
-                              } queued`
-                            : `${road.directionality ?? "unknown"} · ${
-                                road.lane_count ?? 0
-                              } lane(s)`,
-                        });
-                      }}
-                    />
-                  </g>
-                );
-              })}
-
-            {layers.intersections &&
-              (bundle?.render_geometry?.intersections ?? []).map((intersection, index) => {
-                const controlPoint = (bundle?.traffic_baseline?.control_points ?? []).find(
-                  (point) => point.node_id === intersection.node_id,
-                );
-                const intersectionPath = toSmoothPathString(intersection.polygon, true);
-                if (!intersectionPath) {
-                  return null;
-                }
-                return (
-                  <path
-                    key={intersection.intersection_id ?? `intersection-${index}`}
-                    d={intersectionPath}
-                    className="scene-intersection"
-                    onMouseEnter={() =>
-                      setHoverTarget({
-                        label: humanizeIdentifier(intersection.intersection_id),
-                        detail: controlPoint
-                          ? `${controlPoint.control_type} · ${
-                              controlPoint.controlled_road_ids?.length ?? 0
-                            } road(s) · ${
-                              controlPoint.stop_line_ids?.length ?? 0
-                            } stop line(s)`
-                          : intersection.intersection_type ?? "intersection",
-                      })
-                    }
-                  />
-                );
-              })}
-
-            {layers.roads &&
-              (bundle?.render_geometry?.lanes ?? []).map((lane, index) => (
-                <polyline
-                  key={lane.lane_id ?? `lane-${index}`}
-                  points={toPointString(lane.centerline)}
-                  className={`scene-lane scene-lane-${lane.directionality ?? "forward"}`}
-                  onMouseEnter={() =>
-                    setHoverTarget({
-                      label: lane.lane_id ?? "lane",
-                      detail: `${lane.lane_role ?? "travel"} · ${lane.directionality ?? "forward"}`,
-                    })
-                  }
-                />
-              ))}
-
-            {layers.roads &&
-              (bundle?.render_geometry?.turn_connectors ?? []).map((connector, index) => (
-                <polyline
-                  key={connector.connector_id ?? `connector-${index}`}
-                  points={toPointString(connector.centerline)}
-                  className="scene-turn-connector"
-                  onMouseEnter={() =>
-                    setHoverTarget({
-                      label: connector.connector_id ?? "connector",
-                      detail: connector.connector_type ?? "turn connector",
-                    })
-                  }
-                />
-              ))}
-
-            {layers.roads &&
-              (bundle?.render_geometry?.stop_lines ?? []).map((stopLine, index) => (
-                <line
-                  key={stopLine.stop_line_id ?? `stop-line-${index}`}
-                  x1={stopLine.segment?.[0]?.[0] ?? 0}
-                  y1={stopLine.segment?.[0]?.[1] ?? 0}
-                  x2={stopLine.segment?.[1]?.[0] ?? 0}
-                  y2={stopLine.segment?.[1]?.[1] ?? 0}
-                  className="scene-stop-line"
-                  onMouseEnter={() =>
-                    setHoverTarget({
-                      label: stopLine.stop_line_id ?? "stop line",
-                      detail: stopLine.control_kind ?? "stop control",
-                    })
-                  }
-                />
-              ))}
-
-            {layers.roads &&
-              (bundle?.render_geometry?.merge_zones ?? []).map((zone, index) => (
-                <polygon
-                  key={zone.merge_zone_id ?? `merge-zone-${index}`}
-                  points={toPointString(zone.polygon)}
-                  className="scene-merge-zone"
-                  onMouseEnter={() =>
-                    setHoverTarget({
-                      label: zone.merge_zone_id ?? "merge zone",
-                      detail: `${zone.kind ?? "merge"} · ${(zone.lane_ids ?? []).length} lane(s)`,
-                    })
-                  }
-                />
-              ))}
-
-            {scenePlaceLabels.map((label, index) => {
-              const isArea = label.kind === "area";
-              const isRoad = label.kind === "road";
-              const labelWidth = Math.max(
-                1.6,
-                Math.max(label.label.length, label.detail?.length ?? 0) * 0.16 +
-                  (isArea ? 0.72 : 0.46),
-              );
-              const labelHeight = label.detail ? 0.82 : 0.5;
-              const labelX = label.position[0] - labelWidth * 0.5;
-              const labelY = label.position[1] - (isArea ? 0.14 : isRoad ? 0.34 : 0.26);
-              return (
-                <g
-                  key={`${label.kind}-${index}`}
-                  className={`scene-place-label scene-place-label-${label.kind}`}
-                  transform={`translate(${labelX} ${labelY})`}
-                >
-                  <rect
-                    x={0}
-                    y={0}
-                    width={labelWidth}
-                    height={labelHeight}
-                    rx={0.18}
-                    className="scene-place-label-bg"
-                  />
-                  <text
-                    x={labelWidth / 2}
-                    y={label.detail ? 0.24 : 0.18}
-                    className="scene-place-label-text"
-                  >
-                    {label.label}
-                  </text>
-                  {label.detail ? (
-                    <text x={labelWidth / 2} y={0.54} className="scene-place-label-secondary">
-                      {label.detail}
-                    </text>
-                  ) : null}
-                </g>
-              );
-            })}
-
-            {layers.reservations &&
-              (bundle?.traffic_baseline?.queue_records ?? []).map((record, queueIndex) => {
-                const road = (bundle?.render_geometry?.roads ?? []).find(
-                  (entry) => entry.road_id === record.road_id,
-                );
-                const roadTraffic =
-                  typeof record.road_id === "string"
-                    ? trafficRoadById.get(record.road_id) ?? null
-                    : null;
-                const roadPath = toSmoothPathString(road?.centerline);
-                if (!roadPath) {
-                  return null;
-                }
-                const roadWidth = Math.min(Math.max((road?.width_m ?? 1.4) * 0.34, 0.4), 1.72);
-                return (
-                  <path
-                    key={`reservation-${queueIndex}`}
-                    d={roadPath}
-                    className={`scene-reservation scene-queue-overlay ${
-                      selectedTarget?.kind === "queue" &&
-                      selectedTarget.roadId === record.road_id
-                        ? "selected"
-                        : selectedRoutePreviewRoadIds.has(record.road_id ?? "")
-                          ? "selected preview"
-                          : ""
-                    }`}
-                    strokeWidth={roadWidth + 0.42}
-                    onClick={() => onSelectQueue(record.road_id ?? undefined)}
-                    onMouseEnter={() =>
-                      setHoverTarget({
-                        label: `Queue ${humanizeIdentifier(record.road_id)}`,
-                        detail: `${roadTraffic?.queued_vehicle_ids?.length ?? 0} vehicle(s) queued`,
-                      })
-                    }
-                  />
-                );
-              })}
-
-            {layers.vehicles &&
-              displayedVehicles.map((vehicle, vehicleIndex) => {
-                const position = vehicle.position ?? [0, 0, 0];
-                const isSelected = selectedVehicleIds.includes(vehicle.vehicle_id ?? -1);
-                const vehicleSpeed = vehicle.speed ?? 0;
-                const isMoving = vehicleSpeed > 0.05 || vehicle.operational_state === "moving";
-                const isWaiting = vehicle.operational_state === "waiting" || vehicle.operational_state === "queued";
-                const isRouteTracked = selectedRoutePreview?.vehicle_id === vehicle.vehicle_id;
-                const vehiclePrimaryLabel = describeVehicleName(vehicle);
-                const routeContextLabel = isRouteTracked
-                  ? describeRoutePreviewDestination(bundle, selectedRoutePreview, {
-                      includeNodeId: false,
-                    }).replace(/ · [0-9.]+m$/, "")
-                  : null;
-                const stateLabel = isRouteTracked
-                  ? routeContextLabel
-                  : isMoving
-                    ? `Moving · ${formatSpeedPerSecond(vehicleSpeed)}`
-                    : isWaiting
-                      ? "Waiting"
-                      : humanizeIdentifier(vehicle.operational_state ?? "idle").toLowerCase();
-                const motionContextLabel =
-                  isSelected || isMoving || isRouteTracked || isWaiting
-                    ? `${formatHeadingDegrees(vehicle.heading_rad ?? null)} · ${stateLabel}${
-                        isSelected && isRouteTracked ? " · selected route" : ""
-                      }`
-                    : null;
-                const labelWidth = Math.max(
-                  1.48,
-                  Math.max(vehiclePrimaryLabel.length, stateLabel?.length ?? 0) * 0.2 + 0.52,
-                );
-                const labelY = position[1] - Math.max((vehicle.body_length_m ?? 1.12) * 0.84, 1.18);
-                const labelHeight = motionContextLabel ? 0.96 : 0.56;
-                const labelTextY = motionContextLabel ? labelY - 0.14 : labelY;
-                const labelSecondaryY = labelY + 0.24;
-                const selectionEnvelopeLength = Math.max(
-                  vehicle.spacing_envelope_m ?? spacingEnvelopeFromVehicle(vehicle),
-                  0.9,
-                );
-                const selectionEnvelopeWidth = Math.max((vehicle.body_width_m ?? 0.62) * 1.9, 1);
-                return (
-                  <g
-                    key={vehicle.vehicle_id ?? `vehicle-${vehicleIndex}`}
-                    className={[
-                      "scene-vehicle",
-                      isSelected ? "selected" : "",
-                      isMoving ? "moving" : "settled",
-                      isWaiting ? "waiting" : "",
-                      isRouteTracked ? "route-following" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onClick={(event) =>
-                      onSelectVehicle(vehicle.vehicle_id, {
-                        additive: event.shiftKey || event.metaKey || event.ctrlKey,
-                      })
-                    }
-                    onMouseEnter={() =>
-                      setHoverTarget({
-                        label: `${vehiclePrimaryLabel} · V${vehicle.vehicle_id ?? vehicleIndex}`,
-                        detail: `${humanizeIdentifier(vehicle.operational_state ?? "unknown_state").toLowerCase()} · ${
-                          vehicle.lane_id ?? "lane-unassigned"
-                        } · ${formatMeters(vehicle.spacing_envelope_m ?? null)} envelope`,
-                      })
-                    }
-                  >
-                    {isSelected ? (
-                      <rect
-                        x={position[0] - selectionEnvelopeLength * 0.56}
-                        y={position[1] - selectionEnvelopeWidth * 0.5}
-                        width={selectionEnvelopeLength * 1.12}
-                        height={selectionEnvelopeWidth}
-                        rx={0.28}
-                        className="vehicle-selection-ring"
-                      />
-                    ) : null}
-                    <g
-                      transform={`translate(${position[0]} ${position[1]}) rotate(${((vehicle.heading_rad ?? 0) * 180) / Math.PI})`}
-                    >
-                      {isMoving ? (
-                        <line
-                          x1={-Math.max((vehicle.body_length_m ?? 1.12) * 0.42, 0.42)}
-                          y1={0}
-                          x2={Math.max((vehicle.body_length_m ?? 1.12) * 0.24, 0.26)}
-                          y2={0}
-                          className="vehicle-motion-trail"
-                        />
-                      ) : null}
-                      {renderVehicleEnvelope(vehicle)}
-                      {renderVehicleGlyph(vehicle)}
-                    </g>
-                    <g className="vehicle-label">
-                      <rect
-                        x={position[0] - labelWidth * 0.5}
-                        y={labelY - 0.24}
-                        width={labelWidth}
-                        height={labelHeight}
-                        rx={0.16}
-                        className="vehicle-label-bg"
-                      />
-                      <text x={position[0]} y={labelTextY} className="vehicle-label-text">
-                        {vehiclePrimaryLabel}
-                      </text>
-                      {motionContextLabel !== null ? (
-                        <text x={position[0]} y={labelSecondaryY} className="vehicle-label-secondary">
-                          {motionContextLabel}
-                        </text>
-                      ) : null}
-                    </g>
-                  </g>
-                );
-              })}
-
-            {layers.routes &&
-              routeDestinationMarkers.map((marker) => (
-                <g
-                  key={`route-destination-${marker.destinationNodeId}`}
-                  className={`scene-destination scene-route-endpoint ${
-                    marker.selected ? "selected" : ""
-                  }`}
-                  transform={`translate(${marker.position[0]} ${marker.position[1]})`}
-                >
-                  <circle r={marker.selected ? 1.08 : 0.86} className="scene-destination-threshold" />
-                  <circle r={marker.selected ? 0.38 : 0.3} className="scene-destination-core" />
-                  <g className="scene-destination-label">
-                    <rect
-                      x={-Math.max(1.8, marker.label.length * 0.12 + 0.7)}
-                      y={-1.72}
-                      width={Math.max(3.6, marker.label.length * 0.24 + 1.4)}
-                      height={marker.detail ? 0.88 : 0.56}
-                      rx={0.16}
-                      className="scene-destination-label-bg"
-                    />
-                    <text x={0} y={-1.38} className="scene-destination-label-text">
-                      {marker.label}
-                    </text>
-                    {marker.detail ? (
-                      <text x={0} y={-1.02} className="scene-destination-label-secondary">
-                        {marker.detail}
-                      </text>
-                    ) : null}
-                  </g>
-                </g>
-              ))}
-
-            {layers.routes &&
-              routePreviews.map((preview, previewIndex) => {
-                const routePoints = buildRoutePreviewPoints(
-                  preview,
-                  bundle?.map_surface?.nodes ?? [],
-                );
-                const routePath = toSmoothPathString(routePoints);
-                if (!routePath) {
-                  return null;
-                }
-                return (
-                  <path
-                    key={`route-preview-${previewIndex}`}
-                    d={routePath}
-                    className={`scene-route-preview ${
-                      preview.vehicle_id === selectedVehicleId ? "selected" : ""
-                    }`}
-                    onMouseEnter={() =>
-                      setHoverTarget({
-                        label: `Route preview V${preview.vehicle_id ?? "?"}`,
-                        detail: preview.reason ?? "actionable preview",
-                      })
-                    }
-                  />
-                );
-              })}
-
-            {layers.hazards &&
-              blockedEdgeIds.map((edgeId, blockedIndex) => {
-                const edge = findEdgeById(bundle?.map_surface?.edges ?? [], edgeId);
-                const start = edge
-                  ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.start_node_id)
-                  : null;
-                const end = edge
-                  ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.end_node_id)
-                  : null;
-                if (!start || !end) {
-                  return null;
-                }
-                return (
-                  <line
-                    key={`hazard-${blockedIndex}`}
-                    x1={start[0]}
-                    y1={start[1]}
-                    x2={end[0]}
-                    y2={end[1]}
-                    className={`scene-hazard ${
-                      selectedTarget?.kind === "hazard" &&
-                      selectedTarget.edgeId === edgeId
+              {layers.areas &&
+                (bundle?.render_geometry?.areas ?? []).map((area, index) => (
+                  <polygon
+                    key={area.area_id ?? `area-${index}`}
+                    points={toPointString(area.polygon)}
+                    className={`scene-area scene-area-${area.kind ?? "generic"} ${
+                      selectedTarget?.kind === "area" && selectedTarget.areaId === area.area_id
                         ? "selected"
                         : ""
                     }`}
-                    onClick={() => onSelectHazard(edgeId)}
+                    onClick={() => onSelectArea(area.area_id)}
                     onMouseEnter={() =>
                       setHoverTarget({
-                        label: `Blocked edge ${edgeId}`,
-                        detail: "Conflict / hazard overlay",
+                        label: area.label ?? area.area_id ?? "zone",
+                        detail: area.kind ?? "zone",
                       })
                     }
                   />
-                );
-              })}
+                ))}
 
-            {editorEnabled &&
-              (bundle?.map_surface?.nodes ?? []).map((node, index) => {
-                if (node.node_id === undefined || !node.position) {
-                  return null;
-                }
-                return (
-                  <circle
-                    key={node.node_id ?? `node-handle-${index}`}
-                    cx={node.position[0]}
-                    cy={node.position[1]}
-                    r={0.32}
-                    className="scene-edit-handle node"
-                    onMouseDown={(event) => onBeginNodeDrag(event, node)}
+              {layers.roads &&
+                (bundle?.render_geometry?.roads ?? []).map((road, index) => {
+                  const roadPath = toSmoothPathString(road.centerline);
+                  if (!roadPath) {
+                    return null;
+                  }
+                  const roadWidth = Math.min(Math.max((road.width_m ?? 1.4) * 0.34, 0.4), 1.72);
+                  const roadTraffic = trafficRoadById.get(road.road_id ?? "");
+                  return (
+                    <g key={road.road_id ?? `road-${index}`}>
+                      <path
+                        d={roadPath}
+                        className={`scene-road-heatmap scene-road-heatmap-${
+                          roadTraffic?.congestion_level ?? "free"
+                        }`}
+                        strokeWidth={roadWidth + 0.34}
+                        style={{
+                          opacity: Math.max(0.05, (roadTraffic?.congestion_intensity ?? 0) * 0.38),
+                        }}
+                        aria-hidden="true"
+                      />
+                      <path
+                        d={roadPath}
+                        className={`scene-road scene-road-${road.road_class ?? "connector"} ${
+                          selectedTarget?.kind === "road" && selectedTarget.roadId === road.road_id
+                            ? "selected"
+                            : ""
+                        }`}
+                        strokeWidth={roadWidth}
+                        onClick={() => onSelectRoad(road.road_id)}
+                        onMouseEnter={() => {
+                          setHoverTarget({
+                            label: humanizeIdentifier(road.road_id),
+                            detail: roadTraffic
+                              ? `${road.directionality ?? "unknown"} · ${
+                                  road.lane_count ?? 0
+                                } lane(s) · ${roadTraffic.congestion_level} · ${
+                                  roadTraffic.queued_vehicle_ids?.length ?? 0
+                                } queued`
+                              : `${road.directionality ?? "unknown"} · ${
+                                  road.lane_count ?? 0
+                                } lane(s)`,
+                          });
+                        }}
+                      />
+                    </g>
+                  );
+                })}
+
+              {layers.intersections &&
+                (bundle?.render_geometry?.intersections ?? []).map((intersection, index) => {
+                  const controlPoint = (bundle?.traffic_baseline?.control_points ?? []).find(
+                    (point) => point.node_id === intersection.node_id,
+                  );
+                  const intersectionPath = toSmoothPathString(intersection.polygon, true);
+                  if (!intersectionPath) {
+                    return null;
+                  }
+                  return (
+                    <path
+                      key={intersection.intersection_id ?? `intersection-${index}`}
+                      d={intersectionPath}
+                      className="scene-intersection"
+                      onMouseEnter={() =>
+                        setHoverTarget({
+                          label: humanizeIdentifier(intersection.intersection_id),
+                          detail: controlPoint
+                            ? `${controlPoint.control_type} · ${
+                                controlPoint.controlled_road_ids?.length ?? 0
+                              } road(s) · ${
+                                controlPoint.stop_line_ids?.length ?? 0
+                              } stop line(s)`
+                            : intersection.intersection_type ?? "intersection",
+                        })
+                      }
+                    />
+                  );
+                })}
+
+              {layers.roads &&
+                (bundle?.render_geometry?.lanes ?? []).map((lane, index) => (
+                  <polyline
+                    key={lane.lane_id ?? `lane-${index}`}
+                    points={toPointString(lane.centerline)}
+                    className={`scene-lane scene-lane-${lane.directionality ?? "forward"}`}
+                    onMouseEnter={() =>
+                      setHoverTarget({
+                        label: lane.lane_id ?? "lane",
+                        detail: `${lane.lane_role ?? "travel"} · ${lane.directionality ?? "forward"}`,
+                      })
+                    }
                   />
-                );
-              })}
+                ))}
 
-            {editorEnabled &&
-              selectedRoad?.centerline?.map((point, index) => (
-                <circle
-                  key={`${selectedRoad.road_id ?? "road"}-point-${index}`}
-                  cx={point[0]}
-                  cy={point[1]}
-                  r={0.3}
-                  className="scene-edit-handle road"
-                  onMouseDown={(event) =>
-                    onBeginRoadPointDrag(
-                      event,
-                      selectedRoad.road_id ?? "road",
-                      index,
-                      point[2] ?? 0,
-                    )
-                  }
-                />
-              ))}
+              {layers.roads &&
+                (bundle?.render_geometry?.turn_connectors ?? []).map((connector, index) => (
+                  <polyline
+                    key={connector.connector_id ?? `connector-${index}`}
+                    points={toPointString(connector.centerline)}
+                    className="scene-turn-connector"
+                    onMouseEnter={() =>
+                      setHoverTarget({
+                        label: connector.connector_id ?? "connector",
+                        detail: connector.connector_type ?? "turn connector",
+                      })
+                    }
+                  />
+                ))}
 
-            {editorEnabled &&
-              selectedArea?.polygon?.map((point, index) => (
-                <circle
-                  key={`${selectedArea.area_id ?? "area"}-point-${index}`}
-                  cx={point[0]}
-                  cy={point[1]}
-                  r={0.3}
-                  className="scene-edit-handle area"
-                  onMouseDown={(event) =>
-                    onBeginAreaPointDrag(
-                      event,
-                      selectedArea.area_id ?? "area",
-                      index,
-                      point[2] ?? 0,
-                    )
+              {layers.roads &&
+                (bundle?.render_geometry?.stop_lines ?? []).map((stopLine, index) => (
+                  <line
+                    key={stopLine.stop_line_id ?? `stop-line-${index}`}
+                    x1={stopLine.segment?.[0]?.[0] ?? 0}
+                    y1={stopLine.segment?.[0]?.[1] ?? 0}
+                    x2={stopLine.segment?.[1]?.[0] ?? 0}
+                    y2={stopLine.segment?.[1]?.[1] ?? 0}
+                    className="scene-stop-line"
+                    onMouseEnter={() =>
+                      setHoverTarget({
+                        label: stopLine.stop_line_id ?? "stop line",
+                        detail: stopLine.control_kind ?? "stop control",
+                      })
+                    }
+                  />
+                ))}
+
+              {layers.roads &&
+                (bundle?.render_geometry?.merge_zones ?? []).map((zone, index) => (
+                  <polygon
+                    key={zone.merge_zone_id ?? `merge-zone-${index}`}
+                    points={toPointString(zone.polygon)}
+                    className="scene-merge-zone"
+                    onMouseEnter={() =>
+                      setHoverTarget({
+                        label: zone.merge_zone_id ?? "merge zone",
+                        detail: `${zone.kind ?? "merge"} · ${(zone.lane_ids ?? []).length} lane(s)`,
+                      })
+                    }
+                  />
+                ))}
+
+              {layers.reservations &&
+                (bundle?.traffic_baseline?.queue_records ?? []).map((record, queueIndex) => {
+                  const road = (bundle?.render_geometry?.roads ?? []).find(
+                    (entry) => entry.road_id === record.road_id,
+                  );
+                  const roadTraffic =
+                    typeof record.road_id === "string"
+                      ? trafficRoadById.get(record.road_id) ?? null
+                      : null;
+                  const roadPath = toSmoothPathString(road?.centerline);
+                  if (!roadPath) {
+                    return null;
                   }
-                />
-              ))}
+                  const roadWidth = Math.min(Math.max((road?.width_m ?? 1.4) * 0.34, 0.4), 1.72);
+                  return (
+                    <path
+                      key={`reservation-${queueIndex}`}
+                      d={roadPath}
+                      className={`scene-reservation scene-queue-overlay ${
+                        selectedTarget?.kind === "queue" &&
+                        selectedTarget.roadId === record.road_id
+                          ? "selected"
+                          : selectedRoutePreviewRoadIds.has(record.road_id ?? "")
+                            ? "selected preview"
+                            : ""
+                      }`}
+                      strokeWidth={roadWidth + 0.42}
+                      onClick={() => onSelectQueue(record.road_id ?? undefined)}
+                      onMouseEnter={() =>
+                        setHoverTarget({
+                          label: `Queue ${humanizeIdentifier(record.road_id)}`,
+                          detail: `${roadTraffic?.queued_vehicle_ids?.length ?? 0} vehicle(s) queued`,
+                        })
+                      }
+                    />
+                  );
+                })}
+
+              {layers.vehicles &&
+                displayedVehicles.map((vehicle, vehicleIndex) => {
+                  const position = vehicle.position ?? [0, 0, 0];
+                  const isSelected = selectedVehicleIds.includes(vehicle.vehicle_id ?? -1);
+                  const vehicleSpeed = vehicle.speed ?? 0;
+                  const isMoving = vehicleSpeed > 0.05 || vehicle.operational_state === "moving";
+                  const isWaiting =
+                    vehicle.operational_state === "waiting" || vehicle.operational_state === "queued";
+                  const isRouteTracked = selectedRoutePreview?.vehicle_id === vehicle.vehicle_id;
+                  const selectionEnvelopeLength = Math.max(
+                    vehicle.spacing_envelope_m ?? spacingEnvelopeFromVehicle(vehicle),
+                    0.9,
+                  );
+                  const selectionEnvelopeWidth = Math.max((vehicle.body_width_m ?? 0.62) * 1.9, 1);
+                  return (
+                    <g
+                      key={vehicle.vehicle_id ?? `vehicle-${vehicleIndex}`}
+                      className={[
+                        "scene-vehicle",
+                        isSelected ? "selected" : "",
+                        isMoving ? "moving" : "settled",
+                        isWaiting ? "waiting" : "",
+                        isRouteTracked ? "route-following" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={(event) =>
+                        onSelectVehicle(vehicle.vehicle_id, {
+                          additive: event.shiftKey || event.metaKey || event.ctrlKey,
+                        })
+                      }
+                      onMouseEnter={() =>
+                        setHoverTarget({
+                          label: `${describeVehicleName(vehicle)} · V${vehicle.vehicle_id ?? vehicleIndex}`,
+                          detail: `${humanizeIdentifier(vehicle.operational_state ?? "unknown_state").toLowerCase()} · ${
+                            vehicle.lane_id ?? "lane-unassigned"
+                          } · ${formatMeters(vehicle.spacing_envelope_m ?? null)} envelope`,
+                        })
+                      }
+                    >
+                      {isSelected ? (
+                        <rect
+                          x={position[0] - selectionEnvelopeLength * 0.56}
+                          y={position[1] - selectionEnvelopeWidth * 0.5}
+                          width={selectionEnvelopeLength * 1.12}
+                          height={selectionEnvelopeWidth}
+                          rx={0.28}
+                          className="vehicle-selection-ring"
+                        />
+                      ) : null}
+                      <g
+                        transform={`translate(${position[0]} ${position[1]}) rotate(${((vehicle.heading_rad ?? 0) * 180) / Math.PI})`}
+                      >
+                        {isMoving ? (
+                          <line
+                            x1={-Math.max((vehicle.body_length_m ?? 1.12) * 0.42, 0.42)}
+                            y1={0}
+                            x2={Math.max((vehicle.body_length_m ?? 1.12) * 0.24, 0.26)}
+                            y2={0}
+                            className="vehicle-motion-trail"
+                          />
+                        ) : null}
+                        {renderVehicleEnvelope(vehicle)}
+                        {renderVehicleGlyph(vehicle)}
+                      </g>
+                    </g>
+                  );
+                })}
+
+              {layers.routes &&
+                routeDestinationMarkers.map((marker) => (
+                  <g
+                    key={`route-destination-${marker.destinationNodeId}`}
+                    className={`scene-destination scene-route-endpoint ${
+                      marker.selected ? "selected" : ""
+                    }`}
+                    transform={`translate(${marker.position[0]} ${marker.position[1]})`}
+                    onMouseEnter={() =>
+                      setHoverTarget({
+                        label: marker.label,
+                        detail: marker.detail ?? "Route destination",
+                      })
+                    }
+                  >
+                    <circle r={marker.selected ? 1.08 : 0.86} className="scene-destination-threshold" />
+                    <circle r={marker.selected ? 0.38 : 0.3} className="scene-destination-core" />
+                  </g>
+                ))}
+
+              {layers.routes &&
+                routePreviews.map((preview, previewIndex) => {
+                  const routePoints = buildRoutePreviewPoints(
+                    preview,
+                    bundle?.map_surface?.nodes ?? [],
+                  );
+                  const routePath = toSmoothPathString(routePoints);
+                  if (!routePath) {
+                    return null;
+                  }
+                  return (
+                    <path
+                      key={`route-preview-${previewIndex}`}
+                      d={routePath}
+                      className={`scene-route-preview ${
+                        preview.vehicle_id === selectedVehicleId ? "selected" : ""
+                      }`}
+                      onMouseEnter={() =>
+                        setHoverTarget({
+                          label: `Route preview V${preview.vehicle_id ?? "?"}`,
+                          detail: preview.reason ?? "actionable preview",
+                        })
+                      }
+                    />
+                  );
+                })}
+
+              {layers.hazards &&
+                blockedEdgeIds.map((edgeId, blockedIndex) => {
+                  const edge = findEdgeById(bundle?.map_surface?.edges ?? [], edgeId);
+                  const start = edge
+                    ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.start_node_id)
+                    : null;
+                  const end = edge
+                    ? findNodePosition(bundle?.map_surface?.nodes ?? [], edge.end_node_id)
+                    : null;
+                  if (!start || !end) {
+                    return null;
+                  }
+                  return (
+                    <line
+                      key={`hazard-${blockedIndex}`}
+                      x1={start[0]}
+                      y1={start[1]}
+                      x2={end[0]}
+                      y2={end[1]}
+                      className={`scene-hazard ${
+                        selectedTarget?.kind === "hazard" &&
+                        selectedTarget.edgeId === edgeId
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() => onSelectHazard(edgeId)}
+                      onMouseEnter={() =>
+                        setHoverTarget({
+                          label: `Blocked edge ${edgeId}`,
+                          detail: "Conflict / hazard overlay",
+                        })
+                      }
+                    />
+                  );
+                })}
+
+              {editorEnabled &&
+                (bundle?.map_surface?.nodes ?? []).map((node, index) => {
+                  if (node.node_id === undefined || !node.position) {
+                    return null;
+                  }
+                  return (
+                    <circle
+                      key={node.node_id ?? `node-handle-${index}`}
+                      cx={node.position[0]}
+                      cy={node.position[1]}
+                      r={0.32}
+                      className="scene-edit-handle node"
+                      onMouseDown={(event) => onBeginNodeDrag(event, node)}
+                    />
+                  );
+                })}
+
+              {editorEnabled &&
+                selectedRoad?.centerline?.map((point, index) => (
+                  <circle
+                    key={`${selectedRoad.road_id ?? "road"}-point-${index}`}
+                    cx={point[0]}
+                    cy={point[1]}
+                    r={0.3}
+                    className="scene-edit-handle road"
+                    onMouseDown={(event) =>
+                      onBeginRoadPointDrag(
+                        event,
+                        selectedRoad.road_id ?? "road",
+                        index,
+                        point[2] ?? 0,
+                      )
+                    }
+                  />
+                ))}
+
+              {editorEnabled &&
+                selectedArea?.polygon?.map((point, index) => (
+                  <circle
+                    key={`${selectedArea.area_id ?? "area"}-point-${index}`}
+                    cx={point[0]}
+                    cy={point[1]}
+                    r={0.3}
+                    className="scene-edit-handle area"
+                    onMouseDown={(event) =>
+                      onBeginAreaPointDrag(
+                        event,
+                        selectedArea.area_id ?? "area",
+                        index,
+                        point[2] ?? 0,
+                      )
+                    }
+                  />
+                ))}
+            </g>
           </svg>
 
           <div className="scene-overlay-shell">
@@ -949,10 +921,6 @@ export function SceneViewport({
                 <span className="legend-item">
                   <span className="legend-swatch road" />
                   Roads
-                </span>
-                <span className="legend-item">
-                  <span className="legend-swatch traffic" />
-                  Traffic heatmap
                 </span>
                 <span className="legend-item">
                   <span className="legend-swatch vehicle" />
@@ -968,21 +936,15 @@ export function SceneViewport({
                 </span>
               </div>
               <div className="focus-card">
-                <strong>
-                  Proof-of-life scene: {displayedVehicles.length} vehicles, {movingVehicleCount} moving,{" "}
-                  {waitingVehicleCount} waiting
-                </strong>
-                <p>
-                  Named places are surfaced in the map, route endpoints read as destinations, and
-                  the live demo stays readable without decoding raw node IDs.
-                </p>
+                <strong>Quiet projected map</strong>
+                <p>Hover or select a surface to reveal names, queues, and inspection detail.</p>
               </div>
             </div>
-            {hoverTarget ? (
+            {sceneFocusTarget ? (
               <div className="scene-overlay-secondary">
-                <div className="hover-card" aria-live="polite">
-                  <strong>{hoverTarget.label}</strong>
-                  <p>{hoverTarget.detail}</p>
+                <div className="hover-card" aria-live="polite" role="status">
+                  <strong>{sceneFocusTarget.label}</strong>
+                  <p>{sceneFocusTarget.detail}</p>
                 </div>
               </div>
             ) : null}
@@ -1050,15 +1012,12 @@ export function SceneViewport({
                   <span className="minimap-card-label">Scene camera</span>
                   <p className="minimap-card-summary">{minimapViewportCoverage}</p>
                 </div>
-                <span className="minimap-orientation-pill">North-up</span>
+                <span className="minimap-orientation-pill">{sceneViewMode === "iso" ? "Iso" : "Birdseye"}</span>
               </div>
               <div className="minimap-context-strip" aria-label="Minimap context">
                 <span className="selection-pill minimap-context-pill">{minimapSelectedVehicleLabel}</span>
                 <span className="selection-pill minimap-context-pill">
                   Fleet {displayedVehicles.length} · Moving {movingVehicleCount}
-                </span>
-                <span className="selection-pill minimap-context-pill">
-                  Places {namedPlaceCount}
                 </span>
                 <span className="selection-pill minimap-context-pill">Viewport window</span>
                 <span

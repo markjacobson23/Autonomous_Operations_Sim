@@ -40,6 +40,7 @@ import type {
   MoveNodeEditOperation,
   NodePayload,
   Position3,
+  SceneViewMode,
   RoadPayload,
   RoutePreviewPayload,
   SelectedTarget,
@@ -52,6 +53,7 @@ function App(): JSX.Element {
   const sceneRef = useRef<SVGSVGElement | null>(null);
   const liveSession = useLiveSession();
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
+  const [sceneViewMode, setSceneViewMode] = useState<SceneViewMode>("birdseye");
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("operate");
   const [selectedTarget, setSelectedTarget] = useState<SelectedTarget | null>(null);
   const [hoverTarget, setHoverTarget] = useState<HoverTarget | null>(null);
@@ -798,6 +800,8 @@ function App(): JSX.Element {
       onBeginNodeDrag={beginNodeDrag}
       onBeginRoadPointDrag={beginRoadPointDrag}
       onBeginAreaPointDrag={beginAreaPointDrag}
+      sceneViewMode={sceneViewMode}
+      onSceneViewModeChange={setSceneViewMode}
       onControlLiveSession={controlLiveSession}
       onPreviewRouteFromDraft={previewRouteFromDraft}
       onAssignDestinationFromDraft={assignDestinationFromDraft}

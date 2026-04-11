@@ -23,6 +23,7 @@ import type {
   HoverTarget,
   LayerState,
   LiveCommandDraft,
+  SceneViewMode,
   SelectedTarget,
   ViewportState,
 } from "../../types";
@@ -72,6 +73,8 @@ type OperateTabProps = {
     pointIndex: number,
     z: number,
   ) => void;
+  sceneViewMode: SceneViewMode;
+  onSceneViewModeChange: (mode: SceneViewMode) => void;
   onControlLiveSession: (action: "play" | "pause" | "step") => void;
   onPreviewRouteFromDraft: () => void;
   onAssignDestinationFromDraft: () => void;
@@ -113,6 +116,8 @@ export function OperateTab({
   onBeginNodeDrag,
   onBeginRoadPointDrag,
   onBeginAreaPointDrag,
+  sceneViewMode,
+  onSceneViewModeChange,
   onControlLiveSession,
   onPreviewRouteFromDraft,
   onAssignDestinationFromDraft,
@@ -216,6 +221,8 @@ export function OperateTab({
         onBeginNodeDrag={onBeginNodeDrag}
         onBeginRoadPointDrag={onBeginRoadPointDrag}
         onBeginAreaPointDrag={onBeginAreaPointDrag}
+        sceneViewMode={sceneViewMode}
+        onSceneViewModeChange={onSceneViewModeChange}
       />
 
       <SectionCard

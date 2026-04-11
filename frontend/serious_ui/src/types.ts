@@ -8,6 +8,8 @@ export type ViewportState = {
   height: number;
 };
 
+export type SceneViewMode = "birdseye" | "iso";
+
 export type LayerState = {
   areas: boolean;
   roads: boolean;

@@ -12,6 +12,7 @@ import type {
   Position3,
   RecentCommandPayload,
   SceneLabelPayload,
+  SceneViewMode,
   RouteDestinationMarker,
   RoutePreviewPayload,
   SelectedTarget,
@@ -42,6 +43,23 @@ export const workspaceTabs: Array<{
 ];
 
 export const sessionActions = ["Launch Live Run", "Reconnect Bundle"];
+
+export const sceneViewModes: Array<{
+  id: SceneViewMode;
+  label: string;
+  summary: string;
+}> = [
+  {
+    id: "birdseye",
+    label: "Birdseye",
+    summary: "Flat, quiet map view",
+  },
+  {
+    id: "iso",
+    label: "Iso",
+    summary: "Tilted projected scene",
+  },
+];
 
 export const defaultLayers: LayerState = {
   areas: true,
@@ -86,6 +104,25 @@ export function fitViewportToBundle(bundle: BundlePayload | null): ViewportState
     width: bounds.width + paddingX * 2,
     height: bounds.height + paddingY * 2,
   };
+}
+
+export function describeSceneViewMode(viewMode: SceneViewMode): string {
+  return sceneViewModes.find((entry) => entry.id === viewMode)?.summary ?? "Projected map view";
+}
+
+export function sceneProjectionTransform(viewMode: SceneViewMode, bounds: Bounds): string {
+  if (viewMode === "birdseye") {
+    return "";
+  }
+
+  const centerX = bounds.minX + bounds.width / 2;
+  const centerY = bounds.minY + bounds.height / 2;
+  return [
+    `translate(${centerX} ${centerY})`,
+    "scale(1 0.88)",
+    "skewX(-20)",
+    `translate(${-centerX} ${-centerY})`,
+  ].join(" ");
 }
 
 export function computeSceneBounds(bundle: BundlePayload | null): Bounds {
