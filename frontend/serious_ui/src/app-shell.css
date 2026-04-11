@@ -436,10 +436,6 @@ h3 {
   display: none;
 }
 
-.shell-tab-operate .sidebar {
-  display: none;
-}
-
 .shell-tab-operate .operate-pane {
   grid-column: 1 / -1;
 }

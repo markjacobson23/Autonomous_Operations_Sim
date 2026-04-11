@@ -315,168 +315,166 @@ export function OperateTab({
         </div>
       </section>
 
-      <aside className="sidebar">
-        <section className="panel info-panel operate-route-planning" aria-label="route-planning">
-          <PanelHeader
-            eyebrow="Route Planning"
-            title="Primary Operator Workflow"
-            lede="Select a vehicle in the scene, confirm the route preview, then use the primary action to commit or refine the destination without leaving the map."
-            className="compact"
-            meta={
-              <div className="status-stack">
-                <span className="status-pill secondary">Fleet selection: {selectedVehicleIds.length} vehicle(s)</span>
-                <span className="status-pill secondary">
-                  Route preview:{" "}
-                  {selectedRoutePreview?.vehicle_id !== undefined
-                    ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id)}`
-                    : "waiting for preview"}
-                </span>
-              </div>
-            }
-          />
-          <div className="selection-strip">
-            <span className="selection-pill">
-              Destination node:{" "}
-              {selectedRoutePreview?.destination_node_id !== undefined
-                ? formatMaybeNumber(selectedRoutePreview.destination_node_id)
-                : "not set yet"}
-            </span>
-            <span className="selection-pill">Current target: {operateSelectedTargetSummary}</span>
+      <section className="panel info-panel operate-route-planning" aria-label="route-planning">
+        <PanelHeader
+          eyebrow="Route Planning"
+          title="Primary Operator Workflow"
+          lede="Select a vehicle in the scene, confirm the route preview, then use the primary action to commit or refine the destination without leaving the map."
+          className="compact"
+          meta={
+            <div className="status-stack">
+              <span className="status-pill secondary">Fleet selection: {selectedVehicleIds.length} vehicle(s)</span>
+              <span className="status-pill secondary">
+                Route preview:{" "}
+                {selectedRoutePreview?.vehicle_id !== undefined
+                  ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id)}`
+                  : "waiting for preview"}
+              </span>
+            </div>
+          }
+        />
+        <div className="selection-strip">
+          <span className="selection-pill">
+            Destination node:{" "}
+            {selectedRoutePreview?.destination_node_id !== undefined
+              ? formatMaybeNumber(selectedRoutePreview.destination_node_id)
+              : "not set yet"}
+          </span>
+          <span className="selection-pill">Current target: {operateSelectedTargetSummary}</span>
+        </div>
+        <p className="operate-route-hint">
+          Select a vehicle in the scene, confirm the route preview, then use the primary action to
+          commit or refine the destination without leaving the map.
+        </p>
+        <div className="operate-context-grid">
+          <section className="operate-context-card">
+            <p className="operate-card-label">Selected Context</p>
+            <strong>{operateSelectedVehicleSummary}</strong>
+            <p>{operateSelectedContextSummary}</p>
+            <ul className="mini-list">
+              <li>Current target: {operateSelectedTargetSummary}</li>
+              <li>
+                Selection source:{" "}
+                {selectedVehicleIds.length > 1 ? `${selectedVehicleIds.length} vehicles` : "single vehicle focus"}
+              </li>
+            </ul>
+          </section>
+          <div className="route-preview-summary operate-context-card">
+            <div className="preview-badge">
+              <span className="preview-label">Route Preview</span>
+              <strong>{operateRoutePreviewSummary}</strong>
+            </div>
+            <p className="operate-route-preview-detail">{operateRoutePreviewDetail}</p>
+            <ul className="mini-list">
+              <li>Actionable: {selectedRoutePreview?.is_actionable ? "yes" : "no"}</li>
+              <li>Reason: {selectedRoutePreview?.reason ?? "none"}</li>
+              <li>Distance: {formatMeters(selectedRoutePreview?.total_distance ?? null)}</li>
+              <li>Edges: {(selectedRoutePreview?.edge_ids ?? []).join(", ") || "none"}</li>
+              <li>Nodes: {(selectedRoutePreview?.node_ids ?? []).join(" → ") || "none"}</li>
+            </ul>
           </div>
-          <p className="operate-route-hint">
-            Select a vehicle in the scene, confirm the route preview, then use the primary action to
-            commit or refine the destination without leaving the map.
-          </p>
-          <div className="operate-context-grid">
-            <section className="operate-context-card">
-              <p className="operate-card-label">Selected Context</p>
-              <strong>{operateSelectedVehicleSummary}</strong>
-              <p>{operateSelectedContextSummary}</p>
-              <ul className="mini-list">
-                <li>Current target: {operateSelectedTargetSummary}</li>
-                <li>
-                  Selection source:{" "}
-                  {selectedVehicleIds.length > 1 ? `${selectedVehicleIds.length} vehicles` : "single vehicle focus"}
-                </li>
-              </ul>
-            </section>
-            <div className="route-preview-summary operate-context-card">
-              <div className="preview-badge">
-                <span className="preview-label">Route Preview</span>
-                <strong>{operateRoutePreviewSummary}</strong>
-              </div>
-              <p className="operate-route-preview-detail">{operateRoutePreviewDetail}</p>
-              <ul className="mini-list">
-                <li>Actionable: {selectedRoutePreview?.is_actionable ? "yes" : "no"}</li>
-                <li>Reason: {selectedRoutePreview?.reason ?? "none"}</li>
-                <li>Distance: {formatMeters(selectedRoutePreview?.total_distance ?? null)}</li>
-                <li>Edges: {(selectedRoutePreview?.edge_ids ?? []).join(", ") || "none"}</li>
-                <li>Nodes: {(selectedRoutePreview?.node_ids ?? []).join(" → ") || "none"}</li>
-              </ul>
-            </div>
+        </div>
+        <div className="operate-workflow-actions">
+          <div className="operate-next-action">
+            <span className="operate-card-label">Primary next action</span>
+            <strong>{operatePrimaryActionLabel}</strong>
+            <p>{operatePrimaryActionDetail}</p>
           </div>
-          <div className="operate-workflow-actions">
-            <div className="operate-next-action">
-              <span className="operate-card-label">Primary next action</span>
-              <strong>{operatePrimaryActionLabel}</strong>
-              <p>{operatePrimaryActionDetail}</p>
-            </div>
-            <div className="route-planning-grid">
-              <label className="form-field">
-                <span>Vehicle ID</span>
-                <input
-                  type="number"
-                  value={liveCommandDraft.vehicleId}
-                  onChange={(event) =>
-                    setLiveCommandDraft((current) => ({
-                      ...current,
-                      vehicleId: event.target.value,
-                    }))
-                  }
-                  placeholder={selectedVehicleId !== null ? String(selectedVehicleId) : "77"}
-                />
-              </label>
-              <label className="form-field">
-                <span>Destination Node</span>
-                <input
-                  type="number"
-                  value={liveCommandDraft.destinationNodeId}
-                  onChange={(event) =>
-                    setLiveCommandDraft((current) => ({
-                      ...current,
-                      destinationNodeId: event.target.value,
-                    }))
-                  }
-                  placeholder={
-                    routePreviews[0]?.destination_node_id !== undefined
-                      ? String(routePreviews[0].destination_node_id)
-                      : "3"
-                  }
-                />
-              </label>
-              <label className="form-field">
-                <span>Reposition Node</span>
-                <input
-                  type="number"
-                  value={liveCommandDraft.nodeId}
-                  onChange={(event) =>
-                    setLiveCommandDraft((current) => ({
-                      ...current,
-                      nodeId: event.target.value,
-                    }))
-                  }
-                  placeholder={
-                    selectedInspection?.current_node_id !== undefined
-                      ? String(selectedInspection.current_node_id)
-                      : "1"
-                  }
-                />
-              </label>
-              <label className="form-field">
-                <span>Step Seconds</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={liveCommandDraft.stepSeconds}
-                  onChange={(event) =>
-                    setLiveCommandDraft((current) => ({
-                      ...current,
-                      stepSeconds: event.target.value,
-                    }))
-                  }
-                  placeholder={String(sessionControl?.step_seconds ?? 0.5)}
-                />
-              </label>
-            </div>
-            <div className="route-primary-actions action-row">
-              <button
-                className="scene-button scene-button-primary"
-                type="button"
-                onClick={onPreviewRouteFromDraft}
-                disabled={!sessionControl?.route_preview_endpoint}
-              >
-                Preview Route
-              </button>
-              <button
-                className="scene-button scene-button-primary"
-                type="button"
-                onClick={onAssignDestinationFromDraft}
-                disabled={!sessionControl?.command_endpoint}
-              >
-                Assign Destination
-              </button>
-              <button
-                className="scene-button"
-                type="button"
-                onClick={onRepositionVehicleFromDraft}
-                disabled={!sessionControl?.command_endpoint}
-              >
-                Reposition Vehicle
-              </button>
-            </div>
+          <div className="route-planning-grid">
+            <label className="form-field">
+              <span>Vehicle ID</span>
+              <input
+                type="number"
+                value={liveCommandDraft.vehicleId}
+                onChange={(event) =>
+                  setLiveCommandDraft((current) => ({
+                    ...current,
+                    vehicleId: event.target.value,
+                  }))
+                }
+                placeholder={selectedVehicleId !== null ? String(selectedVehicleId) : "77"}
+              />
+            </label>
+            <label className="form-field">
+              <span>Destination Node</span>
+              <input
+                type="number"
+                value={liveCommandDraft.destinationNodeId}
+                onChange={(event) =>
+                  setLiveCommandDraft((current) => ({
+                    ...current,
+                    destinationNodeId: event.target.value,
+                  }))
+                }
+                placeholder={
+                  routePreviews[0]?.destination_node_id !== undefined
+                    ? String(routePreviews[0].destination_node_id)
+                    : "3"
+                }
+              />
+            </label>
+            <label className="form-field">
+              <span>Reposition Node</span>
+              <input
+                type="number"
+                value={liveCommandDraft.nodeId}
+                onChange={(event) =>
+                  setLiveCommandDraft((current) => ({
+                    ...current,
+                    nodeId: event.target.value,
+                  }))
+                }
+                placeholder={
+                  selectedInspection?.current_node_id !== undefined
+                    ? String(selectedInspection.current_node_id)
+                    : "1"
+                }
+              />
+            </label>
+            <label className="form-field">
+              <span>Step Seconds</span>
+              <input
+                type="number"
+                step="0.1"
+                value={liveCommandDraft.stepSeconds}
+                onChange={(event) =>
+                  setLiveCommandDraft((current) => ({
+                    ...current,
+                    stepSeconds: event.target.value,
+                  }))
+                }
+                placeholder={String(sessionControl?.step_seconds ?? 0.5)}
+              />
+            </label>
           </div>
-        </section>
-      </aside>
+          <div className="route-primary-actions action-row">
+            <button
+              className="scene-button scene-button-primary"
+              type="button"
+              onClick={onPreviewRouteFromDraft}
+              disabled={!sessionControl?.route_preview_endpoint}
+            >
+              Preview Route
+            </button>
+            <button
+              className="scene-button scene-button-primary"
+              type="button"
+              onClick={onAssignDestinationFromDraft}
+              disabled={!sessionControl?.command_endpoint}
+            >
+              Assign Destination
+            </button>
+            <button
+              className="scene-button"
+              type="button"
+              onClick={onRepositionVehicleFromDraft}
+              disabled={!sessionControl?.command_endpoint}
+            >
+              Reposition Vehicle
+            </button>
+          </div>
+        </div>
+      </section>
     </section>
   );
 }

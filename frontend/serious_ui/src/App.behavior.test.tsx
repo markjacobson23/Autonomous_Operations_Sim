@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import App from "./App";
@@ -329,6 +329,13 @@ describe("serious ui behavior", () => {
     expect(screen.getByText("Operate")).toBeInTheDocument();
     expect(screen.getByText("Traffic")).toBeInTheDocument();
     expect(screen.getByText("Fleet")).toBeInTheDocument();
+    const routePlanningRegion = screen.getByRole("region", { name: "route-planning" });
+    expect(routePlanningRegion).toBeVisible();
+    expect(within(routePlanningRegion).getByRole("heading", { name: "Primary Operator Workflow" })).toBeVisible();
+    expect(within(routePlanningRegion).getByLabelText("Vehicle ID")).toBeVisible();
+    expect(within(routePlanningRegion).getByLabelText("Destination Node")).toBeVisible();
+    expect(within(routePlanningRegion).getByRole("button", { name: "Preview Route" })).toBeVisible();
+    expect(within(routePlanningRegion).getByRole("button", { name: "Assign Destination" })).toBeVisible();
 
     const destinationInput = screen.getByLabelText("Destination Node");
     await user.clear(destinationInput);
