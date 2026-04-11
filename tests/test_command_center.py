@@ -195,7 +195,9 @@ def test_preview_route_command_builds_non_mutating_route_preview() -> None:
 
 def test_preview_route_command_marks_non_idle_vehicle_as_non_actionable() -> None:
     session = LiveSimulationSession(build_command_center_engine())
-    session.engine.get_vehicle(77).behavior.transition_to(
+    behavior = session.engine.get_vehicle(77).behavior
+    assert behavior is not None
+    behavior.transition_to(
         VehicleOperationalState.MOVING,
         reason="in_transit",
     )

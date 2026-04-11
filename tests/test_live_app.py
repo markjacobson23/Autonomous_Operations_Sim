@@ -13,7 +13,9 @@ from autonomous_ops_sim.simulation.behavior import VehicleOperationalState
 
 def _read_live_bundle(base_url: str) -> dict[str, object]:
     response = request.urlopen(f"{base_url}/live_session_bundle.json")
-    return json.loads(response.read().decode("utf-8"))
+    payload = json.loads(response.read().decode("utf-8"))
+    assert isinstance(payload, dict)
+    return payload
 
 
 def _wait_for_live_time(
@@ -26,7 +28,9 @@ def _wait_for_live_time(
     latest_bundle: dict[str, object] | None = None
     while time.monotonic() < deadline:
         latest_bundle = _read_live_bundle(base_url)
-        if float(latest_bundle["simulated_time_s"]) >= minimum_time_s:
+        simulated_time_s = latest_bundle["simulated_time_s"]
+        assert isinstance(simulated_time_s, (int, float))
+        if float(simulated_time_s) >= minimum_time_s:
             return latest_bundle
         time.sleep(0.05)
     raise AssertionError(
@@ -259,8 +263,12 @@ def test_live_app_frontend_server_supports_live_commands_and_session_control(
 
         playback_thread = server._runtime.playback_thread
         advanced_bundle = _wait_for_live_time(base_url, 1.0)
-        assert advanced_bundle["simulated_time_s"] >= 1.0
-        assert len(advanced_bundle["session_history"]) >= 2
+        advanced_time_s = advanced_bundle["simulated_time_s"]
+        assert isinstance(advanced_time_s, (int, float))
+        assert advanced_time_s >= 1.0
+        advanced_session_history = advanced_bundle["session_history"]
+        assert isinstance(advanced_session_history, list)
+        assert len(advanced_session_history) >= 2
 
         repeated_play_response = request.urlopen(
             request.Request(
@@ -280,8 +288,12 @@ def test_live_app_frontend_server_supports_live_commands_and_session_control(
         assert server._runtime.playback_thread is playback_thread
 
         repeated_bundle = _wait_for_live_time(base_url, 1.5)
-        assert repeated_bundle["simulated_time_s"] >= 1.5
-        assert len(repeated_bundle["session_history"]) == len(advanced_bundle["session_history"]) + 1
+        repeated_time_s = repeated_bundle["simulated_time_s"]
+        assert isinstance(repeated_time_s, (int, float))
+        assert repeated_time_s >= 1.5
+        repeated_session_history = repeated_bundle["session_history"]
+        assert isinstance(repeated_session_history, list)
+        assert len(repeated_session_history) == len(advanced_session_history) + 1
 
         try:
             request.urlopen(
@@ -322,11 +334,18 @@ def test_live_app_frontend_server_supports_live_commands_and_session_control(
 
         paused_bundle = _read_live_bundle(base_url)
         paused_time_s = paused_bundle["simulated_time_s"]
-        paused_history_length = len(paused_bundle["session_history"])
+        assert isinstance(paused_time_s, (int, float))
+        paused_session_history = paused_bundle["session_history"]
+        assert isinstance(paused_session_history, list)
+        paused_history_length = len(paused_session_history)
         time.sleep(0.8)
         after_pause_bundle = _read_live_bundle(base_url)
-        assert after_pause_bundle["simulated_time_s"] == paused_time_s
-        assert len(after_pause_bundle["session_history"]) == paused_history_length
+        after_pause_time_s = after_pause_bundle["simulated_time_s"]
+        assert isinstance(after_pause_time_s, (int, float))
+        assert after_pause_time_s == paused_time_s
+        after_pause_session_history = after_pause_bundle["session_history"]
+        assert isinstance(after_pause_session_history, list)
+        assert len(after_pause_session_history) == paused_history_length
     finally:
         server.stop()
 
@@ -370,13 +389,25 @@ def test_live_app_playback_loop_falls_back_to_paused_when_tick_fails(tmp_path) -
 
         paused_bundle = _wait_for_live_time(base_url, 0.0)
         deadline = time.monotonic() + 3.0
-        while time.monotonic() < deadline and paused_bundle["session_control"]["play_state"] != "paused":
+        while time.monotonic() < deadline:
+            session_control = paused_bundle["session_control"]
+            assert isinstance(session_control, dict)
+            play_state = session_control["play_state"]
+            assert isinstance(play_state, str)
+            if play_state == "paused":
+                break
             time.sleep(0.05)
             paused_bundle = _read_live_bundle(base_url)
 
-        assert paused_bundle["session_control"]["play_state"] == "paused"
+        session_control = paused_bundle["session_control"]
+        assert isinstance(session_control, dict)
+        play_state = session_control["play_state"]
+        assert isinstance(play_state, str)
+        assert play_state == "paused"
         assert server._runtime.playback_thread is None
-        assert paused_bundle["simulated_time_s"] == 0.0
+        paused_time_s = paused_bundle["simulated_time_s"]
+        assert isinstance(paused_time_s, (int, float))
+        assert paused_time_s == 0.0
     finally:
         server._runtime.advance_session = original_advance_session  # type: ignore[assignment]
         server.stop()
@@ -708,7 +739,9 @@ def test_live_app_frontend_server_handles_non_idle_vehicle_route_preview(tmp_pat
     base_url = f"http://{server.host}:{server.port}"
 
     try:
-        server._runtime.session.engine.get_vehicle(vehicle_id).behavior.transition_to(
+        behavior = server._runtime.session.engine.get_vehicle(vehicle_id).behavior
+        assert behavior is not None
+        behavior.transition_to(
             VehicleOperationalState.MOVING,
             reason="test_setup",
         )
