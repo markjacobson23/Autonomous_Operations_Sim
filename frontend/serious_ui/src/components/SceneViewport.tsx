@@ -2,9 +2,14 @@ import type { Dispatch, MouseEvent, Ref, RefObject, SetStateAction } from "react
 
 import {
   buildRoutePreviewPoints,
+  buildScenePlaceLabels,
   clientPointToScene,
   computeSceneBounds,
   describeSelectedTarget,
+  describeLocationLabel,
+  describeRoutePreviewDestination,
+  describeVehicleName,
+  describeVehicleOperationalSummary,
   findEdgeById,
   findNodePosition,
   findVehicleById,
@@ -12,6 +17,8 @@ import {
   formatMeters,
   formatMaybeNumber,
   formatSpeedPerSecond,
+  formatSeconds,
+  humanizeIdentifier,
   maxMotionTime,
   spacingEnvelopeFromVehicle,
   renderVehicleEnvelope,
@@ -23,8 +30,6 @@ import {
   toPointString,
   toScaledPointString,
   toSmoothPathString,
-  trafficRoadPressureScore,
-  vehiclePresentationBadge,
   type DisplayedVehicle,
 } from "../viewModel";
 import { PanelHeader } from "./shared/PanelHeader";
@@ -36,9 +41,7 @@ import type {
   LayerState,
   Position3,
   RouteDestinationMarker,
-  RoutePreviewPayload,
   SelectedTarget,
-  TrafficRoadStatePayload,
   ViewportState,
 } from "../types";
 
@@ -122,11 +125,6 @@ export function SceneViewport({
       .filter((state) => state.road_id)
       .map((state) => [state.road_id as string, state]),
   );
-  const trafficRoadStatesRanked = [...trafficRoadStates].sort(
-    (left, right) =>
-      trafficRoadPressureScore(right) - trafficRoadPressureScore(left) ||
-      (left.road_id ?? "").localeCompare(right.road_id ?? ""),
-  );
   const selectedVehicleId =
     selectedTarget?.kind === "vehicle"
       ? selectedTarget.vehicleId
@@ -165,6 +163,14 @@ export function SceneViewport({
     (left, right) => left - right,
   );
   const routePreviews = bundle?.command_center?.route_previews ?? [];
+  const scenePlaceLabels = buildScenePlaceLabels(bundle);
+  const movingVehicleCount = displayedVehicles.filter(
+    (vehicle) => (vehicle.speed ?? 0) > 0.05 || vehicle.operational_state === "moving",
+  ).length;
+  const waitingVehicleCount = displayedVehicles.filter(
+    (vehicle) => vehicle.operational_state === "waiting" || vehicle.operational_state === "queued",
+  ).length;
+  const namedPlaceCount = scenePlaceLabels.length;
   const selectedRoutePreviewRoadIds = new Set(
     (bundle?.render_geometry?.roads ?? [])
       .filter((road) =>
@@ -189,6 +195,9 @@ export function SceneViewport({
     const selected = routePreviews[0]?.vehicle_id !== undefined
       ? routePreviews[0].vehicle_id === preview.vehicle_id
       : false;
+    const label = describeRoutePreviewDestination(bundle, preview, {
+      includeNodeId: false,
+    }).replace(/ · [0-9.]+m$/, "");
     const existingMarker = markers.get(destinationNodeId);
     if (!existingMarker || (!existingMarker.selected && selected)) {
       markers.set(destinationNodeId, {
@@ -196,6 +205,8 @@ export function SceneViewport({
         position,
         selected,
         previewVehicleId: preview.vehicle_id,
+        label,
+        detail: `V${preview.vehicle_id ?? "?"}`,
       });
     }
     return markers;
@@ -227,10 +238,15 @@ export function SceneViewport({
           (inspection) => inspection.vehicle_id === selectedFleetPrimaryVehicleId,
         ) ?? selectedInspection
       : selectedInspection;
-  const selectedRoutePreviewRoadIdsLabel =
-    selectedRoutePreviewRoadIds.size > 0
-      ? Array.from(selectedRoutePreviewRoadIds).join(", ")
-      : "none";
+  const selectedVehicleStatusSummary = describeVehicleOperationalSummary(
+    bundle,
+    selectedVehicle,
+    selectedInspection,
+    selectedRoutePreview,
+  );
+  const selectedRoutePreviewSummary = describeRoutePreviewDestination(bundle, selectedRoutePreview, {
+    includeNodeId: true,
+  });
 
   const minimapRect = {
     x: ((viewport.x - bounds.minX) / bounds.width) * 100,
@@ -244,7 +260,7 @@ export function SceneViewport({
   )}% tall`;
   const minimapSelectedVehicleLabel =
     selectedVehicle !== null
-      ? `Selected ${selectedVehicle.display_name ?? selectedVehicle.role_label ?? vehiclePresentationBadge(selectedVehicle)}`
+      ? `Selected ${describeVehicleName(selectedVehicle)}`
       : selectedVehicleIds.length > 0
         ? `Fleet ${selectedVehicleIds.length} selected`
         : "No selected vehicle yet";
@@ -256,22 +272,26 @@ export function SceneViewport({
         : "No blocked edges yet";
   const operateSelectedVehicleSummary =
     selectedVehicle !== null
-      ? `${selectedVehicle.display_name ?? selectedVehicle.role_label ?? vehiclePresentationBadge(selectedVehicle)} · ${
-          selectedInspection?.operational_state ??
-          selectedVehicle.operational_state ??
-          "state unknown"
-        }`
+      ? selectedVehicleStatusSummary
       : selectedVehicleIds.length > 0
         ? `Fleet selection active · ${selectedVehicleIds.length} vehicle(s)`
         : "No vehicle selected yet";
   const operateSelectedContextSummary =
     selectedInspection !== null
-      ? `Node ${formatMaybeNumber(selectedInspection.current_node_id ?? null)} · ETA ${formatMaybeNumber(selectedInspection.eta_s ?? null)}s · ${selectedInspection.current_job_id ?? "no job"}`
+      ? `${describeLocationLabel(bundle, selectedInspection.current_node_id ?? null, {
+          includeNodeId: true,
+        })} · ETA ${formatSeconds(selectedInspection.eta_s ?? null)} · ${
+          selectedInspection.current_job_id ?? "no job"
+        }`
       : "Select a vehicle on the map or from the roster to open inspection details.";
   const operateSelectedTargetSummary = describeSelectedTarget(selectedTarget, selectedVehicleId);
   const operateRoutePreviewSummary =
     selectedRoutePreview !== null
-      ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id ?? null)} · Node ${formatMaybeNumber(selectedRoutePreview.destination_node_id ?? null)} · ${
+      ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id ?? null)} · ${describeLocationLabel(
+          bundle,
+          selectedRoutePreview.destination_node_id ?? null,
+          { includeNodeId: true },
+        )} · ${
           selectedRoutePreview.is_actionable ? "actionable" : "pending"
         }`
       : "Waiting for route preview";
@@ -283,60 +303,6 @@ export function SceneViewport({
             : ""
         }`
       : "Choose a vehicle and destination, then preview the route to populate node, edge, and distance details.";
-  const selectedRoadTraffic =
-    selectedRoad?.road_id !== undefined
-      ? trafficRoadById.get(selectedRoad.road_id) ?? null
-      : null;
-  const selectedQueueTraffic =
-    typeof selectedQueueRecord?.road_id === "string"
-      ? trafficRoadById.get(selectedQueueRecord.road_id) ?? null
-      : null;
-  const trafficFocusRoadState =
-    selectedRoadTraffic ?? trafficRoadStatesRanked[0] ?? null;
-  const trafficFocusRoad =
-    trafficFocusRoadState?.road_id !== undefined
-      ? (bundle?.render_geometry?.roads ?? []).find(
-          (road) => road.road_id === trafficFocusRoadState.road_id,
-        ) ?? selectedRoad
-      : selectedRoad;
-  const trafficMonitoringRoadStates = (() => {
-    const states: TrafficRoadStatePayload[] = [];
-    const seenRoadIds = new Set<string>();
-    if (trafficFocusRoadState?.road_id) {
-      states.push(trafficFocusRoadState);
-      seenRoadIds.add(trafficFocusRoadState.road_id);
-    }
-    for (const roadState of trafficRoadStatesRanked) {
-      if (!roadState.road_id || seenRoadIds.has(roadState.road_id)) {
-        continue;
-      }
-      states.push(roadState);
-      seenRoadIds.add(roadState.road_id);
-      if (states.length >= 5) {
-        break;
-      }
-    }
-    return states;
-  })();
-  const trafficQueueRecords = [...(bundle?.traffic_baseline?.queue_records ?? [])].sort(
-    (left, right) => {
-      const leftRoadState =
-        typeof left.road_id === "string" ? trafficRoadById.get(left.road_id) ?? null : null;
-      const rightRoadState =
-        typeof right.road_id === "string" ? trafficRoadById.get(right.road_id) ?? null : null;
-      const leftVehicleCount =
-        left.vehicle_ids?.length ?? (left.vehicle_id !== undefined ? 1 : 0);
-      const rightVehicleCount =
-        right.vehicle_ids?.length ?? (right.vehicle_id !== undefined ? 1 : 0);
-      return (
-        trafficRoadPressureScore(rightRoadState) +
-        rightVehicleCount * 10 -
-        (trafficRoadPressureScore(leftRoadState) + leftVehicleCount * 10) ||
-        (left.road_id ?? "").localeCompare(right.road_id ?? "") ||
-        (left.node_id ?? 0) - (right.node_id ?? 0)
-      );
-    },
-  );
   const selectedFleetStateCounts = selectedFleetVehicles.reduce<Record<string, number>>(
     (counts, vehicle) => {
       const operationalState = (vehicle.operational_state ?? "unknown").split("_").join(" ");
@@ -360,11 +326,9 @@ export function SceneViewport({
     routePreviews.find((preview) => selectedVehicleIds.includes(preview.vehicle_id ?? -1)) ??
     null;
   const selectedFleetRouteSummary = selectedFleetRoutePreview
-    ? `Node ${formatMaybeNumber(selectedFleetRoutePreview.destination_node_id ?? null)}${
-        selectedFleetRoutePreview.total_distance !== undefined
-          ? ` · ${formatMeters(selectedFleetRoutePreview.total_distance)}`
-          : ""
-      }`
+    ? describeRoutePreviewDestination(bundle, selectedFleetRoutePreview, {
+        includeNodeId: true,
+      })
     : "Waiting for route preview";
   const selectedFleetRouteDetail = selectedFleetRoutePreview
     ? `${selectedFleetRoutePreview.is_actionable ? "Actionable" : "Pending"}${
@@ -526,7 +490,7 @@ export function SceneViewport({
                       onClick={() => onSelectRoad(road.road_id)}
                       onMouseEnter={() => {
                         setHoverTarget({
-                          label: road.road_id ?? "road",
+                          label: humanizeIdentifier(road.road_id),
                           detail: roadTraffic
                             ? `${road.directionality ?? "unknown"} · ${
                                 road.lane_count ?? 0
@@ -559,7 +523,7 @@ export function SceneViewport({
                     className="scene-intersection"
                     onMouseEnter={() =>
                       setHoverTarget({
-                        label: intersection.intersection_id ?? "intersection",
+                        label: humanizeIdentifier(intersection.intersection_id),
                         detail: controlPoint
                           ? `${controlPoint.control_type} · ${
                               controlPoint.controlled_road_ids?.length ?? 0
@@ -636,6 +600,47 @@ export function SceneViewport({
                 />
               ))}
 
+            {scenePlaceLabels.map((label, index) => {
+              const isArea = label.kind === "area";
+              const isRoad = label.kind === "road";
+              const labelWidth = Math.max(
+                1.6,
+                Math.max(label.label.length, label.detail?.length ?? 0) * 0.16 +
+                  (isArea ? 0.72 : 0.46),
+              );
+              const labelHeight = label.detail ? 0.82 : 0.5;
+              const labelX = label.position[0] - labelWidth * 0.5;
+              const labelY = label.position[1] - (isArea ? 0.14 : isRoad ? 0.34 : 0.26);
+              return (
+                <g
+                  key={`${label.kind}-${index}`}
+                  className={`scene-place-label scene-place-label-${label.kind}`}
+                  transform={`translate(${labelX} ${labelY})`}
+                >
+                  <rect
+                    x={0}
+                    y={0}
+                    width={labelWidth}
+                    height={labelHeight}
+                    rx={0.18}
+                    className="scene-place-label-bg"
+                  />
+                  <text
+                    x={labelWidth / 2}
+                    y={label.detail ? 0.24 : 0.18}
+                    className="scene-place-label-text"
+                  >
+                    {label.label}
+                  </text>
+                  {label.detail ? (
+                    <text x={labelWidth / 2} y={0.54} className="scene-place-label-secondary">
+                      {label.detail}
+                    </text>
+                  ) : null}
+                </g>
+              );
+            })}
+
             {layers.reservations &&
               (bundle?.traffic_baseline?.queue_records ?? []).map((record, queueIndex) => {
                 const road = (bundle?.render_geometry?.roads ?? []).find(
@@ -666,7 +671,7 @@ export function SceneViewport({
                     onClick={() => onSelectQueue(record.road_id ?? undefined)}
                     onMouseEnter={() =>
                       setHoverTarget({
-                        label: `Queue ${record.road_id ?? "road"}`,
+                        label: `Queue ${humanizeIdentifier(record.road_id)}`,
                         detail: `${roadTraffic?.queued_vehicle_ids?.length ?? 0} vehicle(s) queued`,
                       })
                     }
@@ -680,22 +685,35 @@ export function SceneViewport({
                 const isSelected = selectedVehicleIds.includes(vehicle.vehicle_id ?? -1);
                 const vehicleSpeed = vehicle.speed ?? 0;
                 const isMoving = vehicleSpeed > 0.05 || vehicle.operational_state === "moving";
+                const isWaiting = vehicle.operational_state === "waiting" || vehicle.operational_state === "queued";
                 const isRouteTracked = selectedRoutePreview?.vehicle_id === vehicle.vehicle_id;
+                const vehiclePrimaryLabel = describeVehicleName(vehicle);
                 const routeContextLabel = isRouteTracked
-                  ? `Route to node ${formatMaybeNumber(selectedRoutePreview?.destination_node_id ?? null)}`
-                  : vehicle.lane_selection_reason ?? null;
+                  ? describeRoutePreviewDestination(bundle, selectedRoutePreview, {
+                      includeNodeId: false,
+                    }).replace(/ · [0-9.]+m$/, "")
+                  : null;
+                const stateLabel = isRouteTracked
+                  ? routeContextLabel
+                  : isMoving
+                    ? `Moving · ${formatSpeedPerSecond(vehicleSpeed)}`
+                    : isWaiting
+                      ? "Waiting"
+                      : humanizeIdentifier(vehicle.operational_state ?? "idle").toLowerCase();
                 const motionContextLabel =
-                  isSelected && (isMoving || routeContextLabel !== null)
-                    ? `${formatHeadingDegrees(vehicle.heading_rad ?? null)} · ${formatSpeedPerSecond(
-                        vehicleSpeed,
-                      )}${routeContextLabel !== null ? ` · ${routeContextLabel}` : ""}`
+                  isSelected || isMoving || isRouteTracked || isWaiting
+                    ? `${formatHeadingDegrees(vehicle.heading_rad ?? null)} · ${stateLabel}${
+                        isSelected && isRouteTracked ? " · selected route" : ""
+                      }`
                     : null;
-                const vehicleLabel = `${vehiclePresentationBadge(vehicle)} ${vehicle.vehicle_id ?? vehicleIndex}`;
-                const labelWidth = Math.max(1.12, vehicleLabel.length * 0.22 + 0.34);
-                const labelY = position[1] - Math.max((vehicle.body_length_m ?? 1.12) * 0.72, 1.08);
-                const labelHeight = motionContextLabel ? 0.8 : 0.46;
-                const labelTextY = motionContextLabel ? labelY - 0.12 : labelY;
-                const labelSecondaryY = labelY + 0.27;
+                const labelWidth = Math.max(
+                  1.48,
+                  Math.max(vehiclePrimaryLabel.length, stateLabel?.length ?? 0) * 0.2 + 0.52,
+                );
+                const labelY = position[1] - Math.max((vehicle.body_length_m ?? 1.12) * 0.84, 1.18);
+                const labelHeight = motionContextLabel ? 0.96 : 0.56;
+                const labelTextY = motionContextLabel ? labelY - 0.14 : labelY;
+                const labelSecondaryY = labelY + 0.24;
                 const selectionEnvelopeLength = Math.max(
                   vehicle.spacing_envelope_m ?? spacingEnvelopeFromVehicle(vehicle),
                   0.9,
@@ -708,6 +726,7 @@ export function SceneViewport({
                       "scene-vehicle",
                       isSelected ? "selected" : "",
                       isMoving ? "moving" : "settled",
+                      isWaiting ? "waiting" : "",
                       isRouteTracked ? "route-following" : "",
                     ]
                       .filter(Boolean)
@@ -719,8 +738,8 @@ export function SceneViewport({
                     }
                     onMouseEnter={() =>
                       setHoverTarget({
-                        label: `Vehicle ${vehicle.vehicle_id ?? vehicleIndex}`,
-                        detail: `${vehicle.operational_state ?? "unknown_state"} · ${
+                        label: `${vehiclePrimaryLabel} · V${vehicle.vehicle_id ?? vehicleIndex}`,
+                        detail: `${humanizeIdentifier(vehicle.operational_state ?? "unknown_state").toLowerCase()} · ${
                           vehicle.lane_id ?? "lane-unassigned"
                         } · ${formatMeters(vehicle.spacing_envelope_m ?? null)} envelope`,
                       })
@@ -761,7 +780,7 @@ export function SceneViewport({
                         className="vehicle-label-bg"
                       />
                       <text x={position[0]} y={labelTextY} className="vehicle-label-text">
-                        {vehicleLabel}
+                        {vehiclePrimaryLabel}
                       </text>
                       {motionContextLabel !== null ? (
                         <text x={position[0]} y={labelSecondaryY} className="vehicle-label-secondary">
@@ -784,6 +803,24 @@ export function SceneViewport({
                 >
                   <circle r={marker.selected ? 1.08 : 0.86} className="scene-destination-threshold" />
                   <circle r={marker.selected ? 0.38 : 0.3} className="scene-destination-core" />
+                  <g className="scene-destination-label">
+                    <rect
+                      x={-Math.max(1.8, marker.label.length * 0.12 + 0.7)}
+                      y={-1.72}
+                      width={Math.max(3.6, marker.label.length * 0.24 + 1.4)}
+                      height={marker.detail ? 0.88 : 0.56}
+                      rx={0.16}
+                      className="scene-destination-label-bg"
+                    />
+                    <text x={0} y={-1.38} className="scene-destination-label-text">
+                      {marker.label}
+                    </text>
+                    {marker.detail ? (
+                      <text x={0} y={-1.02} className="scene-destination-label-secondary">
+                        {marker.detail}
+                      </text>
+                    ) : null}
+                  </g>
                 </g>
               ))}
 
@@ -931,10 +968,13 @@ export function SceneViewport({
                 </span>
               </div>
               <div className="focus-card">
-                <strong>Stop lines and yield controls are visible</strong>
+                <strong>
+                  Proof-of-life scene: {displayedVehicles.length} vehicles, {movingVehicleCount} moving,{" "}
+                  {waitingVehicleCount} waiting
+                </strong>
                 <p>
-                  Traffic snapshots now carry control-state overlays and inspection reasons, so
-                  dense corridors stay legible while still showing why vehicles are waiting.
+                  Named places are surfaced in the map, route endpoints read as destinations, and
+                  the live demo stays readable without decoding raw node IDs.
                 </p>
               </div>
             </div>
@@ -964,10 +1004,7 @@ export function SceneViewport({
                   : "waiting for preview"}
               </span>
               <span className="selection-pill">
-                Destination node:{" "}
-                {selectedRoutePreview?.destination_node_id !== undefined
-                  ? formatMaybeNumber(selectedRoutePreview.destination_node_id)
-                  : "not set yet"}
+                Destination: {selectedRoutePreviewSummary}
               </span>
               <span className="selection-pill">Current target: {operateSelectedTargetSummary}</span>
             </div>
@@ -1017,6 +1054,12 @@ export function SceneViewport({
               </div>
               <div className="minimap-context-strip" aria-label="Minimap context">
                 <span className="selection-pill minimap-context-pill">{minimapSelectedVehicleLabel}</span>
+                <span className="selection-pill minimap-context-pill">
+                  Fleet {displayedVehicles.length} · Moving {movingVehicleCount}
+                </span>
+                <span className="selection-pill minimap-context-pill">
+                  Places {namedPlaceCount}
+                </span>
                 <span className="selection-pill minimap-context-pill">Viewport window</span>
                 <span
                   className={`selection-pill minimap-context-pill ${
@@ -1074,16 +1117,16 @@ export function SceneViewport({
                 {displayedVehicles.map((vehicle, index) => {
                   const isPrimarySelected = vehicle.vehicle_id === selectedVehicleId;
                   const isSelectedFleetVehicle = selectedVehicleIds.includes(vehicle.vehicle_id ?? -1);
+                  const isMoving = (vehicle.speed ?? 0) > 0.05 || vehicle.operational_state === "moving";
+                  const isWaiting =
+                    vehicle.operational_state === "waiting" || vehicle.operational_state === "queued";
+                  const isRouteTracked = selectedRoutePreview?.vehicle_id === vehicle.vehicle_id;
                   return (
                     <g
                       key={vehicle.vehicle_id ?? `minimap-vehicle-${index}`}
-                      className={`minimap-vehicle ${
-                        isPrimarySelected
-                          ? "selected"
-                          : isSelectedFleetVehicle
-                            ? "fleet-selected"
-                            : ""
-                      }`}
+                      className={`minimap-vehicle ${isPrimarySelected ? "selected" : isSelectedFleetVehicle ? "fleet-selected" : ""} ${
+                        isMoving ? "moving" : "settled"
+                      } ${isWaiting ? "waiting" : ""} ${isRouteTracked ? "route-following" : ""}`}
                     >
                       {isPrimarySelected ? (
                         <circle
@@ -1142,7 +1185,7 @@ export function SceneViewport({
               </svg>
               <p id="minimap-caption" className="minimap-caption">
                 Click anywhere on the minimap to recenter the main scene. The window mirrors the
-                current camera frame.
+                current camera frame, with selected vehicles and destination markers standing out.
               </p>
             </div>
 

@@ -216,8 +216,412 @@ function buildBundle(overrides: Partial<BundlePayload> = {}): BundlePayload {
   };
 }
 
-function makeFetchMock(routePreviewBundle?: BundlePayload) {
-  const loadedBundle = buildBundle();
+function buildCityStreetBundle(): BundlePayload {
+  return buildBundle({
+    metadata: { surface_name: "Proof-of-Life City Street" },
+    seed: 5201,
+    simulated_time_s: 18.5,
+    command_center: {
+      selected_vehicle_ids: [201, 202],
+      recent_commands: [
+        {
+          command_type: "assign_vehicle_destination",
+          vehicle_id: 201,
+          destination_node_id: 122,
+        },
+      ],
+      route_previews: [
+        {
+          vehicle_id: 201,
+          destination_node_id: 122,
+          start_node_id: 121,
+          is_actionable: true,
+          reason: "Route is clear",
+          total_distance: 12.0,
+          node_ids: [121, 122],
+          edge_ids: [1028, 1029],
+        },
+        {
+          vehicle_id: 202,
+          destination_node_id: 123,
+          start_node_id: 111,
+          is_actionable: false,
+          reason: "Waiting for intersection clearance",
+          total_distance: 16.0,
+          node_ids: [111, 112, 113, 123],
+          edge_ids: [1008, 1010, 1032],
+        },
+      ],
+      vehicle_inspections: [
+        {
+          vehicle_id: 201,
+          operational_state: "moving",
+          current_node_id: 121,
+          current_job_id: "courier-201",
+          wait_reason: "none",
+          eta_s: 4.2,
+          traffic_control_state: "clear",
+          traffic_control_detail: "No control delay",
+          route_ahead_node_ids: [121, 122],
+          route_ahead_edge_ids: [1028, 1029],
+          diagnostics: [{ severity: "info", code: "moving_ok" }],
+        },
+        {
+          vehicle_id: 202,
+          operational_state: "moving",
+          current_node_id: 111,
+          current_job_id: "courier-202",
+          wait_reason: "none",
+          eta_s: 8.1,
+          traffic_control_state: "yield",
+          traffic_control_detail: "Approaching clearance point",
+          route_ahead_node_ids: [111, 112, 113, 123],
+          route_ahead_edge_ids: [1008, 1010, 1032],
+          diagnostics: [{ severity: "info", code: "moving_ok" }],
+        },
+      ],
+    },
+    map_surface: {
+      nodes: [
+        { node_id: 100, position: [0.0, 0.0, 0.0], node_type: "DEPOT" },
+        { node_id: 101, position: [4.0, 0.0, 0.0], node_type: "INTERSECTION" },
+        { node_id: 111, position: [4.0, 4.0, 0.0], node_type: "INTERSECTION" },
+        { node_id: 121, position: [4.0, 8.0, 0.0], node_type: "LOADING_ZONE" },
+        { node_id: 122, position: [8.0, 8.0, 0.0], node_type: "UNLOADING_ZONE" },
+        { node_id: 123, position: [12.0, 8.0, 0.0], node_type: "JOB_SITE" },
+      ],
+      edges: [
+        { edge_id: 1000, start_node_id: 100, end_node_id: 101, distance: 4.0, speed_limit: 3.8 },
+        { edge_id: 1022, start_node_id: 101, end_node_id: 111, distance: 4.0, speed_limit: 3.2 },
+        { edge_id: 1024, start_node_id: 111, end_node_id: 121, distance: 4.0, speed_limit: 3.2 },
+        { edge_id: 1028, start_node_id: 121, end_node_id: 122, distance: 4.0, speed_limit: 3.2 },
+        { edge_id: 1032, start_node_id: 122, end_node_id: 123, distance: 4.0, speed_limit: 3.2 },
+      ],
+    },
+    render_geometry: {
+      roads: [
+        {
+          road_id: "north-avenue",
+          edge_ids: [1000],
+          centerline: [
+            [0.0, 0.0, 0.0],
+            [4.0, 0.0, 0.0],
+          ],
+          road_class: "arterial",
+          directionality: "two_way",
+          lane_count: 2,
+          width_m: 2.0,
+        },
+        {
+          road_id: "center-street",
+          edge_ids: [1022, 1024],
+          centerline: [
+            [4.0, 0.0, 0.0],
+            [4.0, 4.0, 0.0],
+            [4.0, 8.0, 0.0],
+          ],
+          road_class: "collector",
+          directionality: "two_way",
+          lane_count: 1,
+          width_m: 1.6,
+        },
+        {
+          road_id: "library-street",
+          edge_ids: [1028],
+          centerline: [
+            [4.0, 8.0, 0.0],
+            [8.0, 8.0, 0.0],
+          ],
+          road_class: "collector",
+          directionality: "two_way",
+          lane_count: 1,
+          width_m: 1.6,
+        },
+        {
+          road_id: "east-spur",
+          edge_ids: [1032],
+          centerline: [
+            [8.0, 8.0, 0.0],
+            [12.0, 8.0, 0.0],
+          ],
+          road_class: "collector",
+          directionality: "two_way",
+          lane_count: 1,
+          width_m: 1.6,
+        },
+      ],
+      intersections: [
+        {
+          intersection_id: "north-market",
+          node_id: 101,
+          polygon: [
+            [3.5, -0.5, 0.0],
+            [4.5, -0.5, 0.0],
+            [4.5, 0.5, 0.0],
+            [3.5, 0.5, 0.0],
+          ],
+          intersection_type: "junction",
+        },
+        {
+          intersection_id: "city-center",
+          node_id: 111,
+          polygon: [
+            [3.5, 3.5, 0.0],
+            [4.5, 3.5, 0.0],
+            [4.5, 4.5, 0.0],
+            [3.5, 4.5, 0.0],
+          ],
+          intersection_type: "signalized",
+        },
+        {
+          intersection_id: "library-plaza",
+          node_id: 121,
+          polygon: [
+            [3.5, 7.5, 0.0],
+            [4.5, 7.5, 0.0],
+            [4.5, 8.5, 0.0],
+            [3.5, 8.5, 0.0],
+          ],
+          intersection_type: "loading_bay",
+        },
+        {
+          intersection_id: "east-yard",
+          node_id: 123,
+          polygon: [
+            [11.5, 7.5, 0.0],
+            [12.5, 7.5, 0.0],
+            [12.5, 8.5, 0.0],
+            [11.5, 8.5, 0.0],
+          ],
+          intersection_type: "job_site",
+        },
+      ],
+      areas: [
+        {
+          area_id: "south-depot",
+          kind: "depot",
+          label: "South Depot",
+          polygon: [
+            [-0.9, 7.1, 0.0],
+            [1.1, 7.1, 0.0],
+            [1.1, 9.1, 0.0],
+            [-0.9, 9.1, 0.0],
+          ],
+        },
+        {
+          area_id: "market-square",
+          kind: "plaza",
+          label: "Market Square",
+          polygon: [
+            [2.6, 2.6, 0.0],
+            [5.4, 2.6, 0.0],
+            [5.4, 5.4, 0.0],
+            [2.6, 5.4, 0.0],
+          ],
+        },
+        {
+          area_id: "library-plaza-area",
+          kind: "loading_bay",
+          label: "Library Plaza",
+          polygon: [
+            [2.8, 6.8, 0.0],
+            [5.2, 6.8, 0.0],
+            [5.2, 9.2, 0.0],
+            [2.8, 9.2, 0.0],
+          ],
+        },
+        {
+          area_id: "clinic-corner-area",
+          kind: "unloading_bay",
+          label: "Clinic Corner",
+          polygon: [
+            [6.8, 6.8, 0.0],
+            [9.2, 6.8, 0.0],
+            [9.2, 9.2, 0.0],
+            [6.8, 9.2, 0.0],
+          ],
+        },
+        {
+          area_id: "east-yard-area",
+          kind: "job_site",
+          label: "East Yard",
+          polygon: [
+            [10.8, 6.8, 0.0],
+            [13.2, 6.8, 0.0],
+            [13.2, 9.2, 0.0],
+            [10.8, 9.2, 0.0],
+          ],
+        },
+      ],
+    },
+    traffic_baseline: {
+      queue_records: [
+        {
+          road_id: "center-street",
+          node_id: 111,
+          reason: "yield",
+          vehicle_ids: [203],
+          queue_start_s: 0,
+          queue_end_s: 999,
+        },
+      ],
+      control_points: [],
+    },
+    snapshot: {
+      simulated_time_s: 18.5,
+      blocked_edge_ids: [1022],
+      vehicles: [
+        {
+          vehicle_id: 201,
+          node_id: 121,
+          position: [4.0, 8.0, 0.0],
+          operational_state: "moving",
+          vehicle_type: "GENERIC",
+          presentation_key: "car",
+          display_name: "Courier 201",
+          role_label: "Parcel carrier",
+          body_length_m: 1.2,
+          body_width_m: 0.7,
+          spacing_envelope_m: 1.6,
+          primary_color: "rgba(41, 79, 180, 0.96)",
+          accent_color: "rgba(220, 229, 255, 0.96)",
+        },
+        {
+          vehicle_id: 202,
+          node_id: 111,
+          position: [4.0, 4.0, 0.0],
+          operational_state: "moving",
+          vehicle_type: "GENERIC",
+          presentation_key: "car",
+          display_name: "Courier 202",
+          role_label: "Parcel carrier",
+          body_length_m: 1.2,
+          body_width_m: 0.7,
+          spacing_envelope_m: 1.6,
+          primary_color: "rgba(41, 79, 180, 0.96)",
+          accent_color: "rgba(220, 229, 255, 0.96)",
+        },
+        {
+          vehicle_id: 203,
+          node_id: 111,
+          position: [4.1, 4.1, 0.0],
+          operational_state: "waiting",
+          vehicle_type: "GENERIC",
+          presentation_key: "car",
+          display_name: "Courier 203",
+          role_label: "Parcel carrier",
+          body_length_m: 1.2,
+          body_width_m: 0.7,
+          spacing_envelope_m: 1.6,
+          primary_color: "rgba(41, 79, 180, 0.96)",
+          accent_color: "rgba(220, 229, 255, 0.96)",
+        },
+        {
+          vehicle_id: 204,
+          node_id: 100,
+          position: [0.0, 0.0, 0.0],
+          operational_state: "idle",
+          vehicle_type: "GENERIC",
+          presentation_key: "car",
+          display_name: "Courier 204",
+          role_label: "Parcel carrier",
+          body_length_m: 1.2,
+          body_width_m: 0.7,
+          spacing_envelope_m: 1.6,
+          primary_color: "rgba(41, 79, 180, 0.96)",
+          accent_color: "rgba(220, 229, 255, 0.96)",
+        },
+        {
+          vehicle_id: 205,
+          node_id: 122,
+          position: [8.0, 8.0, 0.0],
+          operational_state: "idle",
+          vehicle_type: "GENERIC",
+          presentation_key: "car",
+          display_name: "Courier 205",
+          role_label: "Parcel carrier",
+          body_length_m: 1.2,
+          body_width_m: 0.7,
+          spacing_envelope_m: 1.6,
+          primary_color: "rgba(41, 79, 180, 0.96)",
+          accent_color: "rgba(220, 229, 255, 0.96)",
+        },
+        {
+          vehicle_id: 206,
+          node_id: 123,
+          position: [12.0, 8.0, 0.0],
+          operational_state: "idle",
+          vehicle_type: "GENERIC",
+          presentation_key: "car",
+          display_name: "Courier 206",
+          role_label: "Parcel carrier",
+          body_length_m: 1.2,
+          body_width_m: 0.7,
+          spacing_envelope_m: 1.6,
+          primary_color: "rgba(41, 79, 180, 0.96)",
+          accent_color: "rgba(220, 229, 255, 0.96)",
+        },
+      ],
+    },
+    motion_segments: [
+      {
+        vehicle_id: 201,
+        segment_index: 1,
+        edge_id: 1028,
+        road_id: "library-street",
+        start_node_id: 121,
+        end_node_id: 122,
+        start_time_s: 0,
+        end_time_s: 40,
+        duration_s: 40,
+        distance: 4,
+        start_position: [4.0, 8.0, 0.0],
+        end_position: [8.0, 8.0, 0.0],
+        path_points: [
+          [4.0, 8.0, 0.0],
+          [6.0, 8.0, 0.0],
+          [8.0, 8.0, 0.0],
+        ],
+        body_length_m: 1.2,
+        body_width_m: 0.7,
+        spacing_envelope_m: 1.6,
+        heading_rad: 0,
+        nominal_speed: 3.2,
+        peak_speed: 3.2,
+        profile_kind: "constant",
+      },
+      {
+        vehicle_id: 202,
+        segment_index: 2,
+        edge_id: 1022,
+        road_id: "center-street",
+        start_node_id: 101,
+        end_node_id: 111,
+        start_time_s: 0,
+        end_time_s: 40,
+        duration_s: 40,
+        distance: 4,
+        start_position: [4.0, 0.0, 0.0],
+        end_position: [4.0, 4.0, 0.0],
+        path_points: [
+          [4.0, 0.0, 0.0],
+          [4.0, 2.0, 0.0],
+          [4.0, 4.0, 0.0],
+        ],
+        body_length_m: 1.2,
+        body_width_m: 0.7,
+        spacing_envelope_m: 1.6,
+        heading_rad: Math.PI / 2,
+        nominal_speed: 2.8,
+        peak_speed: 2.8,
+        profile_kind: "constant",
+      },
+    ],
+  });
+}
+
+function makeFetchMock(routePreviewBundle?: BundlePayload, loadedBundleOverride?: BundlePayload) {
+  const loadedBundle = loadedBundleOverride ?? buildBundle();
   const previewBundle = routePreviewBundle ?? buildBundle({
     command_center: {
       route_previews: [
@@ -355,6 +759,32 @@ describe("serious ui behavior", () => {
 
     await user.click(screen.getByRole("button", { name: "Single-Step" }));
     await waitFor(() => expect(screen.getAllByText(/Single-step completed\./i)).not.toHaveLength(0));
+  });
+
+  it("renders the proof-of-life city street scenario as a readable multi-vehicle live scene", async () => {
+    vi.stubGlobal("fetch", makeFetchMock(undefined, buildCityStreetBundle()));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Proof-of-Life City Street")).toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Proof-of-life scene: 6 vehicles, 2 moving, 1 waiting/i),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getAllByText("Market Square").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Library Plaza").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Clinic Corner/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Courier 201 · en route to Clinic Corner/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Clinic Corner · node 122/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Fleet 6 · Moving 2/i)).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Fit Scene" }));
+    await waitFor(() =>
+      expect(screen.getByText(/current camera frame, with selected vehicles and destination markers/i)).toBeInTheDocument(),
+    );
   });
 
   it("shows the bootstrap error state when the bundle cannot load", async () => {

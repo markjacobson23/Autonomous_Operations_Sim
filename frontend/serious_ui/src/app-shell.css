@@ -2824,8 +2824,22 @@ h3 {
     opacity 160ms ease;
 }
 
+.scene-vehicle.settled {
+  opacity: 0.86;
+}
+
 .scene-vehicle.moving {
-  filter: drop-shadow(0 0.34px 0.26px rgba(24, 33, 44, 0.32));
+  filter:
+    drop-shadow(0 0.34px 0.26px rgba(24, 33, 44, 0.32))
+    drop-shadow(0 0 0.28px rgba(10, 118, 108, 0.2));
+  opacity: 1;
+}
+
+.scene-vehicle.waiting {
+  filter:
+    drop-shadow(0 0.34px 0.24px rgba(24, 33, 44, 0.3))
+    drop-shadow(0 0 0.28px rgba(201, 106, 24, 0.18));
+  opacity: 0.96;
 }
 
 .scene-vehicle.route-following .vehicle-envelope {
@@ -2950,6 +2964,63 @@ h3 {
   stroke-width: 0.06;
 }
 
+.scene-place-label {
+  pointer-events: none;
+}
+
+.scene-destination-label {
+  pointer-events: none;
+}
+
+.scene-place-label-bg,
+.scene-destination-label-bg {
+  fill: rgba(255, 250, 244, 0.94);
+  stroke: rgba(66, 78, 88, 0.14);
+  stroke-width: 0.04;
+  filter: drop-shadow(0 0.12px 0.12px rgba(24, 33, 44, 0.12));
+}
+
+.scene-place-label-text,
+.scene-destination-label-text {
+  fill: var(--ink);
+  font-size: 0.38px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  paint-order: stroke fill;
+  stroke: rgba(255, 255, 255, 0.88);
+  stroke-width: 0.08;
+}
+
+.scene-place-label-secondary,
+.scene-destination-label-secondary {
+  fill: var(--muted);
+  font-size: 0.23px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  paint-order: stroke fill;
+  stroke: rgba(255, 255, 255, 0.82);
+  stroke-width: 0.06;
+}
+
+.scene-place-label-area .scene-place-label-bg {
+  fill: rgba(255, 248, 239, 0.98);
+  stroke: rgba(187, 101, 30, 0.22);
+}
+
+.scene-place-label-road .scene-place-label-bg {
+  fill: rgba(248, 250, 255, 0.96);
+  stroke: rgba(36, 83, 199, 0.18);
+}
+
+.scene-place-label-intersection .scene-place-label-bg {
+  fill: rgba(247, 252, 249, 0.96);
+  stroke: rgba(10, 118, 108, 0.18);
+}
+
 .scene-vehicle text {
   fill: var(--ink);
   font-size: 0.58px;
@@ -3022,6 +3093,16 @@ h3 {
 
 .scene-vehicle.route-following.selected .vehicle-selection-ring {
   stroke: rgba(0, 108, 103, 0.78);
+}
+
+.scene-vehicle.waiting .vehicle-label-bg {
+  fill: rgba(255, 248, 239, 0.98);
+  stroke: rgba(201, 106, 24, 0.24);
+}
+
+.scene-vehicle.moving .vehicle-label-bg {
+  fill: rgba(255, 250, 244, 0.98);
+  stroke: rgba(10, 118, 108, 0.2);
 }
 
 @keyframes vehicle-selection-pulse {
@@ -3621,6 +3702,20 @@ h3 {
   pointer-events: none;
 }
 
+.minimap-vehicle.settled {
+  opacity: 0.86;
+}
+
+.minimap-vehicle.moving .minimap-vehicle-core {
+  fill: rgba(10, 118, 108, 0.82);
+  stroke: rgba(255, 251, 246, 0.94);
+}
+
+.minimap-vehicle.waiting .minimap-vehicle-core {
+  fill: rgba(201, 106, 24, 0.9);
+  stroke: rgba(255, 251, 246, 0.94);
+}
+
 .minimap-vehicle-core {
   fill: rgba(0, 108, 103, 0.78);
   stroke: rgba(255, 251, 246, 0.88);
@@ -3665,6 +3760,10 @@ h3 {
 .minimap-destination.selected .minimap-destination-core {
   fill: rgba(255, 247, 235, 0.98);
   stroke: rgba(201, 106, 24, 0.95);
+}
+
+.minimap-destination-label {
+  pointer-events: none;
 }
 
 .minimap-viewport-shadow {

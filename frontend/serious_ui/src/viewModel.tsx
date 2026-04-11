@@ -11,11 +11,13 @@ import type {
   EdgePayload,
   Position3,
   RecentCommandPayload,
+  SceneLabelPayload,
   RouteDestinationMarker,
   RoutePreviewPayload,
   SelectedTarget,
   TrafficRoadStatePayload,
   TrafficSnapshotPayload,
+  VehicleInspectionPayload,
   VehicleSnapshotPayload,
   ViewportState,
   WorkspaceTab,
@@ -689,13 +691,13 @@ export function describeSelectedTarget(
   selectedVehicleId: number | null,
 ): string {
   if (selectedTarget?.kind === "road") {
-    return `road ${selectedTarget.roadId}`;
+    return `road ${humanizeIdentifier(selectedTarget.roadId)}`;
   }
   if (selectedTarget?.kind === "area") {
-    return `zone ${selectedTarget.areaId}`;
+    return `zone ${humanizeIdentifier(selectedTarget.areaId)}`;
   }
   if (selectedTarget?.kind === "queue") {
-    return `queue ${selectedTarget.roadId}`;
+    return `queue ${humanizeIdentifier(selectedTarget.roadId)}`;
   }
   if (selectedTarget?.kind === "hazard") {
     return `blocked edge ${selectedTarget.edgeId}`;
@@ -759,6 +761,168 @@ export function reviewPriorityRank(value: string | undefined): number {
     default:
       return 4;
   }
+}
+
+export function humanizeIdentifier(value: string | null | undefined): string {
+  if (!value) {
+    return "Unknown";
+  }
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+export function describeVehicleName(
+  vehicle: Pick<
+    VehicleSnapshotPayload,
+    "display_name" | "role_label" | "presentation_key" | "vehicle_type" | "vehicle_id"
+  > | null,
+): string {
+  if (!vehicle) {
+    return "Vehicle";
+  }
+  return (
+    vehicle.display_name ??
+    vehicle.role_label ??
+    humanizeIdentifier(vehicle.vehicle_type) ??
+    `${vehiclePresentationBadge(vehicle)} ${formatMaybeNumber(vehicle.vehicle_id ?? null)}`
+  );
+}
+
+export function describeLocationLabel(
+  bundle: BundlePayload | null,
+  nodeId: number | null | undefined,
+  options: { includeNodeId?: boolean } = {},
+): string {
+  if (nodeId === null || nodeId === undefined) {
+    return "Unknown location";
+  }
+  const nodePosition = findNodePosition(bundle?.map_surface?.nodes ?? [], nodeId);
+  const matchingArea = (bundle?.render_geometry?.areas ?? [])
+    .map((area) => ({
+      area,
+      contains:
+        nodePosition !== null &&
+        area.polygon !== undefined &&
+        area.polygon.length > 2 &&
+        polygonContainsPoint(area.polygon, nodePosition),
+      areaSize: polygonArea(area.polygon ?? []),
+    }))
+    .filter((entry) => entry.contains && Boolean(entry.area.label))
+    .sort((left, right) => left.areaSize - right.areaSize)[0]?.area;
+  if (matchingArea?.label) {
+    return options.includeNodeId ? `${matchingArea.label} · node ${nodeId}` : matchingArea.label;
+  }
+  const matchingIntersection = (bundle?.render_geometry?.intersections ?? []).find(
+    (intersection) => intersection.node_id === nodeId,
+  );
+  if (matchingIntersection?.intersection_id) {
+    const label = humanizeIdentifier(matchingIntersection.intersection_id);
+    return options.includeNodeId ? `${label} · node ${nodeId}` : label;
+  }
+  const fallbackLabel = `Node ${nodeId}`;
+  return fallbackLabel;
+}
+
+export function describeRoutePreviewDestination(
+  bundle: BundlePayload | null,
+  preview: RoutePreviewPayload | null,
+  options: { includeNodeId?: boolean } = {},
+): string {
+  if (!preview) {
+    return "Waiting for route preview";
+  }
+  const destinationLabel = describeLocationLabel(
+    bundle,
+    preview.destination_node_id ?? null,
+    options,
+  );
+  if (preview.total_distance !== undefined) {
+    return `${destinationLabel} · ${formatMeters(preview.total_distance)}`;
+  }
+  return destinationLabel;
+}
+
+export function describeVehicleOperationalSummary(
+  bundle: BundlePayload | null,
+  vehicle: VehicleSnapshotPayload | null,
+  inspection: VehicleInspectionPayload | null,
+  preview: RoutePreviewPayload | null,
+): string {
+  const vehicleName = describeVehicleName(vehicle);
+  const currentLocation = describeLocationLabel(
+    bundle,
+    inspection?.current_node_id ?? vehicle?.node_id ?? null,
+  );
+  const currentState = humanizeIdentifier(
+    inspection?.operational_state ?? vehicle?.operational_state ?? "unknown",
+  ).toLowerCase();
+  const routeDestinationLabel = preview
+    ? describeLocationLabel(bundle, preview.destination_node_id ?? null)
+    : null;
+
+  if (currentState.includes("waiting")) {
+    const waitReason =
+      inspection?.wait_reason && inspection.wait_reason !== "none"
+        ? ` · ${humanizeIdentifier(inspection.wait_reason).toLowerCase()}`
+        : "";
+    return `${vehicleName} · waiting at ${currentLocation}${waitReason}`;
+  }
+
+  if (currentState.includes("moving") && routeDestinationLabel) {
+    const eta =
+      inspection?.eta_s !== undefined ? ` · ETA ${formatSeconds(inspection.eta_s ?? null)}` : "";
+    return `${vehicleName} · en route to ${routeDestinationLabel}${eta}`;
+  }
+
+  if (currentState !== "unknown") {
+    return `${vehicleName} · ${currentState} at ${currentLocation}`;
+  }
+
+  return `${vehicleName} · staged at ${currentLocation}`;
+}
+
+export function buildScenePlaceLabels(bundle: BundlePayload | null): SceneLabelPayload[] {
+  const labels: SceneLabelPayload[] = [];
+  for (const area of bundle?.render_geometry?.areas ?? []) {
+    const center = polygonCentroid(area.polygon ?? []);
+    if (!center) {
+      continue;
+    }
+    labels.push({
+      kind: "area",
+      label: area.label ?? humanizeIdentifier(area.area_id),
+      detail: humanizeIdentifier(area.kind),
+      position: center,
+    });
+  }
+  for (const road of bundle?.render_geometry?.roads ?? []) {
+    const center = polylineCentroid(road.centerline ?? []);
+    if (!center) {
+      continue;
+    }
+    labels.push({
+      kind: "road",
+      label: humanizeIdentifier(road.road_id),
+      detail: `${humanizeIdentifier(road.road_class)} · ${humanizeIdentifier(road.directionality)}`,
+      position: center,
+    });
+  }
+  for (const intersection of bundle?.render_geometry?.intersections ?? []) {
+    const center = polygonCentroid(intersection.polygon ?? []);
+    if (!center) {
+      continue;
+    }
+    labels.push({
+      kind: "intersection",
+      label: humanizeIdentifier(intersection.intersection_id),
+      detail: humanizeIdentifier(intersection.intersection_type),
+      position: center,
+    });
+  }
+  return labels;
 }
 
 export function describeEdgeTargetLabel(edgeId: number | undefined, roads: { edge_ids?: number[]; road_id?: string }[]): string | null {
@@ -1130,4 +1294,58 @@ function applyFollowingSpacing(
 
 function pointDistance(start: Position3, end: Position3): number {
   return Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
+}
+
+function polygonCentroid(points: Position3[]): Position3 | null {
+  if (points.length === 0) {
+    return null;
+  }
+  let sumX = 0;
+  let sumY = 0;
+  let sumZ = 0;
+  for (const [x, y, z] of points) {
+    sumX += x;
+    sumY += y;
+    sumZ += z;
+  }
+  return [sumX / points.length, sumY / points.length, sumZ / points.length];
+}
+
+function polylineCentroid(points: Position3[]): Position3 | null {
+  if (points.length === 0) {
+    return null;
+  }
+  return points[Math.floor(points.length / 2)];
+}
+
+function polygonArea(points: Position3[]): number {
+  if (points.length < 3) {
+    return 0;
+  }
+  let area = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const left = points[index];
+    const right = points[(index + 1) % points.length];
+    area += left[0] * right[1] - right[0] * left[1];
+  }
+  return Math.abs(area) * 0.5;
+}
+
+function polygonContainsPoint(points: Position3[], point: Position3): boolean {
+  if (points.length < 3) {
+    return false;
+  }
+  const [testX, testY] = point;
+  let inside = false;
+  for (let index = 0, previous = points.length - 1; index < points.length; previous = index, index += 1) {
+    const [currentX, currentY] = points[index];
+    const [previousX, previousY] = points[previous];
+    const intersects =
+      currentY > testY !== previousY > testY &&
+      testX < ((previousX - currentX) * (testY - currentY)) / (previousY - currentY) + currentX;
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+  return inside;
 }

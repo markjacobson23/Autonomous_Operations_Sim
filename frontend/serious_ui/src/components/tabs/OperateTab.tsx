@@ -5,6 +5,9 @@ import { PanelHeader } from "../shared/PanelHeader";
 import { SectionCard } from "../shared/SectionCard";
 import {
   describeSelectedTarget,
+  describeLocationLabel,
+  describeRoutePreviewDestination,
+  describeVehicleOperationalSummary,
   findVehicleById,
   formatMeters,
   formatMaybeNumber,
@@ -144,21 +147,23 @@ export function OperateTab({
   const operateSelectedTargetSummary = describeSelectedTarget(selectedTarget, selectedVehicleId);
   const operateSelectedVehicleSummary =
     selectedVehicle !== null
-      ? `${selectedVehicle.display_name ?? selectedVehicle.role_label ?? "Vehicle"} · ${
-          selectedInspection?.operational_state ??
-          selectedVehicle.operational_state ??
-          "state unknown"
-        }`
+      ? describeVehicleOperationalSummary(bundle, selectedVehicle, selectedInspection, selectedRoutePreview)
       : selectedVehicleIds.length > 0
         ? `Fleet selection active · ${selectedVehicleIds.length} vehicle(s)`
         : "No vehicle selected yet";
   const operateSelectedContextSummary =
     selectedInspection !== null
-      ? `Node ${formatMaybeNumber(selectedInspection.current_node_id ?? null)} · ETA ${formatSeconds(selectedInspection.eta_s ?? null)} · ${selectedInspection.current_job_id ?? "no job"}`
+      ? `${describeLocationLabel(bundle, selectedInspection.current_node_id ?? null, {
+          includeNodeId: true,
+        })} · ETA ${formatSeconds(selectedInspection.eta_s ?? null)} · ${
+          selectedInspection.current_job_id ?? "no job"
+        }`
       : "Select a vehicle on the map or from the roster to open inspection details.";
   const operateRoutePreviewSummary =
     selectedRoutePreview !== null
-      ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id ?? null)} · Node ${formatMaybeNumber(selectedRoutePreview.destination_node_id ?? null)} · ${
+      ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id ?? null)} · ${describeLocationLabel(bundle, selectedRoutePreview.destination_node_id ?? null, {
+          includeNodeId: true,
+        })} · ${
           selectedRoutePreview.is_actionable ? "actionable" : "pending"
         }`
       : "Waiting for route preview";
@@ -179,25 +184,6 @@ export function OperateTab({
   const operateSessionStateSummary = `Mode ${sessionControl?.play_state ?? "paused"} · step ${formatSeconds(sessionControl?.step_seconds ?? null)} · ${
     sessionControl?.session_control_endpoint ?? "unbound"
   }`;
-
-  const selectedFleetPrimaryInspection = selectedInspection;
-  const selectedFleetPrimaryVehicle = selectedVehicle;
-  const selectedFleetPrimaryVehicleId = selectedVehicleId;
-  const selectedFleetRoutePreview = selectedRoutePreview;
-  const selectedFleetRouteSummary = selectedFleetRoutePreview
-    ? `Node ${formatMaybeNumber(selectedFleetRoutePreview.destination_node_id ?? null)}${
-        selectedFleetRoutePreview.total_distance !== undefined
-          ? ` · ${formatMeters(selectedFleetRoutePreview.total_distance)}`
-          : ""
-      }`
-    : "Waiting for route preview";
-  const selectedFleetRouteDetail = selectedFleetRoutePreview
-    ? `${selectedFleetRoutePreview.is_actionable ? "Actionable" : "Pending"}${
-        selectedFleetRoutePreview.reason ? ` · ${selectedFleetRoutePreview.reason}` : ""
-      }`
-    : selectedFleetPrimaryInspection?.route_ahead_node_ids?.length
-      ? `Inspection sees ${selectedFleetPrimaryInspection.route_ahead_node_ids.length} upcoming node(s)`
-      : "Select a vehicle first to surface route and inspection context.";
 
   return (
     <section className="main-column operate-pane">
@@ -327,7 +313,7 @@ export function OperateTab({
               <span className="status-pill secondary">
                 Route preview:{" "}
                 {selectedRoutePreview?.vehicle_id !== undefined
-                  ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id)}`
+                  ? describeLocationLabel(bundle, selectedRoutePreview.destination_node_id ?? null)
                   : "waiting for preview"}
               </span>
             </div>
@@ -335,9 +321,11 @@ export function OperateTab({
         />
         <div className="selection-strip">
           <span className="selection-pill">
-            Destination node:{" "}
-            {selectedRoutePreview?.destination_node_id !== undefined
-              ? formatMaybeNumber(selectedRoutePreview.destination_node_id)
+            Destination:{" "}
+            {selectedRoutePreview
+              ? describeRoutePreviewDestination(bundle, selectedRoutePreview, {
+                  includeNodeId: true,
+                })
               : "not set yet"}
           </span>
           <span className="selection-pill">Current target: {operateSelectedTargetSummary}</span>

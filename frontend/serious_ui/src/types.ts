@@ -363,6 +363,16 @@ export type RouteDestinationMarker = {
   position: Position3;
   selected: boolean;
   previewVehicleId?: number;
+  label: string;
+  detail?: string;
+};
+
+export type SceneLabelPayload = {
+  kind: "area" | "road" | "intersection";
+  label: string;
+  detail?: string;
+  position: Position3;
+  selected?: boolean;
 };
 
 export type HoverTarget = {
