@@ -23,6 +23,10 @@ from autonomous_ops_sim.simulation.reservations import (
 )
 from autonomous_ops_sim.simulation.trace import Trace
 from autonomous_ops_sim.simulation.trace import TraceEventType
+from autonomous_ops_sim.simulation.traffic_control import (
+    build_traffic_control_points,
+    traffic_control_points_by_node_id,
+)
 from autonomous_ops_sim.simulation.vehicle_process import VehicleProcess
 from autonomous_ops_sim.simulation.world_state import WorldState
 from autonomous_ops_sim.vehicles.vehicle import Vehicle
@@ -57,6 +61,7 @@ class _ScheduledTraceEvent:
     vehicle_id: int
     local_order: int
     event_type: TraceEventType
+    wait_reason: str | None = None
     node_id: int | None = None
     edge_id: int | None = None
     start_node_id: int | None = None
@@ -203,10 +208,10 @@ class SimulationEngine:
         if not ordered_requests:
             return MultiVehicleExecutionResult(
                 route_results=(),
-                reservations=ReservationTable(),
+                reservations=ReservationTable(use_native_acceleration=False),
             )
 
-        reservations = ReservationTable()
+        reservations = ReservationTable(use_native_acceleration=False)
         route_results: list[MultiVehicleRouteResult] = []
         scheduled_events: list[_ScheduledTraceEvent] = []
 
@@ -233,6 +238,7 @@ class SimulationEngine:
                 timestamp_s=event.timestamp_s,
                 vehicle_id=event.vehicle_id,
                 event_type=event.event_type,
+                wait_reason=event.wait_reason,
                 node_id=event.node_id,
                 edge_id=event.edge_id,
                 start_node_id=event.start_node_id,
@@ -454,6 +460,9 @@ class SimulationEngine:
             world_state=self.world_state,
         )
         route = tuple(path)
+        control_points_by_node_id = traffic_control_points_by_node_id(
+            build_traffic_control_points(self.map.render_geometry)
+        )
         current_time_s = 0.0
         waits: list[ConflictWait] = []
         local_order = 0
@@ -463,6 +472,7 @@ class SimulationEngine:
             *,
             timestamp_s: float,
             event_type: TraceEventType,
+            wait_reason: str | None = None,
             node_id: int | None = None,
             edge_id: int | None = None,
             start_node_id: int | None = None,
@@ -480,6 +490,7 @@ class SimulationEngine:
                     vehicle_id=request.vehicle_id,
                     local_order=local_order,
                     event_type=event_type,
+                    wait_reason=wait_reason,
                     node_id=node_id,
                     edge_id=edge_id,
                     start_node_id=start_node_id,
@@ -498,16 +509,30 @@ class SimulationEngine:
             node_id: int,
             to_state: VehicleOperationalState,
             reason: str,
+            wait_reason: str | None = None,
         ) -> None:
             transition = behavior.transition_to(to_state, reason=reason)
             schedule(
                 timestamp_s=timestamp_s,
                 event_type=TraceEventType.BEHAVIOR_TRANSITION,
+                wait_reason=wait_reason,
                 node_id=node_id,
                 from_behavior_state=transition.from_state.value,
                 to_behavior_state=transition.to_state.value,
                 transition_reason=transition.reason,
             )
+
+        def wait_reason_for_segment(
+            *,
+            start_node_id: int,
+            end_node_id: int,
+        ) -> str:
+            if (
+                start_node_id in control_points_by_node_id
+                or end_node_id in control_points_by_node_id
+            ):
+                return "intersection_right_of_way"
+            return "conflict_wait"
 
         if len(route) == 1:
             transition_behavior(
@@ -583,6 +608,10 @@ class SimulationEngine:
                 corridor_node_ids=corridor_node_ids,
                 corridor_travel_time_s=corridor_travel_time_s,
             )
+            wait_reason = wait_reason_for_segment(
+                start_node_id=start_node_id,
+                end_node_id=end_node_id,
+            )
 
             if departure_time_s > current_time_s:
                 if behavior.state == VehicleOperationalState.IDLE:
@@ -591,11 +620,13 @@ class SimulationEngine:
                         node_id=start_node_id,
                         to_state=VehicleOperationalState.CONFLICT_WAIT,
                         reason="conflict_wait_start",
+                        wait_reason=wait_reason,
                     )
                 wait = ConflictWait(
                     node_id=start_node_id,
                     start_time_s=current_time_s,
                     end_time_s=departure_time_s,
+                    reason=wait_reason,
                 )
                 waits.append(wait)
                 reservations.reserve_node(
@@ -603,17 +634,19 @@ class SimulationEngine:
                     node_id=start_node_id,
                     start_time_s=current_time_s,
                     end_time_s=departure_time_s,
-                    reason="conflict_wait",
+                    reason=wait_reason,
                 )
                 schedule(
                     timestamp_s=wait.start_time_s,
                     event_type=TraceEventType.CONFLICT_WAIT_START,
+                    wait_reason=wait_reason,
                     node_id=start_node_id,
                     duration_s=wait.duration_s,
                 )
                 schedule(
                     timestamp_s=wait.end_time_s,
                     event_type=TraceEventType.CONFLICT_WAIT_COMPLETE,
+                    wait_reason=wait_reason,
                     node_id=start_node_id,
                     duration_s=wait.duration_s,
                 )
@@ -638,9 +671,35 @@ class SimulationEngine:
                     node_id=start_node_id,
                     to_state=VehicleOperationalState.MOVING,
                     reason="conflict_wait_complete",
+                    wait_reason=wait_reason,
                 )
 
             arrival_time_s = departure_time_s + travel_time_s
+            if end_node_id in control_points_by_node_id:
+                if segment_index + 1 < len(route) - 1:
+                    next_edge = self.map.get_edge_between(
+                        end_node_id,
+                        route[segment_index + 2],
+                    )
+                    if next_edge is None:
+                        raise RuntimeError(
+                            "Router returned a path containing a missing map edge: "
+                            f"{end_node_id} -> {route[segment_index + 2]}."
+                        )
+                    controlled_clearance_time_s = next_edge.distance / min(
+                        request.max_speed,
+                        next_edge.speed_limit,
+                    )
+                    control_end_time_s = arrival_time_s + controlled_clearance_time_s
+                else:
+                    control_end_time_s = math.inf
+                reservations.reserve_node(
+                    vehicle_id=request.vehicle_id,
+                    node_id=end_node_id,
+                    start_time_s=arrival_time_s,
+                    end_time_s=control_end_time_s,
+                    reason="intersection_right_of_way",
+                )
             if corridor_node_ids is not None and corridor_travel_time_s is not None:
                 reservations.reserve_corridor(
                     vehicle_id=request.vehicle_id,

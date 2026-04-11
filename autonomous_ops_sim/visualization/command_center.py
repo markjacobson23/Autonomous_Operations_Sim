@@ -583,7 +583,9 @@ def _active_execution_context(
             "resource_wait",
             "failed",
         }:
-            wait_reason = event.transition_reason
+            wait_reason = event.wait_reason or event.transition_reason
+        elif event_type == "conflict_wait_start" and event.wait_reason is not None:
+            wait_reason = event.wait_reason
         elif event_type == "behavior_transition" and event.to_behavior_state in {
             "moving",
             "idle",

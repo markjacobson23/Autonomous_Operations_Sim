@@ -36,6 +36,7 @@ class TraceEvent:
     timestamp_s: float
     vehicle_id: int
     event_type: TraceEventType
+    wait_reason: str | None = None
     node_id: int | None = None
     edge_id: int | None = None
     start_node_id: int | None = None
@@ -69,6 +70,7 @@ class Trace:
         timestamp_s: float,
         vehicle_id: int,
         event_type: TraceEventType,
+        wait_reason: str | None = None,
         node_id: int | None = None,
         edge_id: int | None = None,
         start_node_id: int | None = None,
@@ -92,6 +94,7 @@ class Trace:
             timestamp_s=timestamp_s,
             vehicle_id=vehicle_id,
             event_type=event_type,
+            wait_reason=wait_reason,
             node_id=node_id,
             edge_id=edge_id,
             start_node_id=start_node_id,

@@ -111,6 +111,7 @@ def test_multi_vehicle_conflict_response_uses_deterministic_waiting():
     assert wait.start_time_s == 0.0
     assert wait.end_time_s == 1.0
     assert wait.duration_s == 1.0
+    assert wait.reason == "conflict_wait"
     assert [event.event_type for event in wait_events] == [
         TraceEventType.CONFLICT_WAIT_START,
         TraceEventType.CONFLICT_WAIT_COMPLETE,

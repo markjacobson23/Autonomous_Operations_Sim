@@ -248,6 +248,7 @@ def build_replay_bundle(
             replay_state,
             render_geometry=render_geometry,
             motion_segments=motion_segments,
+            trace_events=engine.trace.events,
         ),
         vehicle_presentations=vehicle_presentations,
     )
@@ -328,6 +329,7 @@ def build_live_session_bundle(
             replay_state,
             render_geometry=render_geometry,
             motion_segments=motion_segments,
+            trace_events=session.engine.trace.events,
         ),
         command_center=build_live_command_center_surface(
             session,
@@ -388,6 +390,7 @@ def build_live_sync_bundle(
             replay_state,
             render_geometry=render_geometry,
             motion_segments=motion_segments,
+            trace_events=session.engine.trace.events,
         ),
         command_center=build_live_command_center_surface(
             session,

@@ -38,6 +38,7 @@ class ConflictWait:
     node_id: int
     start_time_s: float
     end_time_s: float
+    reason: str = "conflict_wait"
 
     @property
     def duration_s(self) -> float:
@@ -295,7 +296,10 @@ class ReservationTable:
             if not blockers:
                 return candidate
 
-            candidate = max(blockers)
+            previous_candidate = candidate
+            candidate = max((candidate, *blockers))
+            if candidate == previous_candidate:
+                return candidate
             if not math.isfinite(candidate):
                 raise RuntimeError(
                     "No finite conflict-free departure time is available for the "

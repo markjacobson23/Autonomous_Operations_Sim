@@ -18,6 +18,7 @@ def test_serious_ui_shell_source_includes_finished_operator_regions() -> None:
             "components/tabs/EditorTab.tsx",
             "components/tabs/TrafficTab.tsx",
             "components/tabs/AnalyzeTab.tsx",
+            "viewModel.tsx",
             "app-shell.css",
         )
     )

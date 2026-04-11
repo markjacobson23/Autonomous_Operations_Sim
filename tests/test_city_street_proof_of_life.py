@@ -6,7 +6,14 @@ from typing import cast
 from autonomous_ops_sim.io.scenario_loader import load_scenario
 from autonomous_ops_sim.live_app import LiveAppServer, export_live_app_artifacts
 from autonomous_ops_sim.simulation.scenario_executor import execute_scenario
+from autonomous_ops_sim.simulation.trace import TraceEventType
 from autonomous_ops_sim.simulation.scenario import MultiVehicleRouteBatchExecutionSpec
+from autonomous_ops_sim.visualization import (
+    build_render_geometry_surface,
+    build_traffic_baseline_surface,
+    build_vehicle_motion_segments,
+    build_visualization_state,
+)
 
 
 SCENARIO_PATH = Path("scenarios/proof_of_life_pack/01_city_street_proof_of_life.json")
@@ -50,6 +57,50 @@ def test_city_street_proof_of_life_execution_runs_multiple_vehicle_route_batches
     assert first_result.engine.get_vehicle(204).current_node_id == 123
     assert first_result.engine.get_vehicle(205).current_node_id == 121
     assert first_result.engine.get_vehicle(206).current_node_id == 110
+
+
+def test_city_street_proof_of_life_includes_intersection_right_of_way_waits() -> None:
+    scenario = load_scenario(SCENARIO_PATH)
+    result = execute_scenario(scenario)
+
+    wait_starts = [
+        event
+        for event in result.engine.trace.events
+        if event.event_type == TraceEventType.CONFLICT_WAIT_START
+    ]
+    assert wait_starts
+    assert any(
+        event.wait_reason == "intersection_right_of_way"
+        and event.node_id in {111, 112, 113, 122}
+        for event in wait_starts
+    )
+
+    waiting_vehicle_ids = {
+        event.vehicle_id for event in wait_starts if event.wait_reason == "intersection_right_of_way"
+    }
+    behavior_wait_reasons = {
+        event.wait_reason
+        for event in result.engine.trace.events
+        if event.event_type == TraceEventType.BEHAVIOR_TRANSITION
+        and event.to_behavior_state == "conflict_wait"
+    }
+    assert "intersection_right_of_way" in behavior_wait_reasons
+    assert waiting_vehicle_ids
+
+    state = build_visualization_state(result.engine)
+    render_geometry = build_render_geometry_surface(result.engine.map)
+    motion_segments = build_vehicle_motion_segments(state, render_geometry=render_geometry)
+    baseline = build_traffic_baseline_surface(
+        state,
+        render_geometry=render_geometry,
+        motion_segments=motion_segments,
+        trace_events=result.engine.trace.events,
+    )
+
+    assert any(
+        record.reason == "intersection_right_of_way"
+        for record in baseline.queue_records
+    )
 
 
 def test_city_street_live_app_bundle_launches_with_multiple_vehicles_and_named_places(

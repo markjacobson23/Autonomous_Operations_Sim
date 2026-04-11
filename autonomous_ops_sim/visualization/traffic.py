@@ -3,25 +3,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from autonomous_ops_sim.simulation.trace import TraceEvent
+from autonomous_ops_sim.simulation.traffic_control import (
+    TrafficControlPoint,
+    build_traffic_control_points,
+)
 from autonomous_ops_sim.visualization.geometry import (
     RenderGeometrySurface,
     RoadGeometrySurface,
 )
 from autonomous_ops_sim.visualization.motion import VehicleMotionSegment
 from autonomous_ops_sim.visualization.state import VisualizationState
-
-
-@dataclass(frozen=True)
-class TrafficControlPoint:
-    """Deterministic baseline control rule at one rendered intersection."""
-
-    control_id: str
-    node_id: int
-    control_type: str
-    controlled_road_ids: tuple[str, ...]
-    stop_line_ids: tuple[str, ...]
-    protected_conflict_zone_ids: tuple[str, ...]
-    signal_ready: bool
 
 
 @dataclass(frozen=True)
@@ -73,15 +65,24 @@ def build_traffic_baseline_surface(
     *,
     render_geometry: RenderGeometrySurface,
     motion_segments: tuple[VehicleMotionSegment, ...],
+    trace_events: tuple[TraceEvent, ...] | None = None,
 ) -> TrafficBaselineSurface:
     """Build deterministic baseline traffic semantics from existing replay data."""
 
     return TrafficBaselineSurface(
         control_points=_build_control_points(render_geometry),
-        queue_records=_build_queue_records(
-            state=state,
-            roads=render_geometry.roads,
-            motion_segments=motion_segments,
+        queue_records=(
+            _build_queue_records_from_trace_events(
+                trace_events=trace_events,
+                roads=render_geometry.roads,
+                motion_segments=motion_segments,
+            )
+            if trace_events is not None
+            else _build_queue_records(
+                state=state,
+                roads=render_geometry.roads,
+                motion_segments=motion_segments,
+            )
         ),
     )
 
@@ -211,70 +212,7 @@ def traffic_snapshot_to_dict(snapshot: TrafficSnapshot) -> dict[str, Any]:
 def _build_control_points(
     render_geometry: RenderGeometrySurface,
 ) -> tuple[TrafficControlPoint, ...]:
-    controls: list[TrafficControlPoint] = []
-    for intersection in render_geometry.intersections:
-        min_x = min(point[0] for point in intersection.polygon)
-        max_x = max(point[0] for point in intersection.polygon)
-        min_y = min(point[1] for point in intersection.polygon)
-        max_y = max(point[1] for point in intersection.polygon)
-        connected_road_ids = tuple(
-            sorted(
-                road.road_id
-                for road in render_geometry.roads
-                if _road_touches_intersection_bounds(
-                    road,
-                    min_x=min_x,
-                    max_x=max_x,
-                    min_y=min_y,
-                    max_y=max_y,
-                )
-            )
-        )
-        stop_line_ids = tuple(
-            sorted(
-                stop_line.stop_line_id
-                for stop_line in render_geometry.stop_lines
-                if stop_line.lane_id in {
-                    lane.lane_id
-                    for lane in render_geometry.lanes
-                    if lane.road_id in connected_road_ids
-                }
-            )
-        )
-        protected_conflict_zone_ids = tuple(
-            sorted(
-                merge_zone.merge_zone_id
-                for merge_zone in render_geometry.merge_zones
-                if any(
-                    lane_id in merge_zone.lane_ids
-                    for lane_id in (
-                        lane.lane_id
-                        for lane in render_geometry.lanes
-                        if lane.road_id in connected_road_ids
-                    )
-                )
-            )
-        )
-        if len(connected_road_ids) < 2:
-            continue
-        if len(connected_road_ids) >= 4 or stop_line_ids:
-            control_type = "signalized"
-        elif len(connected_road_ids) >= 2:
-            control_type = "yield"
-        else:
-            control_type = "uncontrolled"
-        controls.append(
-            TrafficControlPoint(
-                control_id=f"control-{intersection.intersection_id}",
-                node_id=intersection.node_id,
-                control_type=control_type,
-                controlled_road_ids=connected_road_ids,
-                stop_line_ids=stop_line_ids,
-                protected_conflict_zone_ids=protected_conflict_zone_ids,
-                signal_ready=bool(stop_line_ids or protected_conflict_zone_ids),
-            )
-        )
-    return tuple(controls)
+    return build_traffic_control_points(render_geometry)
 
 
 def _control_points_by_road_id(
@@ -331,6 +269,60 @@ def _control_priority(control_type: str) -> int:
     }.get(control_type, 0)
 
 
+def _build_queue_records_from_trace_events(
+    *,
+    trace_events: tuple[TraceEvent, ...] | None,
+    roads: tuple[RoadGeometrySurface, ...],
+    motion_segments: tuple[VehicleMotionSegment, ...],
+) -> tuple[TrafficQueueRecord, ...]:
+    if trace_events is None:
+        return ()
+
+    queue_start_events: dict[int, dict[str, Any]] = {}
+    records: list[TrafficQueueRecord] = []
+    road_by_edge_id = {
+        edge_id: road.road_id
+        for road in roads
+        for edge_id in road.edge_ids
+    }
+
+    for event in trace_events:
+        event_type = event.event_type.value
+        vehicle_id = event.vehicle_id
+
+        if event_type == "conflict_wait_start":
+            queue_start_events[vehicle_id] = {
+                "node_id": event.node_id if event.node_id is not None else -1,
+                "queue_start_s": event.timestamp_s,
+                "reason": event.wait_reason or "conflict_wait",
+            }
+            continue
+
+        if event_type != "conflict_wait_complete":
+            continue
+        started = queue_start_events.pop(vehicle_id, None)
+        if started is None:
+            continue
+        road_id = _road_id_after_queue(
+            vehicle_id=vehicle_id,
+            wait_end_s=event.timestamp_s,
+            motion_segments=motion_segments,
+            road_by_edge_id=road_by_edge_id,
+        )
+        records.append(
+            TrafficQueueRecord(
+                vehicle_id=vehicle_id,
+                node_id=started["node_id"],
+                road_id=road_id,
+                queue_start_s=started["queue_start_s"],
+                queue_end_s=event.timestamp_s,
+                reason=started["reason"],
+            )
+        )
+
+    return tuple(records)
+
+
 def _build_queue_records(
     *,
     state: VisualizationState,
@@ -359,7 +351,7 @@ def _build_queue_records(
             queue_start_events[vehicle_id] = {
                 "node_id": int(node_id) if isinstance(node_id, int) else -1,
                 "queue_start_s": frame.timestamp_s,
-                "reason": "conflict_wait",
+                "reason": event.get("wait_reason") or "conflict_wait",
             }
             continue
 
