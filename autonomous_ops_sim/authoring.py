@@ -105,6 +105,7 @@ def validate_geometry_edit_transaction(
     try:
         candidate = apply_geometry_edit_transaction(scenario_data, transaction)
         validate_scenario_payload(candidate)
+        _validate_vehicle_positions_resolve(candidate)
     except (ValueError, TypeError, KeyError, OverflowError) as exc:
         return (
             GeometryValidationMessage(
@@ -210,6 +211,38 @@ def _graph_map_params(scenario_data: dict[str, object]) -> dict[str, object]:
     if not isinstance(params, dict):
         raise ValueError("Graph map is missing a valid 'params' object.")
     return params
+
+
+def _validate_vehicle_positions_resolve(scenario_data: dict[str, object]) -> None:
+    """Reject edits that leave any vehicle unable to resolve to a graph node."""
+
+    map_data = scenario_data.get("map")
+    if not isinstance(map_data, dict):
+        raise ValueError("Scenario is missing a valid top-level 'map' object.")
+    params = map_data.get("params")
+    if not isinstance(params, dict):
+        raise ValueError("Graph map is missing a valid 'params' object.")
+    nodes = _require_list(params.get("nodes"), context="Graph map nodes")
+    node_positions = {
+        tuple(_parse_position(node.get("position"), context=f"Graph node {index} position"))
+        for index, node in enumerate(nodes)
+        if isinstance(node, dict)
+    }
+
+    vehicles = scenario_data.get("vehicles")
+    if not isinstance(vehicles, list):
+        raise ValueError("Scenario vehicles must be a list.")
+
+    for index, vehicle in enumerate(vehicles):
+        if not isinstance(vehicle, dict):
+            raise ValueError("Scenario vehicles must be objects.")
+        vehicle_id = vehicle.get("id", index)
+        position = _parse_position(
+            vehicle.get("position"),
+            context=f"vehicle {vehicle_id} start position",
+        )
+        if position not in node_positions:
+            raise ValueError(f"Scenario vehicle {vehicle_id} start position {position} is not present in the map.")
 
 
 def _apply_move_node(params: dict[str, object], operation: GeometryEditOperation) -> None:

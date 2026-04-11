@@ -200,6 +200,28 @@ def test_geometry_edit_validation_rejects_duplicate_node_position() -> None:
     assert "positions must be unique" in messages[0].message
 
 
+def test_geometry_edit_validation_rejects_orphaned_vehicle_position() -> None:
+    scenario_data = build_authoring_scenario()
+    transaction = geometry_edit_transaction_from_dict(
+        {
+            "label": "move-start-node",
+            "operations": [
+                {
+                    "kind": "move_node",
+                    "target_id": 1,
+                    "position": [2, 3, 0],
+                }
+            ],
+        }
+    )
+
+    messages = validate_geometry_edit_transaction(scenario_data, transaction)
+
+    assert len(messages) == 1
+    assert messages[0].severity == "error"
+    assert "start position" in messages[0].message
+
+
 def test_validate_scenario_payload_accepts_a_valid_authoring_scenario() -> None:
     validate_scenario_payload(build_authoring_scenario())
 

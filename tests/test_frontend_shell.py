@@ -5,134 +5,146 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_serious_ui_shell_source_includes_finished_operator_regions() -> None:
-    app_source = (
-        REPO_ROOT / "frontend" / "serious_ui" / "src" / "App.tsx"
-    ).read_text(encoding="utf-8")
-
-    assert "Final UI cleanup pass" in app_source
-    assert "Operate" in app_source
-    assert "Traffic" in app_source
-    assert "Fleet" in app_source
-    assert "Editor" in app_source
-    assert "Analyze" in app_source
-    assert "Primary Operator Workflow" in app_source
-    assert "Session Status" in app_source
-    assert "Traffic Region" in app_source
-    assert "Fleet Control" in app_source
-    assert "Selected Fleet" in app_source
-    assert "Batch Actions" in app_source
-    assert "Runtime Controls" in app_source
-    assert "Inspection Context" in app_source
-    assert "Selected Vehicles" in app_source
-    assert "Recent Commands" in app_source
-    assert "Scenario Authoring" in app_source
-    assert "Working scenario controls, staged geometry, and validation live together here." in app_source
-    assert "Authoring Controls" in app_source
-    assert "Working Scenario" in app_source
-    assert "Validation clean" in app_source
-    assert "Validation blocked" in app_source
-    assert "Diagnostics and AI Review" in app_source
-    assert "Urgent issues" in app_source
-    assert "Recommended actions" in app_source
-    assert "Supporting Context" in app_source
-    assert "Recent Commands" in app_source
-    assert "Current target" in app_source
-    assert "Route Planning" in app_source
-    assert "Route Preview" in app_source
-    assert "Preview Route" in app_source
-    assert "Waiting for route preview" in app_source
-    assert "Assign Destination" in app_source
-    assert "Reposition Vehicle" in app_source
-    assert "Select Visible" in app_source
-    assert "Clear Selection" in app_source
-    assert "Spawn Vehicle" in app_source
-    assert "Remove Vehicle" in app_source
-    assert "Inject Job" in app_source
-    assert "Declare Hazard" in app_source
-    assert "Clear Hazard" in app_source
-    assert "Edit Scene" in app_source
-    assert "Save Scenario" in app_source
-    assert "Reload Scenario" in app_source
-    assert "Single-Step" in app_source
-    assert "Batch mode activates" in app_source
-    assert "Traffic Region" in app_source
-    assert "Traffic Control" in app_source
-    assert "Congestion Overview" in app_source
-    assert "Active Road Conditions" in app_source
-    assert "Queue and Reservation Detail" in app_source
-    assert "Blocked Edge Watch" in app_source
-    assert "Suggestions" in app_source
-    assert "Anomalies" in app_source
-    assert "Supporting Context" in app_source
-    assert "analysis-chip-alert" in app_source
-    assert "analyze-review-section-urgent" in app_source
-    assert "review-card-urgent" in app_source
-    assert "review-command-item" in app_source
-    assert "review-diagnostic-pill" in app_source
-    assert "operate-session-controls" in app_source
-    assert "operate-route-planning" in app_source
-    assert "fleet-pane" in app_source
-    assert "editor-pane" in app_source
-    assert "traffic-pane" in app_source
-    assert "traffic-monitor-board" in app_source
-    assert "traffic-alert-grid" in app_source
-    assert "traffic-alert-card-congestion" in app_source
-    assert "traffic-alert-card-hazard" in app_source
-    assert "traffic-road-state-pane" in app_source
-    assert "traffic-road-card-grid" in app_source
-    assert "traffic-road-card-spotlight" in app_source
-    assert "traffic-reservation-grid" in app_source
-    assert "traffic-reservation-card-spotlight" in app_source
-    assert "traffic-hazard-focus" in app_source
-    assert "traffic-context-strip" in app_source
-    assert "analyze-pane" in app_source
-    assert "analyze-ai-feedback" in app_source
-    assert "workspace-tabs" in app_source
-    assert "workspace-tab-active" in app_source
-    assert "shell-editor-focused" in app_source
-    assert "editor-mode-banner" in app_source
-    assert "editor-status-grid" in app_source
-    assert "editor-detail-grid" in app_source
-    assert "bundle-status-strip" in app_source
-    assert "state-callout" in app_source
-    assert "fleet-control-grid" in app_source
-    assert "fleet-summary-card" in app_source
-    assert "fleet-batch-card" in app_source
-    assert "fleet-admin-card" in app_source
-    assert "fleet-inspection-card" in app_source
-    assert "fleet-vehicle-pill" in app_source
-    assert "fleet-inspection-spotlight" in app_source
-    assert "fleet-inspection-grid" in app_source
-    assert "fleet-empty-state" in app_source
-    assert "scene-road-heatmap" in app_source
-    assert "scene-route-endpoint" in app_source
-    assert "scene-destination-threshold" in app_source
-    assert "toSmoothPathString" in app_source
-    assert "vehiclePresentationBadge" in app_source
-    assert "vehicle-selection-ring" in app_source
-    assert "vehicle-label-text" in app_source
-    assert "traffic-summary-chip" in app_source
-    assert "scene-legend" in app_source
-    assert "scene-overlay-shell" in app_source
-    assert "scene-overlay-primary" in app_source
-    assert "scene-overlay-secondary" in app_source
-    assert "scene-button-primary" in app_source
-    assert "overview-card-minimap" in app_source
-    assert "minimap-card-head" in app_source
-    assert "minimap-context-strip" in app_source
-    assert "minimap-orientation-pill" in app_source
-    assert "minimap-caption" in app_source
-    assert "minimap-hazard" in app_source
-    assert "minimap-vehicle-halo" in app_source
-    assert "minimap-viewport-shadow" in app_source
-    assert "route-planning-grid" in app_source
-    assert "route-preview-summary" in app_source
-    assert "selectVehicle" in app_source
-    assert "selectRoad" in app_source
-    assert "selectArea" in app_source
-    assert "selectQueue" in app_source
-    assert "selectHazard" in app_source
-    assert "scene-edit-handle" in app_source
+    shell_source = "\n".join(
+        (
+            REPO_ROOT / "frontend" / "serious_ui" / "src" / path
+        ).read_text(encoding="utf-8")
+        for path in (
+            "App.tsx",
+            "components/WorkspaceShell.tsx",
+            "components/SceneViewport.tsx",
+            "components/tabs/OperateTab.tsx",
+            "components/tabs/FleetTab.tsx",
+            "components/tabs/EditorTab.tsx",
+            "components/tabs/TrafficTab.tsx",
+            "components/tabs/AnalyzeTab.tsx",
+            "app-shell.css",
+        )
+    )
+    assert "Final UI cleanup pass" in shell_source
+    assert "Operate" in shell_source
+    assert "Traffic" in shell_source
+    assert "Fleet" in shell_source
+    assert "Editor" in shell_source
+    assert "Analyze" in shell_source
+    assert "Primary Operator Workflow" in shell_source
+    assert "Session Status" in shell_source
+    assert "Traffic Region" in shell_source
+    assert "Fleet Control" in shell_source
+    assert "Selected Fleet" in shell_source
+    assert "Batch Actions" in shell_source
+    assert "Runtime Controls" in shell_source
+    assert "Inspection Context" in shell_source
+    assert "Selected Vehicles" in shell_source
+    assert "Recent Commands" in shell_source
+    assert "Scenario Authoring" in shell_source
+    assert "Working scenario controls, staged geometry, and validation live together here." in shell_source
+    assert "Authoring Controls" in shell_source
+    assert "Working Scenario" in shell_source
+    assert "Validation clean" in shell_source
+    assert "Validation blocked" in shell_source
+    assert "Diagnostics and AI Review" in shell_source
+    assert "Urgent issues" in shell_source
+    assert "Recommended actions" in shell_source
+    assert "Supporting Context" in shell_source
+    assert "Recent Commands" in shell_source
+    assert "Current target" in shell_source
+    assert "Route Planning" in shell_source
+    assert "Route Preview" in shell_source
+    assert "Preview Route" in shell_source
+    assert "Waiting for route preview" in shell_source
+    assert "Assign Destination" in shell_source
+    assert "Reposition Vehicle" in shell_source
+    assert "Select Visible" in shell_source
+    assert "Clear Selection" in shell_source
+    assert "Spawn Vehicle" in shell_source
+    assert "Remove Vehicle" in shell_source
+    assert "Inject Job" in shell_source
+    assert "Declare Hazard" in shell_source
+    assert "Clear Hazard" in shell_source
+    assert "Edit Scene" in shell_source
+    assert "Save Scenario" in shell_source
+    assert "Reload Scenario" in shell_source
+    assert "Single-Step" in shell_source
+    assert "Batch mode activates" in shell_source
+    assert "Traffic Region" in shell_source
+    assert "Traffic Control" in shell_source
+    assert "Congestion Overview" in shell_source
+    assert "Active Road Conditions" in shell_source
+    assert "Queue and Reservation Detail" in shell_source
+    assert "Blocked Edge Watch" in shell_source
+    assert "Suggestions" in shell_source
+    assert "Anomalies" in shell_source
+    assert "Supporting Context" in shell_source
+    assert "analysis-chip-alert" in shell_source
+    assert "analyze-review-section-urgent" in shell_source
+    assert "review-card-urgent" in shell_source
+    assert "review-command-item" in shell_source
+    assert "review-diagnostic-pill" in shell_source
+    assert "operate-session-controls" in shell_source
+    assert "operate-route-planning" in shell_source
+    assert "fleet-pane" in shell_source
+    assert "editor-pane" in shell_source
+    assert "traffic-pane" in shell_source
+    assert "traffic-monitor-board" in shell_source
+    assert "traffic-alert-grid" in shell_source
+    assert "traffic-alert-card-congestion" in shell_source
+    assert "traffic-alert-card-hazard" in shell_source
+    assert "traffic-road-state-pane" in shell_source
+    assert "traffic-road-card-grid" in shell_source
+    assert "traffic-road-card-spotlight" in shell_source
+    assert "traffic-reservation-grid" in shell_source
+    assert "traffic-reservation-card-spotlight" in shell_source
+    assert "traffic-hazard-focus" in shell_source
+    assert "traffic-context-strip" in shell_source
+    assert "analyze-pane" in shell_source
+    assert "analyze-ai-feedback" in shell_source
+    assert "workspace-tabs" in shell_source
+    assert "workspace-tab-active" in shell_source
+    assert "shell-editor-focused" in shell_source
+    assert "editor-mode-banner" in shell_source
+    assert "editor-status-grid" in shell_source
+    assert "editor-detail-grid" in shell_source
+    assert "bundle-status-strip" in shell_source
+    assert "state-callout" in shell_source
+    assert "fleet-control-grid" in shell_source
+    assert "fleet-summary-card" in shell_source
+    assert "fleet-batch-card" in shell_source
+    assert "fleet-admin-card" in shell_source
+    assert "fleet-inspection-card" in shell_source
+    assert "fleet-vehicle-pill" in shell_source
+    assert "fleet-inspection-spotlight" in shell_source
+    assert "fleet-inspection-grid" in shell_source
+    assert "fleet-empty-state" in shell_source
+    assert "scene-road-heatmap" in shell_source
+    assert "scene-route-endpoint" in shell_source
+    assert "scene-destination-threshold" in shell_source
+    assert "toSmoothPathString" in shell_source
+    assert "vehiclePresentationBadge" in shell_source
+    assert "vehicle-selection-ring" in shell_source
+    assert "vehicle-label-text" in shell_source
+    assert "traffic-summary-chip" in shell_source
+    assert "scene-legend" in shell_source
+    assert "scene-overlay-shell" in shell_source
+    assert "scene-overlay-primary" in shell_source
+    assert "scene-overlay-secondary" in shell_source
+    assert "scene-button-primary" in shell_source
+    assert "overview-card-minimap" in shell_source
+    assert "minimap-card-head" in shell_source
+    assert "minimap-context-strip" in shell_source
+    assert "minimap-orientation-pill" in shell_source
+    assert "minimap-caption" in shell_source
+    assert "minimap-hazard" in shell_source
+    assert "minimap-vehicle-halo" in shell_source
+    assert "minimap-viewport-shadow" in shell_source
+    assert "route-planning-grid" in shell_source
+    assert "route-preview-summary" in shell_source
+    assert "selectVehicle" in shell_source
+    assert "selectRoad" in shell_source
+    assert "selectArea" in shell_source
+    assert "selectQueue" in shell_source
+    assert "selectHazard" in shell_source
+    assert "scene-edit-handle" in shell_source
 
 
 def test_serious_ui_shell_styles_define_final_multi_panel_layout() -> None:
