@@ -33,6 +33,12 @@ python3 -m autonomous_ops_sim.cli live --scenario scenarios/showpiece_pack/01_mi
 
 That command prepares a live-session bundle, prefers the built serious frontend when `frontend/serious_ui/dist/` exists, and otherwise falls back to the standalone serious viewer without requiring a handwritten glue script.
 
+For the near-term city-street proof-of-life demo, launch:
+
+```bash
+python3 -m autonomous_ops_sim.cli live --scenario scenarios/proof_of_life_pack/01_city_street_proof_of_life.json
+```
+
 ## Current status
 
 What the project can do today:

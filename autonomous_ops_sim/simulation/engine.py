@@ -247,6 +247,16 @@ class SimulationEngine:
             result.completion_time_s for result in route_results
         )
         self.run(completion_time_s)
+        for result in route_results:
+            if not self.has_vehicle(result.vehicle_id):
+                continue
+            vehicle = self.get_vehicle(result.vehicle_id)
+            final_node_id = result.route[-1]
+            vehicle.move_to_node(
+                node_id=final_node_id,
+                position=self.map.get_position(final_node_id),
+            )
+            vehicle.set_velocity(0.0)
         return MultiVehicleExecutionResult(
             route_results=tuple(route_results),
             reservations=reservations,

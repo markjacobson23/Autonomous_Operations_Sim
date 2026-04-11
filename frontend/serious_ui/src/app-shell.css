@@ -465,6 +465,10 @@ h3 {
   box-shadow: 0 22px 54px rgba(24, 33, 44, 0.1);
 }
 
+.shell-tab-operate .sidebar {
+  align-self: start;
+}
+
 .shell-tab-editor .editor-pane {
   background:
     radial-gradient(circle at top left, rgba(10, 118, 108, 0.08), transparent 32%),

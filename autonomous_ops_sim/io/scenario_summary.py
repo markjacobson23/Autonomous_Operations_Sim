@@ -2,6 +2,7 @@ import json
 
 from autonomous_ops_sim.simulation.scenario import (
     DispatchVehicleJobsExecutionSpec,
+    MultiVehicleRouteBatchExecutionSpec,
     Scenario,
     SingleVehicleJobExecutionSpec,
 )
@@ -46,6 +47,25 @@ def format_scenario_summary(scenario: Scenario) -> str:
                 f"execution: {scenario.execution.kind}",
                 f"execution_vehicle_id: {scenario.execution.vehicle_id}",
                 f"execution_job_count: {len(scenario.execution.jobs)}",
+            ]
+        )
+    elif isinstance(scenario.execution, MultiVehicleRouteBatchExecutionSpec):
+        route_request_count = sum(
+            len(route_batch.requests) for route_batch in scenario.execution.route_batches
+        )
+        vehicle_ids = sorted(
+            {
+                request.vehicle_id
+                for route_batch in scenario.execution.route_batches
+                for request in route_batch.requests
+            }
+        )
+        lines.extend(
+            [
+                f"execution: {scenario.execution.kind}",
+                f"execution_route_batch_count: {len(scenario.execution.route_batches)}",
+                f"execution_route_request_count: {route_request_count}",
+                f"execution_vehicle_ids: {vehicle_ids}",
             ]
         )
     else:

@@ -13,6 +13,9 @@ from autonomous_ops_sim.simulation.scenario import (
     LoadTaskSpec,
     MapSpec,
     MoveTaskSpec,
+    MultiVehicleRouteBatchExecutionSpec,
+    MultiVehicleRouteBatchSpec,
+    MultiVehicleRouteRequestSpec,
     ResourceSpec,
     Scenario,
     SingleVehicleJobExecutionSpec,
@@ -113,9 +116,15 @@ def _parse_scenario(
 
     if execution is not None:
         vehicle_ids = {vehicle.id for vehicle in vehicles}
-        if execution.vehicle_id not in vehicle_ids:
+        referenced_vehicle_ids = _collect_referenced_vehicle_ids(execution)
+        unknown_vehicle_ids = referenced_vehicle_ids - vehicle_ids
+        if unknown_vehicle_ids:
+            unknown_str = ", ".join(
+                sorted(str(vehicle_id) for vehicle_id in unknown_vehicle_ids)
+            )
             raise ValueError(
-                "Scenario execution 'vehicle_id' must reference a configured vehicle."
+                "Scenario execution vehicle_id(s) must reference configured vehicles: "
+                f"{unknown_str}"
             )
 
     resource_ids = {resource.resource_id for resource in resources}
@@ -863,6 +872,42 @@ def _parse_vehicle_spec(data: object) -> VehicleSpec:
 
 
 def _parse_execution_spec(data: dict[str, object]) -> ExecutionSpec:
+    if "kind" not in data:
+        raise ValueError("Scenario execution is missing required field(s): kind")
+
+    kind = data["kind"]
+
+    if kind not in {
+        "single_vehicle_job",
+        "dispatch_vehicle_jobs",
+        "dispatch_vehicle_job_queue",
+        "multi_vehicle_route_batches",
+    }:
+        raise ValueError(f"Unsupported execution kind: {kind!r}")
+    if kind == "multi_vehicle_route_batches":
+        required_keys = {"kind", "route_batches"}
+        missing = required_keys - data.keys()
+        if missing:
+            missing_str = ", ".join(sorted(missing))
+            raise ValueError(
+                f"Scenario execution is missing required field(s): {missing_str}"
+            )
+        route_batches_data = data.get("route_batches")
+        if not isinstance(route_batches_data, list):
+            raise ValueError("Scenario execution 'route_batches' must be a list.")
+        if not route_batches_data:
+            raise ValueError(
+                "Scenario multi-vehicle route execution must contain at least one route batch."
+            )
+        route_batches = tuple(
+            _parse_multi_vehicle_route_batch_spec(batch_data)
+            for batch_data in route_batches_data
+        )
+        return MultiVehicleRouteBatchExecutionSpec(
+            kind=kind,
+            route_batches=route_batches,
+        )
+
     required_keys = {"kind", "vehicle_id"}
     missing = required_keys - data.keys()
     if missing:
@@ -870,16 +915,7 @@ def _parse_execution_spec(data: dict[str, object]) -> ExecutionSpec:
         raise ValueError(
             f"Scenario execution is missing required field(s): {missing_str}"
         )
-
-    kind = data["kind"]
     vehicle_id = data["vehicle_id"]
-
-    if kind not in {
-        "single_vehicle_job",
-        "dispatch_vehicle_jobs",
-        "dispatch_vehicle_job_queue",
-    }:
-        raise ValueError(f"Unsupported execution kind: {kind!r}")
     if not isinstance(vehicle_id, int):
         raise ValueError("Scenario execution 'vehicle_id' must be an int.")
 
@@ -909,6 +945,60 @@ def _parse_execution_spec(data: dict[str, object]) -> ExecutionSpec:
         kind=kind,
         vehicle_id=vehicle_id,
         jobs=dispatch_jobs,
+    )
+
+
+def _parse_multi_vehicle_route_batch_spec(
+    data: object,
+) -> MultiVehicleRouteBatchSpec:
+    if not isinstance(data, dict):
+        raise ValueError("Each scenario route batch must be an object.")
+
+    requests_data = data.get("requests")
+    if not isinstance(requests_data, list):
+        raise ValueError("Scenario route batch 'requests' must be a list.")
+    if not requests_data:
+        raise ValueError("Scenario route batch must contain at least one request.")
+
+    requests = tuple(_parse_multi_vehicle_route_request_spec(request_data) for request_data in requests_data)
+    request_vehicle_ids = [request.vehicle_id for request in requests]
+    if len(set(request_vehicle_ids)) != len(request_vehicle_ids):
+        raise ValueError("Scenario route batch vehicle ids must be unique.")
+
+    return MultiVehicleRouteBatchSpec(requests=requests)
+
+
+def _parse_multi_vehicle_route_request_spec(
+    data: object,
+) -> MultiVehicleRouteRequestSpec:
+    if not isinstance(data, dict):
+        raise ValueError("Each scenario route request must be an object.")
+
+    required_keys = {"vehicle_id", "destination"}
+    missing = required_keys - data.keys()
+    if missing:
+        missing_str = ", ".join(sorted(missing))
+        raise ValueError(
+            f"Scenario route request is missing required field(s): {missing_str}"
+        )
+
+    vehicle_id = data["vehicle_id"]
+    destination = data["destination"]
+    priority = data.get("priority")
+
+    if not isinstance(vehicle_id, int):
+        raise ValueError("Scenario route request 'vehicle_id' must be an int.")
+    parsed_destination = _parse_position_value(
+        destination,
+        context="Scenario route request 'destination'",
+    )
+    if priority is not None and not isinstance(priority, int):
+        raise ValueError("Scenario route request 'priority' must be an int if provided.")
+
+    return MultiVehicleRouteRequestSpec(
+        vehicle_id=vehicle_id,
+        destination=parsed_destination,
+        priority=priority,
     )
 
 
@@ -1146,8 +1236,13 @@ def _collect_referenced_resource_ids(execution: ExecutionSpec | None) -> set[str
     jobs: tuple[JobSpec, ...]
     if isinstance(execution, SingleVehicleJobExecutionSpec):
         jobs = (execution.job,)
-    else:
+    elif isinstance(
+        execution,
+        (DispatchVehicleJobsExecutionSpec, DispatchVehicleJobQueueExecutionSpec),
+    ):
         jobs = execution.jobs
+    else:
+        return set()
 
     return {
         task.resource_id
@@ -1155,3 +1250,24 @@ def _collect_referenced_resource_ids(execution: ExecutionSpec | None) -> set[str
         for task in job.tasks
         if isinstance(task, (LoadTaskSpec, UnloadTaskSpec)) and task.resource_id is not None
     }
+
+
+def _collect_referenced_vehicle_ids(execution: ExecutionSpec | None) -> set[int]:
+    if execution is None:
+        return set()
+
+    if isinstance(execution, SingleVehicleJobExecutionSpec):
+        return {execution.vehicle_id}
+    if isinstance(
+        execution,
+        (DispatchVehicleJobsExecutionSpec, DispatchVehicleJobQueueExecutionSpec),
+    ):
+        return {execution.vehicle_id}
+    if isinstance(execution, MultiVehicleRouteBatchExecutionSpec):
+        return {
+            request.vehicle_id
+            for route_batch in execution.route_batches
+            for request in route_batch.requests
+        }
+
+    raise ValueError(f"Unsupported execution type: {type(execution)!r}")

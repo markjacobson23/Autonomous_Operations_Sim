@@ -14,6 +14,7 @@ from autonomous_ops_sim.simulation.metrics import (
     ExecutionMetricsSummary,
     summarize_engine_execution,
 )
+from autonomous_ops_sim.simulation.reservations import VehicleRouteRequest
 from autonomous_ops_sim.simulation.scenario import (
     DispatchVehicleJobQueueExecutionSpec,
     DispatchVehicleJobsExecutionSpec,
@@ -22,6 +23,9 @@ from autonomous_ops_sim.simulation.scenario import (
     LoadTaskSpec,
     MapSpec,
     MoveTaskSpec,
+    MultiVehicleRouteBatchExecutionSpec,
+    MultiVehicleRouteBatchSpec,
+    MultiVehicleRouteRequestSpec,
     ResourceSpec,
     Scenario,
     ScenarioTaskSpec,
@@ -71,7 +75,11 @@ def execute_scenario(scenario: Scenario) -> ScenarioExecutionResult:
 
     engine = build_scenario_engine(scenario)
 
-    vehicle = _get_execution_vehicle(engine=engine, scenario=scenario)
+    vehicle = (
+        None
+        if isinstance(scenario.execution, MultiVehicleRouteBatchExecutionSpec)
+        else _get_execution_vehicle(engine=engine, scenario=scenario)
+    )
     _execute_configured_work(
         engine=engine,
         scenario=scenario,
@@ -189,7 +197,14 @@ def _build_runtime_vehicles(*, scenario: Scenario, simulation_map) -> tuple[Vehi
 def _get_execution_vehicle(*, engine: SimulationEngine, scenario: Scenario) -> Vehicle:
     assert scenario.execution is not None
 
-    return engine.get_vehicle(scenario.execution.vehicle_id)
+    execution = scenario.execution
+    if isinstance(
+        execution,
+        (SingleVehicleJobExecutionSpec, DispatchVehicleJobsExecutionSpec, DispatchVehicleJobQueueExecutionSpec),
+    ):
+        return engine.get_vehicle(execution.vehicle_id)
+
+    raise ValueError("Scenario execution does not define a single execution vehicle.")
 
 
 def _execute_configured_work(
@@ -197,12 +212,13 @@ def _execute_configured_work(
     engine: SimulationEngine,
     scenario: Scenario,
     simulation_map,
-    vehicle: Vehicle,
+    vehicle: Vehicle | None,
 ) -> None:
     assert scenario.execution is not None
 
     execution = scenario.execution
     if isinstance(execution, SingleVehicleJobExecutionSpec):
+        assert vehicle is not None
         engine.execute_job(
             vehicle=vehicle,
             job=_build_job(
@@ -212,10 +228,19 @@ def _execute_configured_work(
         )
         return
 
+    if isinstance(execution, MultiVehicleRouteBatchExecutionSpec):
+        _execute_multi_vehicle_route_batches(
+            engine=engine,
+            simulation_map=simulation_map,
+            route_batches=execution.route_batches,
+        )
+        return
+
     if not isinstance(execution, DispatchVehicleJobsExecutionSpec):
         if not isinstance(execution, DispatchVehicleJobQueueExecutionSpec):
             raise ValueError(f"Unsupported scenario execution type: {type(execution)!r}")
 
+        assert vehicle is not None
         workload_result = run_dispatch_job_queue(
             engine=engine,
             dispatcher=_build_dispatcher(dispatcher_spec=scenario.dispatcher),
@@ -243,6 +268,53 @@ def _execute_configured_work(
     )
     if dispatch_result is None:
         raise ValueError("Scenario dispatcher did not assign a feasible job.")
+
+
+def _execute_multi_vehicle_route_batches(
+    *,
+    engine: SimulationEngine,
+    simulation_map,
+    route_batches: tuple[MultiVehicleRouteBatchSpec, ...],
+) -> None:
+    for route_batch in route_batches:
+        requests = tuple(
+            _build_vehicle_route_request(
+                engine=engine,
+                simulation_map=simulation_map,
+                request=request_spec,
+            )
+            for request_spec in route_batch.requests
+        )
+        result = engine.execute_multi_vehicle_routes(requests=requests)
+        for route_result in result.route_results:
+            vehicle = engine.get_vehicle(route_result.vehicle_id)
+            destination_node_id = route_result.route[-1]
+            vehicle.move_to_node(
+                node_id=destination_node_id,
+                position=simulation_map.get_position(destination_node_id),
+            )
+            vehicle.set_velocity(0.0)
+
+
+def _build_vehicle_route_request(
+    *,
+    engine: SimulationEngine,
+    simulation_map,
+    request: MultiVehicleRouteRequestSpec,
+):
+    vehicle = engine.get_vehicle(request.vehicle_id)
+    destination_node_id = _resolve_node_id(
+        simulation_map=simulation_map,
+        position=request.destination,
+        label=f"vehicle {request.vehicle_id} route destination",
+    )
+    return VehicleRouteRequest(
+        vehicle_id=request.vehicle_id,
+        start_node_id=vehicle.current_node_id,
+        destination_node_id=destination_node_id,
+        max_speed=vehicle.max_speed,
+        priority=request.priority,
+    )
 
 
 def _build_dispatcher(*, dispatcher_spec: DispatcherSpec | None):

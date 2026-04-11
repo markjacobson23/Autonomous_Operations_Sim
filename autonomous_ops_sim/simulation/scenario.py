@@ -99,10 +99,29 @@ class DispatchVehicleJobQueueExecutionSpec:
     jobs: tuple[JobSpec, ...]
 
 
+@dataclass(frozen=True)
+class MultiVehicleRouteRequestSpec:
+    vehicle_id: int
+    destination: Position
+    priority: int | None = None
+
+
+@dataclass(frozen=True)
+class MultiVehicleRouteBatchSpec:
+    requests: tuple[MultiVehicleRouteRequestSpec, ...]
+
+
+@dataclass(frozen=True)
+class MultiVehicleRouteBatchExecutionSpec:
+    kind: str
+    route_batches: tuple[MultiVehicleRouteBatchSpec, ...]
+
+
 ExecutionSpec = (
     SingleVehicleJobExecutionSpec
     | DispatchVehicleJobsExecutionSpec
     | DispatchVehicleJobQueueExecutionSpec
+    | MultiVehicleRouteBatchExecutionSpec
 )
 
 

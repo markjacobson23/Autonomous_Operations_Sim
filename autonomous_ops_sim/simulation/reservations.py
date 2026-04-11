@@ -234,15 +234,18 @@ class ReservationTable:
                     "corridor_node_ids are provided"
                 )
 
-        native_candidate = self._maybe_native_earliest_departure_time(
-            vehicle_id=vehicle_id,
-            current_node_id=current_node_id,
-            next_node_id=next_node_id,
-            not_before_s=not_before_s,
-            travel_time_s=travel_time_s,
-            corridor_node_ids=corridor_node_ids,
-            corridor_travel_time_s=corridor_travel_time_s,
-        )
+        try:
+            native_candidate = self._maybe_native_earliest_departure_time(
+                vehicle_id=vehicle_id,
+                current_node_id=current_node_id,
+                next_node_id=next_node_id,
+                not_before_s=not_before_s,
+                travel_time_s=travel_time_s,
+                corridor_node_ids=corridor_node_ids,
+                corridor_travel_time_s=corridor_travel_time_s,
+            )
+        except RuntimeError:
+            native_candidate = None
         if native_candidate is not None:
             return native_candidate
 

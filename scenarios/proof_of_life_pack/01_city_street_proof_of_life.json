@@ -1,0 +1,378 @@
+{
+  "name": "city_street_proof_of_life",
+  "seed": 5201,
+  "duration_s": 120.0,
+  "map": {
+    "kind": "graph",
+    "params": {
+      "nodes": [
+        {"id": 100, "position": [0.0, 0.0, 0.0], "node_type": "DEPOT"},
+        {"id": 101, "position": [4.0, 0.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 102, "position": [8.0, 0.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 103, "position": [12.0, 0.0, 0.0], "node_type": "JOB_SITE"},
+        {"id": 110, "position": [0.0, 4.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 111, "position": [4.0, 4.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 112, "position": [8.0, 4.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 113, "position": [12.0, 4.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 120, "position": [0.0, 8.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 121, "position": [4.0, 8.0, 0.0], "node_type": "LOADING_ZONE"},
+        {"id": 122, "position": [8.0, 8.0, 0.0], "node_type": "UNLOADING_ZONE"},
+        {"id": 123, "position": [12.0, 8.0, 0.0], "node_type": "JOB_SITE"}
+      ],
+      "edges": [
+        {"id": 1000, "start_node_id": 100, "end_node_id": 101, "distance": 4.0, "speed_limit": 3.8},
+        {"id": 1001, "start_node_id": 101, "end_node_id": 100, "distance": 4.0, "speed_limit": 3.8},
+        {"id": 1002, "start_node_id": 101, "end_node_id": 102, "distance": 4.0, "speed_limit": 3.8},
+        {"id": 1003, "start_node_id": 102, "end_node_id": 101, "distance": 4.0, "speed_limit": 3.8},
+        {"id": 1004, "start_node_id": 102, "end_node_id": 103, "distance": 4.0, "speed_limit": 3.8},
+        {"id": 1005, "start_node_id": 103, "end_node_id": 102, "distance": 4.0, "speed_limit": 3.8},
+        {"id": 1006, "start_node_id": 110, "end_node_id": 111, "distance": 4.0, "speed_limit": 3.6},
+        {"id": 1007, "start_node_id": 111, "end_node_id": 110, "distance": 4.0, "speed_limit": 3.6},
+        {"id": 1008, "start_node_id": 111, "end_node_id": 112, "distance": 4.0, "speed_limit": 3.6},
+        {"id": 1009, "start_node_id": 112, "end_node_id": 111, "distance": 4.0, "speed_limit": 3.6},
+        {"id": 1010, "start_node_id": 112, "end_node_id": 113, "distance": 4.0, "speed_limit": 3.6},
+        {"id": 1011, "start_node_id": 113, "end_node_id": 112, "distance": 4.0, "speed_limit": 3.6},
+        {"id": 1012, "start_node_id": 120, "end_node_id": 121, "distance": 4.0, "speed_limit": 3.4},
+        {"id": 1013, "start_node_id": 121, "end_node_id": 120, "distance": 4.0, "speed_limit": 3.4},
+        {"id": 1014, "start_node_id": 121, "end_node_id": 122, "distance": 4.0, "speed_limit": 3.4},
+        {"id": 1015, "start_node_id": 122, "end_node_id": 121, "distance": 4.0, "speed_limit": 3.4},
+        {"id": 1016, "start_node_id": 122, "end_node_id": 123, "distance": 4.0, "speed_limit": 3.4},
+        {"id": 1017, "start_node_id": 123, "end_node_id": 122, "distance": 4.0, "speed_limit": 3.4},
+        {"id": 1018, "start_node_id": 100, "end_node_id": 110, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1019, "start_node_id": 110, "end_node_id": 100, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1020, "start_node_id": 110, "end_node_id": 120, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1021, "start_node_id": 120, "end_node_id": 110, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1022, "start_node_id": 101, "end_node_id": 111, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1023, "start_node_id": 111, "end_node_id": 101, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1024, "start_node_id": 111, "end_node_id": 121, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1025, "start_node_id": 121, "end_node_id": 111, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1026, "start_node_id": 102, "end_node_id": 112, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1027, "start_node_id": 112, "end_node_id": 102, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1028, "start_node_id": 112, "end_node_id": 122, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1029, "start_node_id": 122, "end_node_id": 112, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1030, "start_node_id": 103, "end_node_id": 113, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1031, "start_node_id": 113, "end_node_id": 103, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1032, "start_node_id": 113, "end_node_id": 123, "distance": 4.0, "speed_limit": 3.2},
+        {"id": 1033, "start_node_id": 123, "end_node_id": 113, "distance": 4.0, "speed_limit": 3.2}
+      ],
+      "render_geometry": {
+        "roads": [
+          {
+            "id": "north-avenue",
+            "edge_ids": [1000, 1001, 1002, 1003, 1004, 1005],
+            "centerline": [[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [8.0, 0.0, 0.0], [12.0, 0.0, 0.0]],
+            "road_class": "arterial",
+            "directionality": "two_way",
+            "lane_count": 2,
+            "width_m": 2.0
+          },
+          {
+            "id": "market-avenue",
+            "edge_ids": [1006, 1007, 1008, 1009, 1010, 1011],
+            "centerline": [[0.0, 4.0, 0.0], [4.0, 4.0, 0.0], [8.0, 4.0, 0.0], [12.0, 4.0, 0.0]],
+            "road_class": "arterial",
+            "directionality": "two_way",
+            "lane_count": 2,
+            "width_m": 2.0
+          },
+          {
+            "id": "south-avenue",
+            "edge_ids": [1012, 1013, 1014, 1015, 1016, 1017],
+            "centerline": [[0.0, 8.0, 0.0], [4.0, 8.0, 0.0], [8.0, 8.0, 0.0], [12.0, 8.0, 0.0]],
+            "road_class": "arterial",
+            "directionality": "two_way",
+            "lane_count": 2,
+            "width_m": 2.0
+          },
+          {
+            "id": "west-street",
+            "edge_ids": [1018, 1019, 1020, 1021],
+            "centerline": [[0.0, 0.0, 0.0], [0.0, 4.0, 0.0], [0.0, 8.0, 0.0]],
+            "road_class": "collector",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.6
+          },
+          {
+            "id": "center-street",
+            "edge_ids": [1022, 1023, 1024, 1025],
+            "centerline": [[4.0, 0.0, 0.0], [4.0, 4.0, 0.0], [4.0, 8.0, 0.0]],
+            "road_class": "collector",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.6
+          },
+          {
+            "id": "library-street",
+            "edge_ids": [1026, 1027, 1028, 1029],
+            "centerline": [[8.0, 0.0, 0.0], [8.0, 4.0, 0.0], [8.0, 8.0, 0.0]],
+            "road_class": "collector",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.6
+          },
+          {
+            "id": "east-spur",
+            "edge_ids": [1030, 1031, 1032, 1033],
+            "centerline": [[12.0, 0.0, 0.0], [12.0, 4.0, 0.0], [12.0, 8.0, 0.0]],
+            "road_class": "collector",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.6
+          }
+        ],
+        "intersections": [
+          {
+            "id": "northwest-corner",
+            "node_id": 100,
+            "polygon": [[-0.5, -0.5, 0.0], [0.5, -0.5, 0.0], [0.5, 0.5, 0.0], [-0.5, 0.5, 0.0]],
+            "intersection_type": "junction"
+          },
+          {
+            "id": "north-market",
+            "node_id": 101,
+            "polygon": [[3.5, -0.5, 0.0], [4.5, -0.5, 0.0], [4.5, 0.5, 0.0], [3.5, 0.5, 0.0]],
+            "intersection_type": "junction"
+          },
+          {
+            "id": "north-library",
+            "node_id": 102,
+            "polygon": [[7.5, -0.5, 0.0], [8.5, -0.5, 0.0], [8.5, 0.5, 0.0], [7.5, 0.5, 0.0]],
+            "intersection_type": "junction"
+          },
+          {
+            "id": "north-east-terminal",
+            "node_id": 103,
+            "polygon": [[11.5, -0.5, 0.0], [12.5, -0.5, 0.0], [12.5, 0.5, 0.0], [11.5, 0.5, 0.0]],
+            "intersection_type": "terminal"
+          },
+          {
+            "id": "west-market",
+            "node_id": 110,
+            "polygon": [[-0.5, 3.5, 0.0], [0.5, 3.5, 0.0], [0.5, 4.5, 0.0], [-0.5, 4.5, 0.0]],
+            "intersection_type": "junction"
+          },
+          {
+            "id": "city-center",
+            "node_id": 111,
+            "polygon": [[3.5, 3.5, 0.0], [4.5, 3.5, 0.0], [4.5, 4.5, 0.0], [3.5, 4.5, 0.0]],
+            "intersection_type": "signalized"
+          },
+          {
+            "id": "east-market",
+            "node_id": 112,
+            "polygon": [[7.5, 3.5, 0.0], [8.5, 3.5, 0.0], [8.5, 4.5, 0.0], [7.5, 4.5, 0.0]],
+            "intersection_type": "junction"
+          },
+          {
+            "id": "east-station",
+            "node_id": 113,
+            "polygon": [[11.5, 3.5, 0.0], [12.5, 3.5, 0.0], [12.5, 4.5, 0.0], [11.5, 4.5, 0.0]],
+            "intersection_type": "junction"
+          },
+          {
+            "id": "south-depot-corner",
+            "node_id": 120,
+            "polygon": [[-0.5, 7.5, 0.0], [0.5, 7.5, 0.0], [0.5, 8.5, 0.0], [-0.5, 8.5, 0.0]],
+            "intersection_type": "junction"
+          },
+          {
+            "id": "library-plaza",
+            "node_id": 121,
+            "polygon": [[3.5, 7.5, 0.0], [4.5, 7.5, 0.0], [4.5, 8.5, 0.0], [3.5, 8.5, 0.0]],
+            "intersection_type": "loading_bay"
+          },
+          {
+            "id": "clinic-corner",
+            "node_id": 122,
+            "polygon": [[7.5, 7.5, 0.0], [8.5, 7.5, 0.0], [8.5, 8.5, 0.0], [7.5, 8.5, 0.0]],
+            "intersection_type": "unloading_bay"
+          },
+          {
+            "id": "east-yard",
+            "node_id": 123,
+            "polygon": [[11.5, 7.5, 0.0], [12.5, 7.5, 0.0], [12.5, 8.5, 0.0], [11.5, 8.5, 0.0]],
+            "intersection_type": "job_site"
+          }
+        ],
+        "areas": [
+          {
+            "id": "south-depot",
+            "kind": "depot",
+            "label": "South Depot",
+            "polygon": [[-0.9, 7.1, 0.0], [1.1, 7.1, 0.0], [1.1, 9.1, 0.0], [-0.9, 9.1, 0.0]]
+          },
+          {
+            "id": "market-square",
+            "kind": "plaza",
+            "label": "Market Square",
+            "polygon": [[2.6, 2.6, 0.0], [5.4, 2.6, 0.0], [5.4, 5.4, 0.0], [2.6, 5.4, 0.0]]
+          },
+          {
+            "id": "library-plaza-area",
+            "kind": "loading_bay",
+            "label": "Library Plaza",
+            "polygon": [[2.8, 6.8, 0.0], [5.2, 6.8, 0.0], [5.2, 9.2, 0.0], [2.8, 9.2, 0.0]]
+          },
+          {
+            "id": "clinic-corner-area",
+            "kind": "unloading_bay",
+            "label": "Clinic Corner",
+            "polygon": [[6.8, 6.8, 0.0], [9.2, 6.8, 0.0], [9.2, 9.2, 0.0], [6.8, 9.2, 0.0]]
+          },
+          {
+            "id": "east-yard-area",
+            "kind": "job_site",
+            "label": "East Yard",
+            "polygon": [[10.8, 6.8, 0.0], [13.2, 6.8, 0.0], [13.2, 9.2, 0.0], [10.8, 9.2, 0.0]]
+          },
+          {
+            "id": "north-garage",
+            "kind": "building",
+            "label": "North Garage",
+            "polygon": [[10.7, -0.9, 0.0], [13.1, -0.9, 0.0], [13.1, 1.3, 0.0], [10.7, 1.3, 0.0]]
+          },
+          {
+            "id": "north-walk",
+            "kind": "sidewalk",
+            "label": "North Walk",
+            "polygon": [[-1.0, -1.3, 0.0], [13.0, -1.3, 0.0], [13.0, -0.3, 0.0], [-1.0, -0.3, 0.0]]
+          },
+          {
+            "id": "south-walk",
+            "kind": "sidewalk",
+            "label": "South Walk",
+            "polygon": [[-1.0, 8.7, 0.0], [13.0, 8.7, 0.0], [13.0, 9.7, 0.0], [-1.0, 9.7, 0.0]]
+          },
+          {
+            "id": "district-boundary",
+            "kind": "street_boundary",
+            "label": "Compact Street District",
+            "polygon": [[-1.2, -1.6, 0.0], [13.4, -1.6, 0.0], [13.4, 9.8, 0.0], [-1.2, 9.8, 0.0]]
+          }
+        ]
+      },
+      "world_model": {
+        "environment": {
+          "family": "city_street",
+          "archetype": "proof_of_life_city_street",
+          "display_name": "Proof-of-Life City Street"
+        },
+        "layers": {
+          "roads": [
+            {"id": "north-avenue-layer", "kind": "arterial", "label": "North Avenue", "reference_id": "north-avenue"},
+            {"id": "market-avenue-layer", "kind": "arterial", "label": "Market Avenue", "reference_id": "market-avenue"},
+            {"id": "south-avenue-layer", "kind": "arterial", "label": "South Avenue", "reference_id": "south-avenue"},
+            {"id": "west-street-layer", "kind": "collector", "label": "West Street", "reference_id": "west-street"},
+            {"id": "center-street-layer", "kind": "collector", "label": "Center Street", "reference_id": "center-street"},
+            {"id": "library-street-layer", "kind": "collector", "label": "Library Street", "reference_id": "library-street"},
+            {"id": "east-spur-layer", "kind": "collector", "label": "East Spur", "reference_id": "east-spur"}
+          ],
+          "intersections": [
+            {"id": "northwest-corner-layer", "kind": "junction", "label": "Northwest Corner", "reference_id": "northwest-corner"},
+            {"id": "north-market-layer", "kind": "junction", "label": "North Market", "reference_id": "north-market"},
+            {"id": "north-library-layer", "kind": "junction", "label": "North Library", "reference_id": "north-library"},
+            {"id": "north-east-terminal-layer", "kind": "terminal", "label": "North East Terminal", "reference_id": "north-east-terminal"},
+            {"id": "west-market-layer", "kind": "junction", "label": "West Market", "reference_id": "west-market"},
+            {"id": "city-center-layer", "kind": "signalized_intersection", "label": "City Center", "reference_id": "city-center"},
+            {"id": "east-market-layer", "kind": "junction", "label": "East Market", "reference_id": "east-market"},
+            {"id": "east-station-layer", "kind": "junction", "label": "East Station", "reference_id": "east-station"},
+            {"id": "south-depot-corner-layer", "kind": "junction", "label": "South Depot Corner", "reference_id": "south-depot-corner"},
+            {"id": "library-plaza-layer", "kind": "loading_bay", "label": "Library Plaza", "reference_id": "library-plaza"},
+            {"id": "clinic-corner-layer", "kind": "unloading_bay", "label": "Clinic Corner", "reference_id": "clinic-corner"},
+            {"id": "east-yard-layer", "kind": "job_site", "label": "East Yard", "reference_id": "east-yard"}
+          ],
+          "zones": [
+            {"id": "south-depot-zone-layer", "kind": "depot", "label": "South Depot", "reference_id": "south-depot"},
+            {"id": "market-square-zone-layer", "kind": "plaza", "label": "Market Square", "reference_id": "market-square"},
+            {"id": "library-plaza-zone-layer", "kind": "loading_bay", "label": "Library Plaza", "reference_id": "library-plaza-area"},
+            {"id": "clinic-corner-zone-layer", "kind": "unloading_bay", "label": "Clinic Corner", "reference_id": "clinic-corner-area"},
+            {"id": "east-yard-zone-layer", "kind": "job_site", "label": "East Yard", "reference_id": "east-yard-area"}
+          ],
+          "buildings": [
+            {"id": "north-garage-layer", "kind": "building", "label": "North Garage", "reference_id": "north-garage"}
+          ],
+          "sidewalks": [
+            {"id": "north-walk-layer", "kind": "sidewalk", "label": "North Walk", "reference_id": "north-walk"},
+            {"id": "south-walk-layer", "kind": "sidewalk", "label": "South Walk", "reference_id": "south-walk"}
+          ],
+          "boundaries": [
+            {"id": "district-boundary-layer", "kind": "street_boundary", "label": "Compact Street District", "reference_id": "district-boundary"}
+          ],
+          "no_go_areas": []
+        },
+        "asset_layers": [
+          {
+            "id": "asphalt-base",
+            "kind": "terrain_fill",
+            "asset_key": "city_asphalt",
+            "z_index": 0,
+            "opacity": 1.0,
+            "coverage": [[-1.2, -1.6, 0.0], [13.4, -1.6, 0.0], [13.4, 9.8, 0.0], [-1.2, 9.8, 0.0]]
+          },
+          {
+            "id": "lane-markings",
+            "kind": "foreground_overlay",
+            "asset_key": "city_lane_markings",
+            "z_index": 2,
+            "opacity": 0.72,
+            "coverage": [[-0.2, -0.2, 0.0], [12.2, -0.2, 0.0], [12.2, 8.2, 0.0], [-0.2, 8.2, 0.0]]
+          }
+        ]
+      }
+    }
+  },
+  "vehicles": [
+    {"id": 201, "position": [0.0, 0.0, 0.0], "velocity": 0.0, "payload": 0.0, "max_payload": 8.0, "max_speed": 4.0, "vehicle_type": "GENERIC"},
+    {"id": 202, "position": [12.0, 0.0, 0.0], "velocity": 0.0, "payload": 0.0, "max_payload": 8.0, "max_speed": 4.0, "vehicle_type": "GENERIC"},
+    {"id": 203, "position": [0.0, 8.0, 0.0], "velocity": 0.0, "payload": 0.0, "max_payload": 8.0, "max_speed": 4.0, "vehicle_type": "GENERIC"},
+    {"id": 204, "position": [12.0, 8.0, 0.0], "velocity": 0.0, "payload": 0.0, "max_payload": 8.0, "max_speed": 4.0, "vehicle_type": "GENERIC"},
+    {"id": 205, "position": [0.0, 4.0, 0.0], "velocity": 0.0, "payload": 0.0, "max_payload": 8.0, "max_speed": 4.0, "vehicle_type": "GENERIC"},
+    {"id": 206, "position": [4.0, 8.0, 0.0], "velocity": 0.0, "payload": 0.0, "max_payload": 8.0, "max_speed": 4.0, "vehicle_type": "GENERIC"}
+  ],
+  "execution": {
+    "kind": "multi_vehicle_route_batches",
+    "route_batches": [
+      {
+        "requests": [
+          {"vehicle_id": 201, "destination": [4.0, 0.0, 0.0]},
+          {"vehicle_id": 202, "destination": [8.0, 0.0, 0.0]},
+          {"vehicle_id": 203, "destination": [4.0, 4.0, 0.0]},
+          {"vehicle_id": 204, "destination": [8.0, 4.0, 0.0]},
+          {"vehicle_id": 205, "destination": [12.0, 4.0, 0.0]},
+          {"vehicle_id": 206, "destination": [8.0, 8.0, 0.0]}
+        ]
+      },
+      {
+        "requests": [
+          {"vehicle_id": 201, "destination": [0.0, 0.0, 0.0]},
+          {"vehicle_id": 202, "destination": [12.0, 0.0, 0.0]},
+          {"vehicle_id": 203, "destination": [0.0, 4.0, 0.0]},
+          {"vehicle_id": 204, "destination": [12.0, 8.0, 0.0]},
+          {"vehicle_id": 205, "destination": [4.0, 8.0, 0.0]},
+          {"vehicle_id": 206, "destination": [0.0, 8.0, 0.0]}
+        ]
+      },
+      {
+        "requests": [
+          {"vehicle_id": 201, "destination": [4.0, 0.0, 0.0]},
+          {"vehicle_id": 202, "destination": [8.0, 0.0, 0.0]},
+          {"vehicle_id": 203, "destination": [12.0, 4.0, 0.0]},
+          {"vehicle_id": 204, "destination": [4.0, 4.0, 0.0]},
+          {"vehicle_id": 205, "destination": [8.0, 4.0, 0.0]},
+          {"vehicle_id": 206, "destination": [8.0, 8.0, 0.0]}
+        ]
+      },
+      {
+        "requests": [
+          {"vehicle_id": 201, "destination": [0.0, 0.0, 0.0]},
+          {"vehicle_id": 202, "destination": [12.0, 0.0, 0.0]},
+          {"vehicle_id": 203, "destination": [0.0, 8.0, 0.0]},
+          {"vehicle_id": 204, "destination": [12.0, 8.0, 0.0]},
+          {"vehicle_id": 205, "destination": [4.0, 8.0, 0.0]},
+          {"vehicle_id": 206, "destination": [0.0, 4.0, 0.0]}
+        ]
+      }
+    ]
+  }
+}
