@@ -9,12 +9,16 @@ export type LiveBundleResource = {
   loadState: LoadState;
   loadMessage: string;
   bundle: JsonRecord | null;
+  refresh: () => void;
 };
 
 export type LiveRoadViewModel = {
   roadId: string;
   centerline: Point2[];
   blocked: boolean;
+  roadClass: string;
+  directionality: string;
+  laneCount: number;
 };
 
 export type LiveAreaViewModel = {
@@ -29,6 +33,40 @@ export type LiveVehicleViewModel = {
   position: Point2;
   state: string;
   stateClass: "moving" | "waiting" | "idle";
+};
+
+export type LiveRoutePreviewViewModel = {
+  vehicleId: number;
+  destinationNodeId: number;
+  isActionable: boolean;
+  reason: string | null;
+  reasonCode: string | null;
+  nodeIds: number[];
+  edgeIds: number[];
+  totalDistance: number | null;
+};
+
+export type LiveVehicleInspectionViewModel = {
+  vehicleId: number;
+  currentNodeId: number | null;
+  exactPosition: Point2;
+  operationalState: string;
+  currentJobId: string | null;
+  currentTaskIndex: number | null;
+  currentTaskType: string | null;
+  assignedResourceId: string | null;
+  waitReason: string | null;
+  trafficControlState: string | null;
+  trafficControlDetail: string | null;
+  etaSeconds: number | null;
+  routeAheadNodeIds: number[];
+  routeAheadEdgeIds: number[];
+  recentCommands: JsonRecord[];
+  diagnostics: Array<{
+    code: string;
+    severity: string;
+    message: string;
+  }>;
 };
 
 export type LiveBundleViewModel = {
@@ -57,6 +95,11 @@ export type LiveBundleViewModel = {
     areas: LiveAreaViewModel[];
     vehicles: LiveVehicleViewModel[];
     blockedEdgeIds: number[];
+    environment: {
+      family: string;
+      archetypeId: string;
+      displayName: string;
+    };
     bounds: {
       minX: number;
       minY: number;
@@ -65,6 +108,10 @@ export type LiveBundleViewModel = {
       width: number;
       height: number;
     };
+  };
+  commandCenter: {
+    routePreviews: LiveRoutePreviewViewModel[];
+    vehicleInspections: LiveVehicleInspectionViewModel[];
   };
   utility: {
     frontendOwnedState: readonly string[];
@@ -83,6 +130,8 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
   const renderGeometry = readRecord(bundle, "render_geometry");
   const trafficBaseline = readRecord(bundle, "traffic_baseline");
   const aiAssist = readRecord(commandCenter, "ai_assist");
+  const worldModel = readRecord(renderGeometry, "world_model");
+  const worldEnvironment = readRecord(worldModel, "environment");
 
   const roads = readArray(renderGeometry, "roads").flatMap((road, index) => {
     const roadRecord = isRecord(road) ? road : null;
@@ -96,6 +145,9 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
         blocked: readNumberArray(roadRecord, "edge_ids").some((edgeId) =>
           readNumberArray(snapshot, "blocked_edge_ids").includes(edgeId),
         ),
+        roadClass: readString(roadRecord, "road_class", "connector"),
+        directionality: readString(roadRecord, "directionality", "one_way"),
+        laneCount: readNumber(roadRecord, "lane_count", 1),
       },
     ];
   });
@@ -138,6 +190,66 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
 
   const blockedEdgeIds = readNumberArray(snapshot, "blocked_edge_ids");
   const selectedVehicleIds = readNumberArray(commandCenter, "selected_vehicle_ids");
+  const routePreviews = readArray(commandCenter, "route_previews").flatMap((preview, index) => {
+    const previewRecord = isRecord(preview) ? preview : null;
+    if (previewRecord === null) {
+      return [];
+    }
+
+    return [
+      {
+        vehicleId: readNumber(previewRecord, "vehicle_id", index + 1),
+        destinationNodeId: readNumber(previewRecord, "destination_node_id", -1),
+        isActionable: Boolean(previewRecord.is_actionable),
+        reason: readStringOrNull(previewRecord, "reason"),
+        reasonCode: readStringOrNull(previewRecord, "reason_code"),
+        nodeIds: readNumberList(previewRecord, "node_ids"),
+        edgeIds: readNumberList(previewRecord, "edge_ids"),
+        totalDistance: readNumberOrNull(previewRecord, "total_distance"),
+      },
+    ];
+  });
+  const vehicleInspections = readArray(commandCenter, "vehicle_inspections").flatMap((inspection, index) => {
+    const inspectionRecord = isRecord(inspection) ? inspection : null;
+    if (inspectionRecord === null) {
+      return [];
+    }
+
+    return [
+      {
+        vehicleId: readNumber(inspectionRecord, "vehicle_id", index + 1),
+        currentNodeId: readNumberOrNull(inspectionRecord, "current_node_id"),
+        exactPosition: readPoint(inspectionRecord.exact_position) ?? ([0, 0] as Point2),
+        operationalState: readString(inspectionRecord, "operational_state", "unknown"),
+        currentJobId: readStringOrNull(inspectionRecord, "current_job_id"),
+        currentTaskIndex: readNumberOrNull(inspectionRecord, "current_task_index"),
+        currentTaskType: readStringOrNull(inspectionRecord, "current_task_type"),
+        assignedResourceId: readStringOrNull(inspectionRecord, "assigned_resource_id"),
+        waitReason: readStringOrNull(inspectionRecord, "wait_reason"),
+        trafficControlState: readStringOrNull(inspectionRecord, "traffic_control_state"),
+        trafficControlDetail: readStringOrNull(inspectionRecord, "traffic_control_detail"),
+        etaSeconds: readNumberOrNull(inspectionRecord, "eta_s"),
+        routeAheadNodeIds: readNumberList(inspectionRecord, "route_ahead_node_ids"),
+        routeAheadEdgeIds: readNumberList(inspectionRecord, "route_ahead_edge_ids"),
+        recentCommands: readArray(inspectionRecord, "recent_commands").flatMap((entry) =>
+          isRecord(entry) ? [entry] : [],
+        ),
+        diagnostics: readArray(inspectionRecord, "diagnostics").flatMap((entry) => {
+          const diagnostic = isRecord(entry) ? entry : null;
+          if (diagnostic === null) {
+            return [];
+          }
+          return [
+            {
+              code: readString(diagnostic, "code", "unknown"),
+              severity: readString(diagnostic, "severity", "info"),
+              message: readString(diagnostic, "message", "No detail available."),
+            },
+          ];
+        }),
+      },
+    ];
+  });
   const trafficRoadStates = readArray(trafficBaseline, "road_states").flatMap((entry) =>
     isRecord(entry) ? [entry] : [],
   );
@@ -180,7 +292,16 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
       areas,
       vehicles,
       blockedEdgeIds,
+      environment: {
+        family: readString(worldEnvironment, "family", "unknown"),
+        archetypeId: readString(worldEnvironment, "archetype_id", "unknown"),
+        displayName: readString(worldEnvironment, "display_name", "unknown environment"),
+      },
       bounds: padBounds(computeBounds(collectScenePoints(bundle)), 2),
+    },
+    commandCenter: {
+      routePreviews,
+      vehicleInspections,
     },
     utility: {
       frontendOwnedState: [
@@ -188,6 +309,8 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
         "scene mode and layer toggles",
         "selection and hover state",
         "popup and inspector state",
+        "route preview and command form state",
+        "session control UI state",
         "planning workflow drafts",
         "mode and panel state",
       ],
@@ -254,12 +377,34 @@ function readString(value: JsonRecord | null | undefined, key: string, fallback:
   return typeof nested === "string" && nested.trim().length > 0 ? nested : fallback;
 }
 
+function readStringOrNull(value: JsonRecord | null | undefined, key: string): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const nested = value[key];
+  return typeof nested === "string" && nested.trim().length > 0 ? nested : null;
+}
+
 function readNumber(value: JsonRecord | null | undefined, key: string, fallback: number): number {
   if (value === null || value === undefined) {
     return fallback;
   }
   const nested = value[key];
   return typeof nested === "number" && Number.isFinite(nested) ? nested : fallback;
+}
+
+function readNumberOrNull(value: JsonRecord | null | undefined, key: string): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const nested = value[key];
+  return typeof nested === "number" && Number.isFinite(nested) ? nested : null;
+}
+
+function readNumberList(value: JsonRecord, key: string): number[] {
+  return readArray(value, key).flatMap((entry) =>
+    typeof entry === "number" && Number.isFinite(entry) ? [entry] : [],
+  );
 }
 
 function readNumberArray(value: JsonRecord | null, key: string): number[] {

@@ -2,6 +2,7 @@ import { useMemo, useReducer } from "react";
 
 import type { SceneBounds } from "../adapters/mapViewport";
 import { fitCameraToBounds, focusPoints, panCamera, setSceneViewMode, zoomCamera } from "../adapters/mapViewport";
+import type { SelectionTarget } from "../adapters/selectionModel";
 
 export type FrontendModeId = "operate" | "traffic" | "fleet" | "editor" | "analyze";
 
@@ -27,6 +28,7 @@ export type FrontendUiState = {
   };
   layers: LayerState;
   selection: {
+    target: SelectionTarget | null;
     vehicleIds: number[];
     hoveredTarget: string | null;
   };
@@ -60,7 +62,7 @@ type FrontendUiAction =
   | { type: "focus_points"; points: Point2[]; fallbackBounds: SceneBounds }
   | { type: "set_scene_view_mode"; sceneViewMode: SceneViewMode }
   | { type: "set_layers"; layers: LayerState }
-  | { type: "set_selection"; vehicleIds: number[]; hoveredTarget: string | null }
+  | { type: "set_selection"; target: SelectionTarget | null; vehicleIds: number[]; hoveredTarget: string | null }
   | { type: "set_popup"; open: boolean; targetLabel: string | null }
   | { type: "set_inspector"; pinned: boolean; section: FrontendUiState["inspector"]["section"] }
   | { type: "set_planning"; draftStatus: "idle"; draftLabel: string | null }
@@ -87,6 +89,7 @@ export function createDefaultFrontendUiState(): FrontendUiState {
     },
     layers: defaultLayers,
     selection: {
+      target: null,
       vehicleIds: [],
       hoveredTarget: null,
     },
@@ -163,6 +166,7 @@ function frontendUiStateReducer(
       return {
         ...state,
         selection: {
+          target: action.target,
           vehicleIds: action.vehicleIds,
           hoveredTarget: action.hoveredTarget,
         },
@@ -232,8 +236,11 @@ export function useFrontendUiState(): {
               [layer]: !state.layers[layer],
             },
           }),
-        setSelection: (vehicleIds: number[], hoveredTarget: string | null) =>
-          dispatch({ type: "set_selection", vehicleIds, hoveredTarget }),
+        setSelection: (target: SelectionTarget | null, vehicleIds: number[], hoveredTarget: string | null) =>
+          dispatch({ type: "set_selection", target, vehicleIds, hoveredTarget }),
+        setPopup: (open: boolean, targetLabel: string | null) => dispatch({ type: "set_popup", open, targetLabel }),
+        setInspector: (pinned: boolean, section: FrontendUiState["inspector"]["section"]) =>
+          dispatch({ type: "set_inspector", pinned, section }),
       },
     }),
     [state],
@@ -250,7 +257,9 @@ export type FrontendUiActions = {
   setSceneViewMode: (sceneViewMode: SceneViewMode) => void;
   setLayers: (layers: LayerState) => void;
   toggleLayer: (layer: keyof LayerState) => void;
-  setSelection: (vehicleIds: number[], hoveredTarget: string | null) => void;
+  setSelection: (target: SelectionTarget | null, vehicleIds: number[], hoveredTarget: string | null) => void;
+  setPopup: (open: boolean, targetLabel: string | null) => void;
+  setInspector: (pinned: boolean, section: FrontendUiState["inspector"]["section"]) => void;
 };
 
 export type Point2 = readonly [number, number];

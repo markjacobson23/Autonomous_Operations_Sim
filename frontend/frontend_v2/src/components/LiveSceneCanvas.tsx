@@ -1,6 +1,7 @@
 import type { LiveBundleViewModel } from "../adapters/liveBundle";
 import type { LayerState } from "../state/frontendUiState";
 import type { ViewBox } from "../adapters/mapViewport";
+import type { SelectionTarget } from "../adapters/selectionModel";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 
 type LiveSceneCanvasProps = {
@@ -8,11 +9,15 @@ type LiveSceneCanvasProps = {
   viewBox: ViewBox;
   sceneTransform: string;
   layers: LayerState;
+  selectionTarget: SelectionTarget | null;
   onPointerDown?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onPointerMove?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onPointerUp?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onPointerLeave?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onWheel?: (event: ReactWheelEvent<SVGSVGElement>) => void;
+  onSelectVehicle: (vehicleId: number) => void;
+  onSelectRoad: (roadId: string) => void;
+  onSelectArea: (areaId: string) => void;
 };
 
 export function LiveSceneCanvas({
@@ -20,11 +25,15 @@ export function LiveSceneCanvas({
   viewBox,
   sceneTransform,
   layers,
+  selectionTarget,
   onPointerDown,
   onPointerMove,
   onPointerUp,
   onPointerLeave,
   onWheel,
+  onSelectVehicle,
+  onSelectRoad,
+  onSelectArea,
 }: LiveSceneCanvasProps): JSX.Element {
   const { bounds, roads, areas, vehicles } = model.map;
 
@@ -61,11 +70,16 @@ export function LiveSceneCanvas({
             if (area.polygon.length < 3) {
               return null;
             }
+            const isSelected = selectionTarget?.kind === "area" && selectionTarget.areaId === area.areaId;
             return (
               <path
                 key={area.areaId}
                 d={pointsToClosedPath(area.polygon)}
-                className={`area-surface area-surface-${areaKindToken(area.kind)}`}
+                className={`area-surface area-surface-${areaKindToken(area.kind)}${isSelected ? " area-surface-selected" : ""}`}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  onSelectArea(area.areaId);
+                }}
               />
             );
           })}
@@ -74,28 +88,56 @@ export function LiveSceneCanvas({
             if (road.centerline.length < 2) {
               return null;
             }
+            const isSelected = selectionTarget?.kind === "road" && selectionTarget.roadId === road.roadId;
             return (
-              <g key={road.roadId}>
+              <g key={road.roadId} className={isSelected ? "road-group road-group-selected" : "road-group"}>
                 <path
                   d={pointsToPath(road.centerline)}
-                  className={road.blocked ? "road-path road-path-blocked" : "road-path road-path-casing"}
+                  className="road-hit-target"
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    onSelectRoad(road.roadId);
+                  }}
                 />
-                <path d={pointsToPath(road.centerline)} className="road-path road-path-core" />
+                <path
+                  d={pointsToPath(road.centerline)}
+                  className={
+                    road.blocked
+                      ? `road-path road-path-casing road-path-blocked${isSelected ? " road-path-selected" : ""}`
+                      : `road-path road-path-casing${isSelected ? " road-path-selected" : ""}`
+                  }
+                />
+                <path
+                  d={pointsToPath(road.centerline)}
+                  className={`road-path road-path-core${isSelected ? " road-path-core-selected" : ""}`}
+                />
               </g>
             );
           })}
         {layers.vehicles &&
-          vehicles.map((vehicle) => (
-            <g key={vehicle.vehicleId} transform={`translate(${vehicle.position[0]} ${vehicle.position[1]})`}>
-              <circle className={`vehicle-core vehicle-core-${vehicle.stateClass}`} r="0.55" />
-              <circle className="vehicle-halo" r="0.95" />
+          vehicles.map((vehicle) => {
+            const isSelected =
+              selectionTarget?.kind === "vehicle" && selectionTarget.vehicleId === vehicle.vehicleId;
+            return (
+              <g
+                key={vehicle.vehicleId}
+                transform={`translate(${vehicle.position[0]} ${vehicle.position[1]})`}
+                className={isSelected ? "vehicle-group vehicle-group-selected" : "vehicle-group"}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  onSelectVehicle(vehicle.vehicleId);
+                }}
+              >
+                <circle className={`vehicle-core vehicle-core-${vehicle.stateClass}`} r={isSelected ? "0.72" : "0.55"} />
+                <circle className={`vehicle-halo${isSelected ? " vehicle-halo-selected" : ""}`} r={isSelected ? "1.18" : "0.95"} />
               {layers.labels && (
                 <text className="vehicle-label" y="-1.1" textAnchor="middle">
                   {`${vehicle.vehicleId} · ${vehicle.state}`}
                 </text>
               )}
-            </g>
-          ))}
+              </g>
+            );
+          })}
       </g>
     </svg>
   );

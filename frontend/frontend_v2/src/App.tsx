@@ -8,7 +8,14 @@ function App(): JSX.Element {
   const bundleViewModel = buildLiveBundleViewModel(bundleResource);
   const uiState = useFrontendUiState();
 
-  return <FrontendShell bundle={bundleViewModel} uiState={uiState.state} actions={uiState.actions} />;
+  return (
+    <FrontendShell
+      bundle={bundleViewModel}
+      uiState={uiState.state}
+      actions={uiState.actions}
+      refreshBundle={bundleResource.refresh}
+    />
+  );
 }
 
 export default App;

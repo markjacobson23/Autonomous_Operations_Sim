@@ -1,12 +1,15 @@
 import { frontendOwnedState, frontendV2Home, repoLayoutDecision, simulatorOwnedTruth } from "../architecture";
 import type { LiveBundleViewModel } from "../adapters/liveBundle";
+import { buildSelectionPresentation } from "../adapters/selectionModel";
 import type { FrontendModeId, FrontendUiActions, FrontendUiState } from "../state/frontendUiState";
 import { MapShell } from "./MapShell";
+import { OperateRail } from "./OperateRail";
 
 type FrontendShellProps = {
   bundle: LiveBundleViewModel;
   uiState: FrontendUiState;
   actions: FrontendUiActions;
+  refreshBundle: () => void;
 };
 
 const modeDetails: Array<{ id: FrontendModeId; label: string; summary: string }> = [
@@ -17,7 +20,9 @@ const modeDetails: Array<{ id: FrontendModeId; label: string; summary: string }>
   { id: "analyze", label: "Analyze", summary: "Diagnostics and explanation" },
 ];
 
-export function FrontendShell({ bundle, uiState, actions }: FrontendShellProps): JSX.Element {
+export function FrontendShell({ bundle, uiState, actions, refreshBundle }: FrontendShellProps): JSX.Element {
+  const selectionPresentation = buildSelectionPresentation(bundle, uiState);
+  const isOperateMode = uiState.modePanel.activeMode === "operate";
 
   return (
     <div className="app-shell">
@@ -61,103 +66,122 @@ export function FrontendShell({ bundle, uiState, actions }: FrontendShellProps):
         <MapShell bundle={bundle} uiState={uiState} actions={actions} />
 
         <aside className="shell-rail">
-          <section className="panel">
-            <h2>Session identity</h2>
-            <dl className="info-grid">
-              <div>
-                <dt>Scenario</dt>
-                <dd>{bundle.sessionIdentity.scenarioPath}</dd>
-              </div>
-              <div>
-                <dt>Surface</dt>
-                <dd>{bundle.sessionIdentity.surfaceName}</dd>
-              </div>
-              <div>
-                <dt>API version</dt>
-                <dd>{bundle.sessionIdentity.apiVersion}</dd>
-              </div>
-              <div>
-                <dt>Play state</dt>
-                <dd>{bundle.sessionIdentity.playState}</dd>
-              </div>
-              <div>
-                <dt>Step size</dt>
-                <dd>{bundle.sessionIdentity.stepSeconds}</dd>
-              </div>
-              <div>
-                <dt>Sim time</dt>
-                <dd>{bundle.sessionIdentity.simulatedTime}</dd>
-              </div>
-            </dl>
-          </section>
+          {isOperateMode ? (
+            <OperateRail bundle={bundle} uiState={uiState} refreshBundle={refreshBundle} />
+          ) : (
+            <>
+              <section className="panel">
+                <h2>Session identity</h2>
+                <dl className="info-grid">
+                  <div>
+                    <dt>Scenario</dt>
+                    <dd>{bundle.sessionIdentity.scenarioPath}</dd>
+                  </div>
+                  <div>
+                    <dt>Surface</dt>
+                    <dd>{bundle.sessionIdentity.surfaceName}</dd>
+                  </div>
+                  <div>
+                    <dt>API version</dt>
+                    <dd>{bundle.sessionIdentity.apiVersion}</dd>
+                  </div>
+                  <div>
+                    <dt>Play state</dt>
+                    <dd>{bundle.sessionIdentity.playState}</dd>
+                  </div>
+                  <div>
+                    <dt>Step size</dt>
+                    <dd>{bundle.sessionIdentity.stepSeconds}</dd>
+                  </div>
+                  <div>
+                    <dt>Sim time</dt>
+                    <dd>{bundle.sessionIdentity.simulatedTime}</dd>
+                  </div>
+                </dl>
+              </section>
 
-          <section className="panel">
-            <h2>Connection state</h2>
-            <div className="stack-copy">
-              <p className="status-line">
-                <strong>{connectionLabel(bundle.loadState)}</strong>
-                <span>{bundle.bundleUrl}</span>
-              </p>
-              <p>{bundle.loadMessage}</p>
-            </div>
-          </section>
+              <section className="panel">
+                <h2>Connection state</h2>
+                <div className="stack-copy">
+                  <p className="status-line">
+                    <strong>{connectionLabel(bundle.loadState)}</strong>
+                    <span>{bundle.bundleUrl}</span>
+                  </p>
+                  <p>{bundle.loadMessage}</p>
+                </div>
+              </section>
 
-          <section className="panel">
-            <h2>Global alerts</h2>
-            <ul className="list-copy">
-              {bundle.alerts.length > 0 ? (
-                bundle.alerts.map((alert) => <li key={alert}>{alert}</li>)
-              ) : (
-                <li>No active alerts.</li>
-              )}
-            </ul>
-          </section>
+              <section className="panel">
+                <h2>Global alerts</h2>
+                <ul className="list-copy">
+                  {bundle.alerts.length > 0 ? (
+                    bundle.alerts.map((alert) => <li key={alert}>{alert}</li>)
+                  ) : (
+                    <li>No active alerts.</li>
+                  )}
+                </ul>
+              </section>
 
-          <section className="panel">
-            <h2>Inspector</h2>
-            <p className="stack-copy">
-              Reserved for selection-scoped inspection. Step 43 keeps the shell visible while the interaction model remains out of scope.
-            </p>
-            <ul className="list-copy">
-              <li>Current mode: {uiState.modePanel.activeMode}</li>
-              <li>Vehicles visible: {bundle.map.vehicles.length}</li>
-              <li>Blocked edges: {bundle.map.blockedEdgeIds.length}</li>
-              <li>Viewport: {describeViewport(uiState)}</li>
-            </ul>
-          </section>
+              <section className="panel">
+                <h2>Inspector</h2>
+                {selectionPresentation === null ? (
+                  <>
+                    <p className="stack-copy">
+                      Click a vehicle, road, or area on the map to inspect it. The inspector stays compact until a selection exists.
+                    </p>
+                    <ul className="list-copy">
+                      <li>Current mode: {uiState.modePanel.activeMode}</li>
+                      <li>Environment: {bundle.map.environment.displayName}</li>
+                      <li>Vehicles visible: {bundle.map.vehicles.length}</li>
+                      <li>Viewport: {describeViewport(uiState)}</li>
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <div className="selection-inspector-head">
+                      <div>
+                        <p className="panel-kicker">Selected</p>
+                        <h3>{selectionPresentation.title}</h3>
+                      </div>
+                      <span className="selection-popup-badge">{selectionPresentation.badge}</span>
+                    </div>
+                    <p className="stack-copy">{selectionPresentation.summary}</p>
+                    <p className="selection-inspector-context">{selectionPresentation.context}</p>
+                    <dl className="selection-inspector-details">
+                      {selectionPresentation.details.map((detail) => (
+                        <div key={detail.label}>
+                          <dt>{detail.label}</dt>
+                          <dd>{detail.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    {selectionPresentation.notes.length > 0 ? (
+                      <ul className="list-copy">
+                        {selectionPresentation.notes.map((note) => (
+                          <li key={note}>{note}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </>
+                )}
+              </section>
 
-          <section className="panel">
-            <h2>Command surface</h2>
-            <p className="stack-copy">
-              Reserved for typed preview and commit workflows. The live transport already exists in the backend; the UI interaction model comes next.
-            </p>
-            <ul className="list-copy">
-              <li>
-                Session control endpoint: <code>{bundle.commandSurface.sessionControlEndpoint}</code>
-              </li>
-              <li>
-                Command endpoint: <code>{bundle.commandSurface.commandEndpoint}</code>
-              </li>
-              <li>
-                Preview endpoint: <code>{bundle.commandSurface.previewEndpoint}</code>
-              </li>
-            </ul>
-          </section>
-
-          <section className="panel">
-            <h2>Utility surfaces</h2>
-            <ul className="list-copy">
-              <li>Mode switching is local-only in this step.</li>
-              <li>Frontend-owned state: {frontendOwnedState.join(", ")}.</li>
-              <li>Simulator-owned truth: {simulatorOwnedTruth.join(", ")}.</li>
-              <li>Repo home: <code>{frontendV2Home}</code></li>
-            </ul>
-            <div className="mini-summary">
-              {repoLayoutDecision.map((item) => (
-                <span key={item}>{item}</span>
-              ))}
-            </div>
-          </section>
+              <section className="panel">
+                <h2>Utility surfaces</h2>
+                <ul className="list-copy">
+                  <li>Mode switching is local-only in this step.</li>
+                  <li>Frontend-owned state: {frontendOwnedState.join(", ")}.</li>
+                  <li>Simulator-owned truth: {simulatorOwnedTruth.join(", ")}.</li>
+                  <li>Repo home: <code>{frontendV2Home}</code></li>
+                </ul>
+                <div className="mini-summary">
+                  {repoLayoutDecision.map((item) => (
+                    <span key={item}>{item}</span>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
         </aside>
       </main>
     </div>

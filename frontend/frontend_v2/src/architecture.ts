@@ -5,6 +5,8 @@ export const frontendOwnedState = [
   "scene mode and layer toggles",
   "selection and hover state",
   "popup and inspector state",
+  "route preview and command form state",
+  "session control UI state",
   "planning workflow drafts",
   "mode and panel state",
 ] as const;

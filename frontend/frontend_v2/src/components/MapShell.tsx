@@ -7,9 +7,11 @@ import {
   minimapViewport,
   sceneTransform,
 } from "../adapters/mapViewport";
+import { buildSelectionPresentation, focusPointsForSelection, resolveActiveSelectionTarget } from "../adapters/selectionModel";
 import type { FrontendUiActions, FrontendUiState } from "../state/frontendUiState";
 import { LiveSceneCanvas } from "./LiveSceneCanvas";
 import { MapMinimap } from "./MapMinimap";
+import { SelectionPopup } from "./SelectionPopup";
 
 type MapShellProps = {
   bundle: LiveBundleViewModel;
@@ -43,7 +45,9 @@ export function MapShell({ bundle, uiState, actions }: MapShellProps): JSX.Eleme
     : createInitialCamera(bundle.map.bounds, uiState.camera.sceneViewMode);
   const viewBox = cameraToViewBox(camera, bundle.map.bounds);
   const viewport = minimapViewport(bundle.map.bounds, viewBox);
-  const selectedPoints = collectSelectedPoints(bundle, uiState);
+  const activeSelectionTarget = resolveActiveSelectionTarget(bundle, uiState);
+  const selectionPresentation = buildSelectionPresentation(bundle, uiState);
+  const selectedPoints = focusPointsForSelection(bundle, activeSelectionTarget);
   const canFocusSelected = selectedPoints.length > 0;
 
   function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
@@ -93,6 +97,34 @@ export function MapShell({ bundle, uiState, actions }: MapShellProps): JSX.Eleme
       x: worldX,
       y: worldY,
     });
+  }
+
+  function commitSelection(target: NonNullable<typeof activeSelectionTarget>, vehicleIds: number[]) {
+    const nextUiState = {
+      ...uiState,
+      selection: {
+        ...uiState.selection,
+        target,
+        vehicleIds,
+        hoveredTarget: null,
+      },
+    };
+    const presentation = buildSelectionPresentation(bundle, nextUiState);
+    actions.setSelection(target, vehicleIds, null);
+    actions.setPopup(true, presentation?.title ?? null);
+    actions.setInspector(false, "summary");
+  }
+
+  function handleSelectVehicle(vehicleId: number) {
+    commitSelection({ kind: "vehicle", vehicleId }, [vehicleId]);
+  }
+
+  function handleSelectRoad(roadId: string) {
+    commitSelection({ kind: "road", roadId }, []);
+  }
+
+  function handleSelectArea(areaId: string) {
+    commitSelection({ kind: "area", areaId }, []);
   }
 
   function handlePan(directionX: number, directionY: number) {
@@ -181,11 +213,15 @@ export function MapShell({ bundle, uiState, actions }: MapShellProps): JSX.Eleme
             viewBox={viewBox}
             sceneTransform={sceneTransform(camera, viewBox)}
             layers={uiState.layers}
+            selectionTarget={activeSelectionTarget}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={clearDragState}
             onPointerLeave={clearDragState}
             onWheel={handleWheel}
+            onSelectVehicle={handleSelectVehicle}
+            onSelectRoad={handleSelectRoad}
+            onSelectArea={handleSelectArea}
           />
         ) : (
           <div className="map-loading">
@@ -193,6 +229,7 @@ export function MapShell({ bundle, uiState, actions }: MapShellProps): JSX.Eleme
             <span>{bundle.loadState === "error" ? bundle.loadMessage : "Waiting for the authoritative bundle."}</span>
           </div>
         )}
+        <SelectionPopup presentation={selectionPresentation} />
       </div>
 
       <div className="map-shell-footer">
@@ -214,17 +251,4 @@ export function MapShell({ bundle, uiState, actions }: MapShellProps): JSX.Eleme
       </div>
     </section>
   );
-}
-
-function collectSelectedPoints(bundle: LiveBundleViewModel, uiState: FrontendUiState): Array<readonly [number, number]> {
-  const selectedIds = uiState.selection.vehicleIds.length > 0 ? uiState.selection.vehicleIds : bundle.selectedVehicleIds;
-  if (selectedIds.length === 0) {
-    return [];
-  }
-
-  const vehicleLookup = new Map(bundle.map.vehicles.map((vehicle) => [vehicle.vehicleId, vehicle.position]));
-  return selectedIds.flatMap((vehicleId) => {
-    const position = vehicleLookup.get(vehicleId);
-    return position === undefined ? [] : [position];
-  });
 }

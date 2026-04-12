@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { LiveBundleResource, LoadState, JsonRecord } from "../adapters/liveBundle";
 
@@ -6,17 +6,22 @@ export function useLiveSessionBundle(): LiveBundleResource {
   const [bundle, setBundle] = useState<JsonRecord | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [loadMessage, setLoadMessage] = useState("Connecting to live session bundle...");
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const [bundleUrl] = useState(() => {
     return new URLSearchParams(window.location.search).get("bundle") ?? "/live_session_bundle.json";
   });
+
+  const refresh = useCallback(() => {
+    setRefreshNonce((currentNonce) => currentNonce + 1);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     const resolvedBundleUrl = new URL(bundleUrl, window.location.href).toString();
 
     async function loadBundle() {
-      setLoadState("loading");
-      setLoadMessage(`Connecting to ${bundleUrl}...`);
+      setLoadState((currentState) => (currentState === "ready" ? "loading" : currentState));
+      setLoadMessage(refreshNonce === 0 ? `Connecting to ${bundleUrl}...` : `Refreshing ${bundleUrl}...`);
       try {
         const response = await fetch(resolvedBundleUrl, { signal: controller.signal });
         if (!response.ok) {
@@ -43,13 +48,21 @@ export function useLiveSessionBundle(): LiveBundleResource {
 
     void loadBundle();
     return () => controller.abort();
-  }, [bundleUrl]);
+  }, [bundleUrl, refreshNonce]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      refresh();
+    }, 2500);
+    return () => window.clearInterval(intervalId);
+  }, [refresh]);
 
   return {
     bundleUrl,
     loadState,
     loadMessage,
     bundle,
+    refresh,
   };
 }
 
