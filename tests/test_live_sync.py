@@ -121,9 +121,9 @@ def test_live_state_updates_are_deterministic_and_match_visualization_frames() -
     assert [update.trigger.source for update in updates[:5]] == [
         "session",
         "command",
-        "trace",
-        "trace",
-        "trace",
+        "command",
+        "session",
+        "command",
     ]
     assert [
         (
@@ -158,9 +158,9 @@ def test_repeated_session_sequences_produce_identical_live_sync_output() -> None
     assert export_a == export_b
     assert [effect.emitted_update_indices for effect in surface_a.command_effects] == [
         (1,),
-        (2, 3, 4, 5, 6, 7, 8, 9),
-        (11,),
-        (12, 13, 14, 15, 16, 17, 18, 19),
+        (2,),
+        (4,),
+        (5,),
     ]
 
 

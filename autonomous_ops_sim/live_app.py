@@ -16,6 +16,7 @@ from autonomous_ops_sim.api import (
     apply_command_with_result,
     build_live_session_bundle,
     live_session_bundle_to_dict,
+    SimulationCommandResult,
     simulation_command_result_to_dict,
 )
 from autonomous_ops_sim.authoring import (
@@ -36,14 +37,17 @@ from autonomous_ops_sim.simulation import (
     LiveSimulationSession,
     RepositionVehicleCommand,
     SimulationCommand,
+    SimulationEngine,
     SpawnVehicleCommand,
     UnblockEdgeCommand,
 )
 from autonomous_ops_sim.simulation.commands import job_from_dict
+from autonomous_ops_sim.simulation.commands import command_to_dict
 from autonomous_ops_sim.simulation.scenario_executor import build_scenario_engine
 from autonomous_ops_sim.simulation.live_session import session_advance_to_dict
 from autonomous_ops_sim.visualization import export_serious_viewer_html
 from autonomous_ops_sim.visualization.command_center import RoutePreviewRequest
+from autonomous_ops_sim.visualization.state import VehicleSurfaceState
 
 
 DEFAULT_LIVE_OUTPUT_DIRECTORY = Path("live_output")
@@ -81,6 +85,7 @@ class LiveSessionRuntime:
     artifacts: LiveAppArtifacts
     session: LiveSimulationSession
     play_state: str = "paused"
+    pending_route_commands: list[AssignVehicleDestinationCommand] = field(default_factory=list)
     playback_thread: threading.Thread | None = None
     playback_stop_event: threading.Event = field(default_factory=threading.Event)
     lock: threading.RLock = field(default_factory=threading.RLock)
@@ -106,6 +111,7 @@ class LiveSessionRuntime:
                 selected_vehicle_ids=selected_vehicle_ids,
                 route_preview_requests=route_preview_requests,
                 play_state=self.play_state,
+                pending_route_commands=self.pending_route_commands,
             )
             self._write_bundle(bundle)
             return bundle
@@ -119,7 +125,15 @@ class LiveSessionRuntime:
         | list[RoutePreviewRequest] = (),
     ) -> tuple[dict[str, object], dict[str, object]]:
         with self.lock:
-            result = apply_command_with_result(self.session, command)
+            if isinstance(command, AssignVehicleDestinationCommand):
+                self.session.controller.validate(command)
+                self._queue_route_command(command)
+                result = _build_live_command_result(
+                    engine=self.session.engine,
+                    command=command,
+                )
+            else:
+                result = apply_command_with_result(self.session, command)
             bundle = self._refresh_locked(
                 selected_vehicle_ids=selected_vehicle_ids,
                 route_preview_requests=route_preview_requests,
@@ -135,7 +149,15 @@ class LiveSessionRuntime:
         | list[RoutePreviewRequest] = (),
     ) -> tuple[dict[str, object], dict[str, object]]:
         with self.lock:
-            record = self.session.advance_by(delta_s)
+            started_at_s = self.session.engine.simulated_time_s
+            self._flush_pending_route_commands()
+            target_time_s = started_at_s + delta_s
+            if self.session.engine.simulated_time_s < target_time_s:
+                self.session.engine.run(target_time_s)
+            record = self.session._append_progress_record(
+                started_at_s=started_at_s,
+                completed_at_s=self.session.engine.simulated_time_s,
+            )
             bundle = self._refresh_locked(
                 selected_vehicle_ids=selected_vehicle_ids,
                 route_preview_requests=route_preview_requests,
@@ -221,6 +243,7 @@ class LiveSessionRuntime:
             scenario = load_scenario(self.artifacts.working_scenario_path)
             self.session = LiveSimulationSession(build_scenario_engine(scenario))
             self.play_state = "paused"
+            self.pending_route_commands = []
             return self._refresh_locked(
                 selected_vehicle_ids=selected_vehicle_ids,
                 route_preview_requests=route_preview_requests,
@@ -240,6 +263,7 @@ class LiveSessionRuntime:
             selected_vehicle_ids=selected_vehicle_ids,
             route_preview_requests=route_preview_requests,
             play_state=self.play_state,
+            pending_route_commands=self.pending_route_commands,
         )
         self._write_bundle(bundle)
         return bundle
@@ -249,6 +273,25 @@ class LiveSessionRuntime:
             json.dumps(bundle, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+
+    def _queue_route_command(
+        self,
+        command: AssignVehicleDestinationCommand,
+    ) -> None:
+        self.pending_route_commands = [
+            queued_command
+            for queued_command in self.pending_route_commands
+            if queued_command.vehicle_id != command.vehicle_id
+        ]
+        self.pending_route_commands.append(command)
+
+    def _flush_pending_route_commands(self) -> None:
+        pending_commands = self.pending_route_commands
+        if not pending_commands:
+            return
+        self.pending_route_commands = []
+        for command in pending_commands:
+            self.session.apply(command)
 
     def _run_playback_loop(self) -> None:
         current_thread = threading.current_thread()
@@ -843,6 +886,8 @@ def _build_live_bundle_record(
     route_preview_requests: tuple[RoutePreviewRequest, ...]
     | list[RoutePreviewRequest] = (),
     play_state: str = "paused",
+    pending_route_commands: tuple[AssignVehicleDestinationCommand, ...]
+    | list[AssignVehicleDestinationCommand] = (),
 ) -> dict[str, object]:
     bundle = live_session_bundle_to_dict(
         build_live_session_bundle(
@@ -851,6 +896,12 @@ def _build_live_bundle_record(
             route_preview_requests=route_preview_requests,
         )
     )
+    if pending_route_commands:
+        recent_commands = bundle.get("command_center", {}).get("recent_commands")
+        if isinstance(recent_commands, list):
+            recent_commands.extend(
+                command_to_dict(command) for command in pending_route_commands
+            )
     bundle["authoring"] = {
         "mode": "live_geometry_editing",
         "save_endpoint": "/api/authoring/save",
@@ -868,8 +919,29 @@ def _build_live_bundle_record(
         "route_preview_endpoint": "/api/live/preview",
         "command_endpoint": "/api/live/command",
         "session_control_endpoint": "/api/live/session/control",
+        "pending_route_commands": [
+            command_to_dict(command) for command in pending_route_commands
+        ],
     }
     return bundle
+
+
+def _build_live_command_result(
+    *,
+    engine: SimulationEngine,
+    command: SimulationCommand,
+) -> SimulationCommandResult:
+    return SimulationCommandResult(
+        status="accepted",
+        command=command_to_dict(command),
+        sequence=None,
+        started_at_s=engine.simulated_time_s,
+        completed_at_s=engine.simulated_time_s,
+        result_timestamp_s=engine.simulated_time_s,
+        emitted_update_indices=(),
+        blocked_edge_ids=tuple(sorted(engine.world_state.blocked_edge_ids)),
+        vehicles=_build_live_vehicle_surface_states(engine),
+    )
 
 
 def _read_json_object(path: Path) -> dict[str, object]:
@@ -877,6 +949,21 @@ def _read_json_object(path: Path) -> dict[str, object]:
     if not isinstance(data, dict):
         raise ValueError(f"Expected JSON object at {path}.")
     return data
+
+
+def _build_live_vehicle_surface_states(
+    engine: SimulationEngine,
+) -> tuple[VehicleSurfaceState, ...]:
+    return tuple(
+        VehicleSurfaceState(
+            vehicle_id=vehicle.id,
+            node_id=vehicle.current_node_id,
+            position=vehicle.position,
+            operational_state=vehicle.operational_state,
+        )
+        for vehicle in engine.vehicles
+        if getattr(vehicle, "is_active", True)
+    )
 
 
 def _selection_requests_from_payload(

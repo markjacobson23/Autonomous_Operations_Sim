@@ -5,7 +5,6 @@ import json
 from typing import Any
 
 from autonomous_ops_sim.simulation.commands import (
-    AssignVehicleDestinationCommand,
     InjectJobCommand,
     command_to_dict,
 )
@@ -83,13 +82,11 @@ class LiveSyncSurface:
 def build_live_runtime_snapshot(session: LiveSimulationSession) -> LiveRuntimeSnapshot:
     """Build a stable current-state snapshot from one live session."""
 
-    state = build_visualization_state_from_live_session(session)
-    latest_frame = state.frames[-1]
     return LiveRuntimeSnapshot(
         simulated_time_s=session.engine.simulated_time_s,
         is_active=session.is_active,
-        blocked_edge_ids=latest_frame.blocked_edge_ids,
-        vehicles=latest_frame.vehicles,
+        blocked_edge_ids=tuple(sorted(session.engine.world_state.blocked_edge_ids)),
+        vehicles=_build_current_vehicle_surface_states(session.engine),
         command_count=len(session.command_history),
         session_step_count=len(session.progress_history),
         trace_event_count=len(session.engine.trace.events),
@@ -139,8 +136,8 @@ def build_live_sync_surface(session: LiveSimulationSession) -> LiveSyncSurface:
         snapshot=LiveRuntimeSnapshot(
             simulated_time_s=session.engine.simulated_time_s,
             is_active=session.is_active,
-            blocked_edge_ids=state.frames[-1].blocked_edge_ids,
-            vehicles=state.frames[-1].vehicles,
+            blocked_edge_ids=tuple(sorted(session.engine.world_state.blocked_edge_ids)),
+            vehicles=_build_current_vehicle_surface_states(session.engine),
             command_count=len(session.command_history),
             session_step_count=len(session.progress_history),
             trace_event_count=len(session.engine.trace.events),
@@ -268,8 +265,17 @@ def _build_command_effects(
     updates: tuple[LiveStateUpdate, ...],
 ) -> tuple[LiveCommandEffect, ...]:
     effects: list[LiveCommandEffect] = []
-    for record in command_history:
-        emitted_updates = _select_command_updates(record=record, updates=updates)
+    for index, record in enumerate(command_history):
+        next_command_started_at_s = (
+            command_history[index + 1].started_at_s
+            if index + 1 < len(command_history)
+            else None
+        )
+        emitted_updates = _select_command_updates(
+            record=record,
+            updates=updates,
+            next_command_started_at_s=next_command_started_at_s,
+        )
         if emitted_updates:
             latest_update = emitted_updates[-1]
             emitted_update_indices = tuple(
@@ -303,8 +309,9 @@ def _select_command_updates(
     *,
     record: CommandApplicationRecord,
     updates: tuple[LiveStateUpdate, ...],
+    next_command_started_at_s: float | None,
 ) -> tuple[LiveStateUpdate, ...]:
-    if not isinstance(record.command, (AssignVehicleDestinationCommand, InjectJobCommand)):
+    if not isinstance(record.command, InjectJobCommand):
         return tuple(
             update
             for update in updates
@@ -312,13 +319,15 @@ def _select_command_updates(
             and update.trigger.sequence == record.sequence
         )
 
+    upper_bound_s = next_command_started_at_s
     return tuple(
         update
         for update in updates
         if update.trigger.source == "trace"
         and update.trigger.trace_event is not None
         and update.trigger.trace_event.get("vehicle_id") == record.command.vehicle_id
-        and record.started_at_s <= update.timestamp_s <= record.completed_at_s
+        and record.started_at_s <= update.timestamp_s
+        and (upper_bound_s is None or update.timestamp_s < upper_bound_s)
     )
 
 
@@ -341,6 +350,21 @@ def _vehicle_surface_state_to_dict(
         "primary_color": presentation.primary_color if presentation else "rgba(95, 109, 121, 0.96)",
         "accent_color": presentation.accent_color if presentation else "rgba(255, 255, 255, 0.92)",
     }
+
+
+def _build_current_vehicle_surface_states(
+    engine,
+) -> tuple[VehicleSurfaceState, ...]:
+    return tuple(
+        VehicleSurfaceState(
+            vehicle_id=vehicle.id,
+            node_id=vehicle.current_node_id,
+            position=vehicle.position,
+            operational_state=vehicle.operational_state,
+        )
+        for vehicle in engine.vehicles
+        if getattr(vehicle, "is_active", True)
+    )
 
 
 def _build_vehicle_presentations(

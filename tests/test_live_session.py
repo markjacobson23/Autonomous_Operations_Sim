@@ -90,8 +90,8 @@ def test_live_session_progression_is_deterministic() -> None:
         for record in session_a.progress_history
     ] == [
         (0.0, 1.0),
-        (1.4, 1.9),
-        (2.4, 3.0),
+        (1.0, 1.5),
+        (1.5, 3.0),
     ]
     assert [record.sequence for record in session_a.progress_history] == [0, 1, 2]
     assert all(
@@ -110,14 +110,14 @@ def test_typed_commands_apply_deterministically_during_live_session() -> None:
     assert [record.started_at_s for record in session_a.command_history] == [
         1.0,
         1.0,
-        1.9,
-        1.9,
+        1.5,
+        1.5,
     ]
     assert [record.completed_at_s for record in session_a.command_history] == [
         1.0,
-        1.4,
-        1.9,
-        2.4,
+        1.0,
+        1.5,
+        1.5,
     ]
     assert session_a.engine.world_state.blocked_edge_ids == {2}
     assert session_b.engine.world_state.blocked_edge_ids == {2}
@@ -146,25 +146,27 @@ def test_trace_and_replay_ordering_remain_stable_after_session_control() -> None
         (0, 0.0, "initial", "initial_state"),
         (1, 1.0, "session", "session_advance"),
         (2, 1.0, "command", "block_edge"),
-        (3, 1.0, "trace", "behavior_transition"),
-        (4, 1.0, "trace", "route_start"),
-        (5, 1.0, "trace", "edge_enter"),
-        (6, 1.2, "trace", "node_arrival"),
-        (7, 1.2, "trace", "edge_enter"),
-        (8, 1.4, "trace", "node_arrival"),
-        (9, 1.4, "trace", "route_complete"),
-        (10, 1.4, "trace", "behavior_transition"),
-        (11, 1.9, "session", "session_advance"),
-        (12, 1.9, "command", "reposition_vehicle"),
-        (13, 1.9, "trace", "behavior_transition"),
-        (14, 1.9, "trace", "route_start"),
-        (15, 1.9, "trace", "edge_enter"),
-        (16, 2.1999999999999997, "trace", "node_arrival"),
-        (17, 2.1999999999999997, "trace", "edge_enter"),
-        (18, 2.4, "trace", "node_arrival"),
-        (19, 2.4, "trace", "route_complete"),
-        (20, 2.4, "trace", "behavior_transition"),
-        (21, 3.0, "session", "session_advance"),
+        (3, 1.0, "command", "assign_vehicle_destination"),
+        (4, 1.5, "session", "session_advance"),
+        (5, 1.5, "command", "reposition_vehicle"),
+        (6, 1.5, "command", "assign_vehicle_destination"),
+        (7, 1.0, "trace", "behavior_transition"),
+        (8, 1.0, "trace", "route_start"),
+        (9, 1.0, "trace", "edge_enter"),
+        (10, 1.2, "trace", "node_arrival"),
+        (11, 1.2, "trace", "edge_enter"),
+        (12, 1.4, "trace", "node_arrival"),
+        (13, 1.4, "trace", "route_complete"),
+        (14, 1.4, "trace", "behavior_transition"),
+        (15, 1.5, "trace", "behavior_transition"),
+        (16, 1.5, "trace", "route_start"),
+        (17, 1.5, "trace", "edge_enter"),
+        (18, 1.8, "trace", "node_arrival"),
+        (19, 1.8, "trace", "edge_enter"),
+        (20, 2.0, "trace", "node_arrival"),
+        (21, 2.0, "trace", "route_complete"),
+        (22, 2.0, "trace", "behavior_transition"),
+        (23, 3.0, "session", "session_advance"),
     ]
 
 

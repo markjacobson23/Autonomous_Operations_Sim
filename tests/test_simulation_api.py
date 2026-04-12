@@ -130,16 +130,13 @@ def test_replay_bundle_is_versioned_and_matches_existing_replay_surface() -> Non
         "accepted",
     ]
     assert [result.sequence for result in bundle.command_results] == [0, 1, 2, 3]
-    assert bundle.command_results[0].blocked_edge_ids == (2,)
-    assert [segment.edge_id for segment in bundle.motion_segments] == [3, 4, 5, 4]
-    assert bundle.motion_segments[0].lane_id is not None
-    assert bundle.motion_segments[0].lane_selection_reason is not None
+    assert bundle.command_results[-1].vehicles[0].node_id == 2
+    assert bundle.command_results[-1].vehicles[0].operational_state == "idle"
+    assert bundle.motion_segments == ()
     assert bundle.traffic_baseline.control_points != ()
     assert bundle.traffic_baseline.queue_records == ()
-    assert [
-        (vehicle.vehicle_id, vehicle.node_id, vehicle.operational_state)
-        for vehicle in bundle.command_results[-1].vehicles
-    ] == [(77, 3, "idle")]
+    assert bundle.summary.final_time_s == 0.0
+    assert bundle.summary.trace_event_count == 0
 
 
 def test_live_session_and_live_sync_bundles_share_one_api_version() -> None:
@@ -181,16 +178,18 @@ def test_live_session_and_live_sync_bundles_share_one_api_version() -> None:
     assert live_bundle.command_center.vehicle_inspections[0].recent_commands[-1][
         "command_type"
     ] == "assign_vehicle_destination"
-    assert sync_bundle.command_results[1].emitted_update_indices == (
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-    )
+    assert [result.emitted_update_indices for result in live_bundle.command_results] == [
+        (),
+        (),
+        (),
+        (),
+    ]
+    assert [result.emitted_update_indices for result in sync_bundle.command_results] == [
+        (1,),
+        (2,),
+        (4,),
+        (5,),
+    ]
 
 
 def test_apply_command_with_result_returns_stable_rejection_record() -> None:

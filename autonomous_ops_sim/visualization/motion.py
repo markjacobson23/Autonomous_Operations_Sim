@@ -149,7 +149,16 @@ def build_vehicle_motion_segments(
             end_node_id=end_node_id,
         )
         start_position = _node_position(state.map_surface, start_node_id)
-        end_position = _node_position(state.map_surface, end_node_id)
+        if arrival_frame is None:
+            arrival_frame = state.frames[-1]
+            end_vehicle_state = _vehicle_state_for_frame(
+                frame=arrival_frame,
+                vehicle_id=vehicle_id,
+            )
+            end_position = end_vehicle_state.position
+            end_node_id = end_vehicle_state.node_id
+        else:
+            end_position = _node_position(state.map_surface, end_node_id)
         duration_s = max(0.0, arrival_frame.timestamp_s - frame.timestamp_s)
         edge = edge_lookup.get(edge_id)
         distance = edge.distance if edge is not None else _distance(start_position, end_position)
@@ -370,10 +379,7 @@ def _find_matching_arrival_frame(
             and int(event["node_id"]) == end_node_id
         ):
             return frame
-    raise ValueError(
-        "could not resolve node_arrival frame for motion segment "
-        f"vehicle_id={vehicle_id} end_node_id={end_node_id}"
-    )
+    return None
 
 
 def _reference_frame_for_time(
@@ -393,6 +399,17 @@ def _node_position(map_surface: MapSurface, node_id: int) -> Position:
         if node.node_id == node_id:
             return node.position
     raise ValueError(f"unknown node_id in map_surface: {node_id}")
+
+
+def _vehicle_state_for_frame(
+    *,
+    frame,
+    vehicle_id: int,
+):
+    for vehicle in frame.vehicles:
+        if vehicle.vehicle_id == vehicle_id:
+            return vehicle
+    raise ValueError(f"unknown vehicle_id in visualization frame: {vehicle_id}")
 
 
 def _distance(start: Position, end: Position) -> float:

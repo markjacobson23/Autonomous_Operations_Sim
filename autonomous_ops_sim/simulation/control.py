@@ -61,6 +61,24 @@ class SimulationController:
 
         return tuple(self._history)
 
+    def record_command_application(
+        self,
+        command: SimulationCommand,
+        *,
+        started_at_s: float,
+        completed_at_s: float,
+    ) -> CommandApplicationRecord:
+        """Record a validated command application without mutating engine state."""
+
+        record = CommandApplicationRecord(
+            sequence=len(self._history),
+            command=command,
+            started_at_s=started_at_s,
+            completed_at_s=completed_at_s,
+        )
+        self._history.append(record)
+        return record
+
     @property
     def temporary_hazards(self) -> dict[int, str]:
         """Return the current temporary hazard labels keyed by edge id."""
@@ -94,9 +112,8 @@ class SimulationController:
         elif isinstance(command, ClearTemporaryHazardCommand):
             self._apply_clear_temporary_hazard(command)
         elif isinstance(command, AssignVehicleDestinationCommand):
-            # Step 60: Proper routed execution (no teleport)
             vehicle = self.engine.get_vehicle(command.vehicle_id)
-            self.engine.execute_vehicle_route(
+            self.engine.assign_vehicle_route(
                 vehicle=vehicle,
                 destination_node_id=command.destination_node_id,
             )

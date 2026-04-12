@@ -592,11 +592,17 @@ def _build_replay_command_results(
     results: list[SimulationCommandResult] = []
     frame_index = 1
 
-    for record in command_history:
+    for index, record in enumerate(command_history):
+        next_command_started_at_s = (
+            command_history[index + 1].started_at_s
+            if index + 1 < len(command_history)
+            else None
+        )
         frame, frame_index = _select_replay_result_frame(
             record=record,
             frames=frames,
             start_index=frame_index,
+            next_command_started_at_s=next_command_started_at_s,
         )
         results.append(_build_replay_command_result(record=record, frame=frame))
 
@@ -629,6 +635,7 @@ def _select_replay_result_frame(
     record: CommandApplicationRecord,
     frames: tuple[ReplayFrame, ...],
     start_index: int,
+    next_command_started_at_s: float | None,
 ) -> tuple[ReplayFrame, int]:
     candidate: ReplayFrame | None = None
     frame_index = start_index
@@ -641,6 +648,7 @@ def _select_replay_result_frame(
             record.command,
             (
                 BlockEdgeCommand,
+                AssignVehicleDestinationCommand,
                 RepositionVehicleCommand,
                 UnblockEdgeCommand,
                 SpawnVehicleCommand,
@@ -658,14 +666,18 @@ def _select_replay_result_frame(
 
         assert isinstance(
             record.command,
-            (AssignVehicleDestinationCommand, InjectJobCommand),
+            InjectJobCommand,
         )
         trace_event = frame.trigger.trace_event
         if (
             frame.trigger.source != "trace"
             or trace_event is None
             or trace_event.get("vehicle_id") != record.command.vehicle_id
-            or not (record.started_at_s <= frame.timestamp_s <= record.completed_at_s)
+            or frame.timestamp_s < record.started_at_s
+            or (
+                next_command_started_at_s is not None
+                and frame.timestamp_s >= next_command_started_at_s
+            )
         ):
             continue
 

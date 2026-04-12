@@ -18,6 +18,24 @@ def _read_live_bundle(base_url: str) -> dict[str, object]:
     return payload
 
 
+def _vehicle_by_id(bundle: dict[str, object], vehicle_id: int) -> dict[str, object]:
+    vehicles = bundle["snapshot"]["vehicles"]
+    assert isinstance(vehicles, list)
+    for vehicle in vehicles:
+        if vehicle["vehicle_id"] == vehicle_id:
+            return vehicle
+    raise AssertionError(f"vehicle_id {vehicle_id} not found in bundle snapshot")
+
+
+def _node_position(bundle: dict[str, object], node_id: int) -> list[float]:
+    nodes = bundle["map_surface"]["nodes"]
+    assert isinstance(nodes, list)
+    for node in nodes:
+        if node["node_id"] == node_id:
+            return node["position"]
+    raise AssertionError(f"node_id {node_id} not found in bundle map_surface")
+
+
 def _wait_for_live_time(
     base_url: str,
     minimum_time_s: float,
@@ -346,6 +364,137 @@ def test_live_app_frontend_server_supports_live_commands_and_session_control(
         after_pause_session_history = after_pause_bundle["session_history"]
         assert isinstance(after_pause_session_history, list)
         assert len(after_pause_session_history) == paused_history_length
+    finally:
+        server.stop()
+
+
+def test_live_app_defers_assign_destination_until_session_advances(tmp_path) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    initial_bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
+    vehicle_id = initial_bundle["command_center"]["vehicles"][0]["vehicle_id"]
+    destination_node_id = initial_bundle["map_surface"]["edges"][0]["end_node_id"]
+    initial_vehicle = _vehicle_by_id(initial_bundle, vehicle_id)
+    initial_time_s = initial_bundle["simulated_time_s"]
+    initial_position = initial_vehicle["position"]
+    initial_trace_count = len(initial_bundle["trace_events"])
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        assign_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/command",
+                data=json.dumps(
+                    {
+                        "command_type": "assign_vehicle_destination",
+                        "vehicle_id": vehicle_id,
+                        "destination_node_id": destination_node_id,
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        assign_payload = json.loads(assign_response.read().decode("utf-8"))
+        assert assign_payload["ok"] is True
+        assert assign_payload["bundle"]["session_control"]["play_state"] == "paused"
+        assert assign_payload["bundle"]["session_control"]["pending_route_commands"] == [
+            {
+                "command_type": "assign_vehicle_destination",
+                "destination_node_id": destination_node_id,
+                "vehicle_id": vehicle_id,
+            }
+        ]
+
+        paused_bundle = _read_live_bundle(base_url)
+        paused_vehicle = paused_bundle["snapshot"]["vehicles"][0]
+        assert paused_bundle["simulated_time_s"] == initial_time_s
+        assert paused_vehicle["position"] == initial_position
+        assert paused_vehicle["node_id"] == initial_vehicle["node_id"]
+        assert paused_bundle["session_control"]["pending_route_commands"] == [
+            {
+                "command_type": "assign_vehicle_destination",
+                "destination_node_id": destination_node_id,
+                "vehicle_id": vehicle_id,
+            }
+        ]
+        assert len(paused_bundle["trace_events"]) == initial_trace_count
+        assert all(
+            event["event_type"] != "route_complete"
+            for event in paused_bundle["trace_events"]
+        )
+
+        step_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/session/control",
+                data=json.dumps(
+                    {
+                        "action": "step",
+                        "delta_s": 0.5,
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        step_payload = json.loads(step_response.read().decode("utf-8"))
+        assert step_payload["ok"] is True
+        assert step_payload["session_advance"]["completed_at_s"] >= initial_time_s
+        assert step_payload["bundle"]["simulated_time_s"] >= initial_time_s
+        assert step_payload["bundle"]["session_control"]["pending_route_commands"] == []
+
+        stepped_bundle = _read_live_bundle(base_url)
+        stepped_vehicle = _vehicle_by_id(stepped_bundle, vehicle_id)
+        destination_position = _node_position(stepped_bundle, destination_node_id)
+        assert stepped_bundle["simulated_time_s"] >= initial_time_s
+        assert stepped_vehicle["position"] != initial_position
+        assert stepped_vehicle["position"] != destination_position
+        assert not any(
+            event["event_type"] == "route_complete"
+            and event["vehicle_id"] == vehicle_id
+            for event in stepped_bundle["trace_events"]
+        )
+
+        completed_bundle = stepped_bundle
+        completed_vehicle = stepped_vehicle
+        for _ in range(1, 10):
+            request.urlopen(
+                request.Request(
+                    url=f"{base_url}/api/live/session/control",
+                    data=json.dumps(
+                        {
+                            "action": "step",
+                            "delta_s": 0.5,
+                        }
+                    ).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+            )
+            completed_bundle = _read_live_bundle(base_url)
+            completed_vehicle = _vehicle_by_id(completed_bundle, vehicle_id)
+            if any(
+                event["event_type"] == "route_complete"
+                and event["vehicle_id"] == vehicle_id
+                for event in completed_bundle["trace_events"]
+            ):
+                break
+
+        assert any(
+            event["event_type"] == "route_complete"
+            and event["vehicle_id"] == vehicle_id
+            for event in completed_bundle["trace_events"]
+        )
+        assert completed_vehicle["position"] == destination_position
     finally:
         server.stop()
 

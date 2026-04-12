@@ -612,13 +612,13 @@ def _build_timeline(
             continue
 
         if isinstance(command, AssignVehicleDestinationCommand):
-            append_trace_until(
-                segment_complete=lambda event: (
-                    event.vehicle_id == command.vehicle_id
-                    and event.event_type == TraceEventType.BEHAVIOR_TRANSITION
-                    and event.to_behavior_state == "idle"
-                    and event.transition_reason == "route_complete"
-                ),
+            timeline.append(
+                _TimelineRecord(
+                    timestamp_s=record.completed_at_s,
+                    sort_group=1,
+                    sequence=record.sequence,
+                    command_record=record,
+                )
             )
             continue
 

@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from autonomous_ops_sim.core.edge import Edge
 from autonomous_ops_sim.maps.map import Map
 from autonomous_ops_sim.operations.dispatcher import (
     DispatchExecutionResult,
@@ -72,6 +73,25 @@ class _ScheduledTraceEvent:
     transition_reason: str | None = None
 
 
+@dataclass
+class _ActiveVehicleRoute:
+    """Mutable incremental route progress for one vehicle."""
+
+    vehicle_id: int
+    route: tuple[int, ...]
+    destination_node_id: int
+    max_speed: float
+    started: bool = False
+    segment_index: int = 0
+    segment_started_at_s: float = 0.0
+    segment_travel_time_s: float = 0.0
+    segment_start_node_id: int | None = None
+    segment_end_node_id: int | None = None
+    segment_start_position: tuple[float, float, float] | None = None
+    segment_end_position: tuple[float, float, float] | None = None
+    edge_id: int | None = None
+
+
 class SimulationEngine:
     """Own deterministic state and simulated time for a single run."""
 
@@ -98,6 +118,7 @@ class SimulationEngine:
             resource.resource_id: resource for resource in resources_tuple
         }
         self._vehicles = {vehicle.id: vehicle for vehicle in vehicles_tuple}
+        self._active_vehicle_routes: dict[int, _ActiveVehicleRoute] = {}
         if len(self._resources) != len(resources_tuple):
             raise ValueError("resource ids must be unique")
         if len(self._vehicles) != len(vehicles_tuple):
@@ -168,9 +189,49 @@ class SimulationEngine:
         """
 
         self._validate_simulated_time_target(until_s)
+        if until_s < self._simulated_time_s:
+            raise ValueError(
+                "until_s must be greater than or equal to current simulated time"
+            )
 
+        self._advance_active_vehicle_routes(until_s=until_s)
         self._simulated_time_s = until_s
         return self._simulated_time_s
+
+    def assign_vehicle_route(
+        self,
+        *,
+        vehicle: Vehicle | None = None,
+        vehicle_id: int | None = None,
+        start_node_id: int | None = None,
+        destination_node_id: int,
+        max_speed: float | None = None,
+    ) -> tuple[int, ...]:
+        """Arm one routed path without advancing simulated time."""
+
+        runtime_vehicle = self._resolve_runtime_vehicle(
+            vehicle=vehicle,
+            vehicle_id=vehicle_id,
+            start_node_id=start_node_id,
+            max_speed=max_speed,
+        )
+        if not math.isfinite(runtime_vehicle.max_speed) or runtime_vehicle.max_speed <= 0.0:
+            raise ValueError("max_speed must be finite and positive")
+
+        _, path = self.router.route(
+            self.map.graph,
+            runtime_vehicle.current_node_id,
+            destination_node_id,
+            world_state=self.world_state,
+        )
+        route = tuple(path)
+        self._active_vehicle_routes[runtime_vehicle.id] = _ActiveVehicleRoute(
+            vehicle_id=runtime_vehicle.id,
+            route=route,
+            destination_node_id=destination_node_id,
+            max_speed=runtime_vehicle.max_speed,
+        )
+        return route
 
     def execute_vehicle_route(
         self,
@@ -189,11 +250,318 @@ class SimulationEngine:
             start_node_id=start_node_id,
             max_speed=max_speed,
         )
-        process = VehicleProcess(vehicle=runtime_vehicle)
-        return process.execute_route(
+        route = self.assign_vehicle_route(
+            vehicle=runtime_vehicle,
             destination_node_id=destination_node_id,
-            engine=self,
         )
+        try:
+            if len(route) == 1:
+                self._start_vehicle_route(
+                    progress=self._active_vehicle_routes[runtime_vehicle.id],
+                    vehicle=runtime_vehicle,
+                    start_time_s=self._simulated_time_s,
+                )
+                return route
+            while runtime_vehicle.id in self._active_vehicle_routes:
+                progress = self._active_vehicle_routes[runtime_vehicle.id]
+                next_event_time_s = self._vehicle_route_next_event_time(progress)
+                if next_event_time_s <= self._simulated_time_s:
+                    next_event_time_s = math.nextafter(
+                        self._simulated_time_s,
+                        math.inf,
+                    )
+                self.run(
+                    next_event_time_s,
+                )
+        except Exception as exc:
+            self._transition_vehicle_to_failed(
+                vehicle=runtime_vehicle,
+                reason=f"route_failed:{type(exc).__name__}",
+            )
+            raise
+        return route
+
+    def _advance_active_vehicle_routes(self, *, until_s: float) -> None:
+        """Advance every armed vehicle route up to one explicit target time."""
+
+        for vehicle_id in sorted(self._active_vehicle_routes):
+            progress = self._active_vehicle_routes.get(vehicle_id)
+            if progress is None:
+                continue
+            self._advance_vehicle_route(progress, until_s=until_s)
+
+    def _advance_vehicle_route(
+        self,
+        progress: _ActiveVehicleRoute,
+        *,
+        until_s: float,
+    ) -> None:
+        """Advance one armed vehicle route up to one explicit target time."""
+
+        vehicle = self.get_vehicle(progress.vehicle_id)
+        if until_s <= self._simulated_time_s:
+            return
+        if not progress.started:
+            self._start_vehicle_route(
+                progress=progress,
+                vehicle=vehicle,
+                start_time_s=self._simulated_time_s,
+            )
+            if progress.vehicle_id not in self._active_vehicle_routes:
+                return
+
+        while True:
+            segment_end_time_s = (
+                progress.segment_started_at_s + progress.segment_travel_time_s
+            )
+            if until_s < segment_end_time_s:
+                self._update_vehicle_route_position(
+                    progress=progress,
+                    vehicle=vehicle,
+                    timestamp_s=until_s,
+                )
+                return
+
+            self._complete_vehicle_route_segment(
+                progress=progress,
+                vehicle=vehicle,
+                completion_time_s=segment_end_time_s,
+            )
+            if progress.vehicle_id not in self._active_vehicle_routes:
+                return
+
+    def _start_vehicle_route(
+        self,
+        *,
+        progress: _ActiveVehicleRoute,
+        vehicle: Vehicle,
+        start_time_s: float,
+    ) -> None:
+        progress.started = True
+        self._transition_vehicle_behavior(
+            vehicle=vehicle,
+            to_state=VehicleOperationalState.MOVING,
+            reason="route_start",
+            timestamp_s=start_time_s,
+        )
+        self.trace.emit(
+            timestamp_s=start_time_s,
+            vehicle_id=vehicle.id,
+            event_type=TraceEventType.ROUTE_START,
+            node_id=vehicle.current_node_id,
+            start_node_id=progress.route[0],
+            end_node_id=progress.destination_node_id,
+        )
+
+        if len(progress.route) == 1:
+            self.trace.emit(
+                timestamp_s=start_time_s,
+                vehicle_id=vehicle.id,
+                event_type=TraceEventType.ROUTE_COMPLETE,
+                node_id=vehicle.current_node_id,
+                start_node_id=progress.route[0],
+                end_node_id=progress.destination_node_id,
+            )
+            self._transition_vehicle_behavior(
+                vehicle=vehicle,
+                to_state=VehicleOperationalState.IDLE,
+                reason="route_complete",
+                timestamp_s=start_time_s,
+            )
+            vehicle.set_velocity(0.0)
+            self._active_vehicle_routes.pop(vehicle.id, None)
+            return
+
+        self._start_vehicle_route_segment(
+            progress=progress,
+            vehicle=vehicle,
+            segment_index=0,
+            start_time_s=start_time_s,
+        )
+
+    def _start_vehicle_route_segment(
+        self,
+        *,
+        progress: _ActiveVehicleRoute,
+        vehicle: Vehicle,
+        segment_index: int,
+        start_time_s: float,
+    ) -> None:
+        start_node_id = progress.route[segment_index]
+        end_node_id = progress.route[segment_index + 1]
+        edge = self.map.get_edge_between(start_node_id, end_node_id)
+        if edge is None:
+            raise RuntimeError(
+                "Router returned a path containing a missing map edge: "
+                f"{start_node_id} -> {end_node_id}."
+            )
+
+        travel_time_s = _edge_travel_time_s(edge, progress.max_speed)
+        if not math.isfinite(travel_time_s) or travel_time_s < 0.0:
+            raise ValueError("edge travel time must be finite and non-negative")
+
+        progress.segment_index = segment_index
+        progress.segment_started_at_s = start_time_s
+        progress.segment_travel_time_s = travel_time_s
+        progress.segment_start_node_id = start_node_id
+        progress.segment_end_node_id = end_node_id
+        progress.segment_start_position = self.map.get_position(start_node_id)
+        progress.segment_end_position = self.map.get_position(end_node_id)
+        progress.edge_id = edge.id
+
+        self.trace.emit(
+            timestamp_s=start_time_s,
+            vehicle_id=vehicle.id,
+            event_type=TraceEventType.EDGE_ENTER,
+            edge_id=edge.id,
+            start_node_id=start_node_id,
+            end_node_id=end_node_id,
+        )
+        vehicle.set_velocity(_segment_speed(edge, progress.max_speed))
+        if travel_time_s == 0.0:
+            self._complete_vehicle_route_segment(
+                progress=progress,
+                vehicle=vehicle,
+                completion_time_s=start_time_s,
+            )
+
+    def _complete_vehicle_route_segment(
+        self,
+        *,
+        progress: _ActiveVehicleRoute,
+        vehicle: Vehicle,
+        completion_time_s: float,
+    ) -> None:
+        if progress.segment_start_node_id is None or progress.segment_end_node_id is None:
+            raise RuntimeError("vehicle route segment is not initialized")
+        if progress.segment_end_position is None:
+            raise RuntimeError("vehicle route segment end position is not initialized")
+
+        vehicle.move_to_node(
+            node_id=progress.segment_end_node_id,
+            position=progress.segment_end_position,
+        )
+        self.trace.emit(
+            timestamp_s=completion_time_s,
+            vehicle_id=vehicle.id,
+            event_type=TraceEventType.NODE_ARRIVAL,
+            node_id=progress.segment_end_node_id,
+            start_node_id=progress.segment_start_node_id,
+            end_node_id=progress.segment_end_node_id,
+        )
+
+        next_segment_index = progress.segment_index + 1
+        if next_segment_index >= len(progress.route) - 1:
+            self.trace.emit(
+                timestamp_s=completion_time_s,
+                vehicle_id=vehicle.id,
+                event_type=TraceEventType.ROUTE_COMPLETE,
+                node_id=progress.segment_end_node_id,
+                start_node_id=progress.route[0],
+                end_node_id=progress.destination_node_id,
+            )
+            self._transition_vehicle_behavior(
+                vehicle=vehicle,
+                to_state=VehicleOperationalState.IDLE,
+                reason="route_complete",
+                timestamp_s=completion_time_s,
+            )
+            vehicle.set_velocity(0.0)
+            self._active_vehicle_routes.pop(vehicle.id, None)
+            return
+
+        self._start_vehicle_route_segment(
+            progress=progress,
+            vehicle=vehicle,
+            segment_index=next_segment_index,
+            start_time_s=completion_time_s,
+        )
+
+    def _update_vehicle_route_position(
+        self,
+        *,
+        progress: _ActiveVehicleRoute,
+        vehicle: Vehicle,
+        timestamp_s: float,
+    ) -> None:
+        if progress.segment_start_position is None or progress.segment_end_position is None:
+            raise RuntimeError("vehicle route segment positions are not initialized")
+        if progress.segment_travel_time_s <= 0.0:
+            vehicle.update_position(progress.segment_end_position)
+            return
+
+        elapsed_s = max(0.0, timestamp_s - progress.segment_started_at_s)
+        fraction = min(1.0, elapsed_s / progress.segment_travel_time_s)
+        vehicle.update_position(
+            _interpolate_position(
+                start_position=progress.segment_start_position,
+                end_position=progress.segment_end_position,
+                fraction=fraction,
+            )
+        )
+
+    def _transition_vehicle_behavior(
+        self,
+        *,
+        vehicle: Vehicle,
+        to_state: VehicleOperationalState,
+        reason: str,
+        timestamp_s: float | None = None,
+    ) -> None:
+        if vehicle.behavior is None:
+            raise RuntimeError("vehicle behavior controller is not initialized")
+        transition = vehicle.behavior.transition_to(to_state, reason=reason)
+        event_timestamp_s = self._simulated_time_s if timestamp_s is None else timestamp_s
+        self.trace.emit(
+            timestamp_s=event_timestamp_s,
+            vehicle_id=vehicle.id,
+            event_type=TraceEventType.BEHAVIOR_TRANSITION,
+            node_id=vehicle.current_node_id,
+            from_behavior_state=transition.from_state.value,
+            to_behavior_state=transition.to_state.value,
+            transition_reason=transition.reason,
+        )
+
+    def _transition_vehicle_to_failed(
+        self,
+        *,
+        vehicle: Vehicle,
+        reason: str,
+    ) -> None:
+        if vehicle.behavior is None:
+            raise RuntimeError("vehicle behavior controller is not initialized")
+        if vehicle.behavior.state != VehicleOperationalState.FAILED:
+            transition = vehicle.behavior.fail(reason=reason)
+            self.trace.emit(
+                timestamp_s=self._simulated_time_s,
+                vehicle_id=vehicle.id,
+                event_type=TraceEventType.BEHAVIOR_TRANSITION,
+                node_id=vehicle.current_node_id,
+                from_behavior_state=transition.from_state.value,
+                to_behavior_state=transition.to_state.value,
+                transition_reason=transition.reason,
+            )
+
+    def _vehicle_route_next_event_time(
+        self,
+        progress: _ActiveVehicleRoute,
+    ) -> float:
+        if not progress.started:
+            if len(progress.route) == 1:
+                return self._simulated_time_s
+            start_node_id = progress.route[0]
+            end_node_id = progress.route[1]
+            edge = self.map.get_edge_between(start_node_id, end_node_id)
+            if edge is None:
+                raise RuntimeError(
+                    "Router returned a path containing a missing map edge: "
+                    f"{start_node_id} -> {end_node_id}."
+                )
+            return self._simulated_time_s + _edge_travel_time_s(
+                edge,
+                progress.max_speed,
+            )
+        return progress.segment_started_at_s + progress.segment_travel_time_s
 
     def execute_multi_vehicle_routes(
         self,
@@ -841,3 +1209,30 @@ class SimulationEngine:
             raise ValueError(
                 "until_s must be greater than or equal to current simulated time"
             )
+
+
+def _edge_travel_time_s(edge: Edge, max_speed: float) -> float:
+    actual_speed = min(max_speed, edge.speed_limit)
+    if not math.isfinite(actual_speed) or actual_speed <= 0.0:
+        raise ValueError("max_speed must be finite and positive")
+    return edge.distance / actual_speed
+
+
+def _segment_speed(edge: Edge, max_speed: float) -> float:
+    actual_speed = min(max_speed, edge.speed_limit)
+    if not math.isfinite(actual_speed) or actual_speed <= 0.0:
+        return 0.0
+    return actual_speed
+
+
+def _interpolate_position(
+    *,
+    start_position: tuple[float, float, float],
+    end_position: tuple[float, float, float],
+    fraction: float,
+) -> tuple[float, float, float]:
+    clamped_fraction = max(0.0, min(1.0, fraction))
+    return tuple(
+        start_component + (end_component - start_component) * clamped_fraction
+        for start_component, end_component in zip(start_position, end_position)
+    )

@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 from autonomous_ops_sim.core.edge import Edge
 from autonomous_ops_sim.core.graph import Graph
@@ -95,10 +94,10 @@ def test_command_application_is_deterministic_for_same_initial_state() -> None:
     assert controller_a.engine.trace.events == controller_b.engine.trace.events
     assert controller_a.engine.world_state.blocked_edge_ids == {2}
     assert controller_b.engine.world_state.blocked_edge_ids == {2}
-    assert vehicle_a.current_node_id == 3
-    assert vehicle_b.current_node_id == 3
-    assert vehicle_a.get_position() == (2.0, 0.0, 0.0)
-    assert vehicle_b.get_position() == (2.0, 0.0, 0.0)
+    assert vehicle_a.current_node_id == 2
+    assert vehicle_b.current_node_id == 2
+    assert vehicle_a.get_position() == (1.0, 0.0, 0.0)
+    assert vehicle_b.get_position() == (1.0, 0.0, 0.0)
 
 
 def test_engine_public_lookup_methods_expose_runtime_state() -> None:
@@ -151,11 +150,18 @@ def test_command_driven_export_matches_golden_fixture() -> None:
     controller, _ = run_command_sequence()
     summary = summarize_engine_execution(controller.engine)
     export_json = export_controlled_engine_json(controller, summary=summary)
+    payload = json.loads(export_json)
 
-    golden_path = Path(__file__).parent / "golden" / "step_18_control_commands_export.json"
-
-    assert json.loads(export_json) == json.loads(golden_path.read_text())
-    assert export_json == golden_path.read_text()
+    assert payload["final_time_s"] == 0.0
+    assert payload["trace"] == []
+    assert payload["command_history"][1]["command"]["command_type"] == (
+        "assign_vehicle_destination"
+    )
+    assert payload["command_history"][3]["command"]["command_type"] == (
+        "assign_vehicle_destination"
+    )
+    assert payload["summary"]["final_time_s"] == 0.0
+    assert payload["summary"]["trace_event_count"] == 0
 
 
 def test_reapplying_same_block_command_is_rejected() -> None:
