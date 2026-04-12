@@ -151,10 +151,12 @@ export function LiveSceneCanvas({
                       ? `road-path road-path-casing road-path-blocked${isSelected ? " road-path-selected" : ""}`
                       : `road-path road-path-casing${isSelected ? " road-path-selected" : ""}`
                   }
+                  pointerEvents="none"
                 />
                 <path
                   d={pointsToPath(road.centerline)}
                   className={`road-path road-path-core${isSelected ? " road-path-core-selected" : ""}`}
+                  pointerEvents="none"
                 />
               </g>
             );
@@ -225,7 +227,7 @@ export function LiveSceneCanvas({
                   onSelectVehicle(vehicle.vehicleId, event.ctrlKey || event.metaKey || event.shiftKey);
                 }}
               >
-                {isSelected ? <circle className="vehicle-selection-ring" r="1.52" /> : null}
+                {isSelected ? <circle className="vehicle-selection-ring" r="1.52" pointerEvents="none" /> : null}
                 <circle className={`vehicle-core vehicle-core-${vehicle.stateClass}`} r={isSelected ? "0.72" : "0.55"} />
                 <circle className={`vehicle-halo${isSelected ? " vehicle-halo-selected" : ""}`} r={isSelected ? "1.18" : "0.95"} />
                 {layers.labels && (

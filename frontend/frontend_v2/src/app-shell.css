@@ -647,11 +647,13 @@ p {
   stroke: rgba(255, 253, 248, 0.72);
   stroke-width: 0.9;
   opacity: 0.88;
+  pointer-events: none;
 }
 
 .road-path-core {
   stroke: rgba(64, 74, 80, 0.78);
   stroke-width: 0.42;
+  pointer-events: none;
 }
 
 .road-path-blocked {
@@ -724,6 +726,7 @@ p {
   fill: rgba(14, 104, 114, 0.06);
   stroke: rgba(14, 104, 114, 0.78);
   stroke-width: 0.12;
+  pointer-events: none;
 }
 
 .map-legend {
