@@ -848,6 +848,34 @@ describe("serious ui behavior", () => {
     await waitFor(() => expect(screen.getByLabelText("Scene minimap")).toBeInTheDocument());
   });
 
+  it("makes Fleet mode the primary place to understand and manage multi-select batches", async () => {
+    vi.stubGlobal("fetch", makeFetchMock(buildCityStreetBundle()));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Proof-of-Life City Street")).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: /^Fleet\b/i }));
+
+    expect(screen.getByRole("heading", { name: "Fleet Mode" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Fleet Roster" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Grouped Vehicle Context" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Batch Action Hooks" })).toBeVisible();
+    expect(screen.getAllByText(/2 selected/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/batch select is active/i).length).toBeGreaterThan(0);
+
+    await user.click(screen.getAllByRole("button", { name: "Select only" })[0]);
+    await waitFor(() => expect(screen.getAllByText(/1 selected/i).length).toBeGreaterThan(0));
+    expect(screen.getAllByText(/single-select is active/i).length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: /Add V202 to batch/i }));
+    await waitFor(() => expect(screen.getAllByText(/2 selected/i).length).toBeGreaterThan(0));
+    expect(screen.getAllByText(/batch select is active/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "moving" })).toBeVisible();
+  });
+
   it("classifies geometry-first environment forms without family-specific hacks", () => {
     expect(classifyEnvironmentFormKind("yard", "loading bay")).toBe("flat");
     expect(classifyEnvironmentFormKind("building", "warehouse")).toBe("raised");

@@ -1,9 +1,13 @@
+import { useState } from "react";
+
 import { frontendOwnedState, frontendV2Home, repoLayoutDecision, simulatorOwnedTruth } from "../architecture";
-import type { LiveBundleViewModel } from "../adapters/liveBundle";
+import type { LiveBundleViewModel, LiveRoutePreviewViewModel } from "../adapters/liveBundle";
 import { buildSelectionPresentation } from "../adapters/selectionModel";
 import type { FrontendModeId, FrontendUiActions, FrontendUiState } from "../state/frontendUiState";
+import { FleetRail } from "./FleetRail";
 import { MapShell } from "./MapShell";
 import { OperateRail } from "./OperateRail";
+import { TrafficRail } from "./TrafficRail";
 
 type FrontendShellProps = {
   bundle: LiveBundleViewModel;
@@ -15,14 +19,16 @@ type FrontendShellProps = {
 const modeDetails: Array<{ id: FrontendModeId; label: string; summary: string }> = [
   { id: "operate", label: "Operate", summary: "Live watch and intervention surface" },
   { id: "traffic", label: "Traffic", summary: "Congestion and blockage context" },
-  { id: "fleet", label: "Fleet", summary: "Vehicle-focused overview" },
+  { id: "fleet", label: "Fleet", summary: "Multi-vehicle overview and batch lane" },
   { id: "editor", label: "Editor", summary: "Authoring entry point" },
   { id: "analyze", label: "Analyze", summary: "Diagnostics and explanation" },
 ];
 
 export function FrontendShell({ bundle, uiState, actions, refreshBundle }: FrontendShellProps): JSX.Element {
+  const [activeRoutePreview, setActiveRoutePreview] = useState<LiveRoutePreviewViewModel | null>(null);
   const selectionPresentation = buildSelectionPresentation(bundle, uiState);
-  const isOperateMode = uiState.modePanel.activeMode === "operate";
+  const activeMode = uiState.modePanel.activeMode;
+  const isOperateMode = activeMode === "operate";
 
   return (
     <div className="app-shell">
@@ -63,13 +69,23 @@ export function FrontendShell({ bundle, uiState, actions, refreshBundle }: Front
       </section>
 
       <main className="shell-grid">
-        <MapShell bundle={bundle} uiState={uiState} actions={actions} />
+        <MapShell bundle={bundle} uiState={uiState} actions={actions} activeRoutePreview={activeRoutePreview} />
 
         <aside className="shell-rail">
           {isOperateMode ? (
-            <OperateRail bundle={bundle} uiState={uiState} refreshBundle={refreshBundle} />
-          ) : (
-            <>
+            <OperateRail
+              bundle={bundle}
+              uiState={uiState}
+              refreshBundle={refreshBundle}
+              activeRoutePreview={activeRoutePreview}
+              setActiveRoutePreview={setActiveRoutePreview}
+            />
+          ) : uiState.modePanel.activeMode === "traffic" ? (
+              <TrafficRail bundle={bundle} uiState={uiState} />
+            ) : activeMode === "fleet" ? (
+              <FleetRail bundle={bundle} uiState={uiState} actions={actions} />
+            ) : (
+              <>
               <section className="panel">
                 <h2>Session identity</h2>
                 <dl className="info-grid">

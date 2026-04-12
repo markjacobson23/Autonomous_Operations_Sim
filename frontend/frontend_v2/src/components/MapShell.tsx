@@ -7,19 +7,26 @@ import {
   minimapViewport,
   sceneTransform,
 } from "../adapters/mapViewport";
-import { buildSelectionPresentation, focusPointsForSelection, resolveActiveSelectionTarget } from "../adapters/selectionModel";
+import {
+  buildSelectionPresentation,
+  focusPointsForSelection,
+  resolveActiveSelectionTarget,
+  resolveSelectionVehicleIds,
+} from "../adapters/selectionModel";
 import type { FrontendUiActions, FrontendUiState } from "../state/frontendUiState";
 import { LiveSceneCanvas } from "./LiveSceneCanvas";
 import { MapMinimap } from "./MapMinimap";
 import { SelectionPopup } from "./SelectionPopup";
+import type { LiveRoutePreviewViewModel } from "../adapters/liveBundle";
 
 type MapShellProps = {
   bundle: LiveBundleViewModel;
   uiState: FrontendUiState;
   actions: FrontendUiActions;
+  activeRoutePreview: LiveRoutePreviewViewModel | null;
 };
 
-export function MapShell({ bundle, uiState, actions }: MapShellProps): JSX.Element {
+export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapShellProps): JSX.Element {
   const initialFitDoneRef = useRef(false);
   const [dragState, setDragState] = useState<{
     pointerId: number;
@@ -46,8 +53,15 @@ export function MapShell({ bundle, uiState, actions }: MapShellProps): JSX.Eleme
   const viewBox = cameraToViewBox(camera, bundle.map.bounds);
   const viewport = minimapViewport(bundle.map.bounds, viewBox);
   const activeSelectionTarget = resolveActiveSelectionTarget(bundle, uiState);
+  const selectedVehicleIds = resolveSelectionVehicleIds(bundle, uiState);
   const selectionPresentation = buildSelectionPresentation(bundle, uiState);
-  const selectedPoints = focusPointsForSelection(bundle, activeSelectionTarget);
+  const selectedPoints =
+    selectedVehicleIds.length > 0
+      ? selectedVehicleIds.flatMap((vehicleId) => {
+          const vehicle = bundle.map.vehicles.find((entry) => entry.vehicleId === vehicleId);
+          return vehicle === undefined ? [] : [vehicle.position];
+        })
+      : focusPointsForSelection(bundle, activeSelectionTarget);
   const canFocusSelected = selectedPoints.length > 0;
 
   function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
@@ -115,8 +129,22 @@ export function MapShell({ bundle, uiState, actions }: MapShellProps): JSX.Eleme
     actions.setInspector(false, "summary");
   }
 
-  function handleSelectVehicle(vehicleId: number) {
-    commitSelection({ kind: "vehicle", vehicleId }, [vehicleId]);
+  function handleSelectVehicle(vehicleId: number, additive: boolean) {
+    const currentVehicleIds = selectedVehicleIds;
+    const nextVehicleIds = additive
+      ? currentVehicleIds.includes(vehicleId)
+        ? currentVehicleIds.filter((id) => id !== vehicleId)
+        : [...currentVehicleIds, vehicleId]
+      : [vehicleId];
+
+    if (nextVehicleIds.length === 0) {
+      actions.setSelection(null, [], null);
+      actions.setPopup(false, null);
+      actions.setInspector(false, "summary");
+      return;
+    }
+
+    commitSelection({ kind: "vehicle", vehicleId: nextVehicleIds[0] }, nextVehicleIds);
   }
 
   function handleSelectRoad(roadId: string) {
@@ -214,6 +242,9 @@ export function MapShell({ bundle, uiState, actions }: MapShellProps): JSX.Eleme
             sceneTransform={sceneTransform(camera, viewBox)}
             layers={uiState.layers}
             selectionTarget={activeSelectionTarget}
+            selectedVehicleIds={selectedVehicleIds}
+            activeRoutePreview={activeRoutePreview}
+            activeMode={uiState.modePanel.activeMode}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={clearDragState}

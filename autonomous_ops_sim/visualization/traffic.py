@@ -167,6 +167,9 @@ def traffic_baseline_surface_to_dict(
                 "node_id": control.node_id,
                 "control_type": control.control_type,
                 "controlled_road_ids": list(control.controlled_road_ids),
+                "stop_line_ids": list(control.stop_line_ids),
+                "protected_conflict_zone_ids": list(control.protected_conflict_zone_ids),
+                "signal_ready": control.signal_ready,
             }
             for control in surface.control_points
         ],

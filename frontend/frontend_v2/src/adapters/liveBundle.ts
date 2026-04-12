@@ -15,6 +15,7 @@ export type LiveBundleResource = {
 export type LiveRoadViewModel = {
   roadId: string;
   centerline: Point2[];
+  edgeIds: number[];
   blocked: boolean;
   roadClass: string;
   directionality: string;
@@ -26,6 +27,43 @@ export type LiveAreaViewModel = {
   kind: string;
   polygon: Point2[];
   label: string | null;
+};
+
+export type LiveTrafficControlPointViewModel = {
+  controlId: string;
+  nodeId: number;
+  controlType: string;
+  controlledRoadIds: string[];
+  stopLineIds: string[];
+  protectedConflictZoneIds: string[];
+  signalReady: boolean;
+};
+
+export type LiveTrafficQueueRecordViewModel = {
+  vehicleId: number;
+  nodeId: number;
+  roadId: string | null;
+  queueStartS: number;
+  queueEndS: number;
+  reason: string;
+};
+
+export type LiveTrafficRoadStateViewModel = {
+  roadId: string;
+  activeVehicleIds: number[];
+  queuedVehicleIds: number[];
+  occupancyCount: number;
+  minSpacingM: number | null;
+  congestionIntensity: number;
+  congestionLevel: string;
+  controlState: string;
+  stopLineIds: string[];
+  protectedConflictZoneIds: string[];
+};
+
+export type LiveNodeViewModel = {
+  nodeId: number;
+  position: Point2;
 };
 
 export type LiveVehicleViewModel = {
@@ -91,6 +129,7 @@ export type LiveBundleViewModel = {
     previewEndpoint: string;
   };
   map: {
+    nodes: LiveNodeViewModel[];
     roads: LiveRoadViewModel[];
     areas: LiveAreaViewModel[];
     vehicles: LiveVehicleViewModel[];
@@ -113,6 +152,12 @@ export type LiveBundleViewModel = {
     routePreviews: LiveRoutePreviewViewModel[];
     vehicleInspections: LiveVehicleInspectionViewModel[];
   };
+  traffic: {
+    sampleTimeS: number | null;
+    roadStates: LiveTrafficRoadStateViewModel[];
+    queueRecords: LiveTrafficQueueRecordViewModel[];
+    controlPoints: LiveTrafficControlPointViewModel[];
+  };
   utility: {
     frontendOwnedState: readonly string[];
     simulatorOwnedTruth: readonly string[];
@@ -129,6 +174,7 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
   const snapshot = readRecord(bundle, "snapshot");
   const renderGeometry = readRecord(bundle, "render_geometry");
   const trafficBaseline = readRecord(bundle, "traffic_baseline");
+  const trafficSnapshot = readRecord(bundle, "traffic_snapshot");
   const aiAssist = readRecord(commandCenter, "ai_assist");
   const worldModel = readRecord(renderGeometry, "world_model");
   const worldEnvironment = readRecord(worldModel, "environment");
@@ -142,12 +188,31 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
       {
         roadId: readString(roadRecord, "road_id", `road-${index}`),
         centerline: readPointList(readArray(roadRecord, "centerline")),
+        edgeIds: readNumberList(roadRecord, "edge_ids"),
         blocked: readNumberArray(roadRecord, "edge_ids").some((edgeId) =>
           readNumberArray(snapshot, "blocked_edge_ids").includes(edgeId),
         ),
         roadClass: readString(roadRecord, "road_class", "connector"),
         directionality: readString(roadRecord, "directionality", "one_way"),
         laneCount: readNumber(roadRecord, "lane_count", 1),
+      },
+    ];
+  });
+  const nodes = readArray(renderGeometry, "intersections").flatMap((intersection, index) => {
+    const intersectionRecord = isRecord(intersection) ? intersection : null;
+    if (intersectionRecord === null) {
+      return [];
+    }
+
+    const position = averagePoint(readPointList(readArray(intersectionRecord, "polygon")));
+    if (position === null) {
+      return [];
+    }
+
+    return [
+      {
+        nodeId: readNumber(intersectionRecord, "node_id", index + 1),
+        position,
       },
     ];
   });
@@ -250,16 +315,27 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
       },
     ];
   });
-  const trafficRoadStates = readArray(trafficBaseline, "road_states").flatMap((entry) =>
+  const controlPoints = readArray(trafficBaseline, "control_points").flatMap((entry) =>
+    isRecord(entry) ? [entry] : [],
+  );
+  const queueRecords = readArray(trafficBaseline, "queue_records").flatMap((entry) =>
+    isRecord(entry) ? [entry] : [],
+  );
+  const trafficRoadStates = readArray(trafficSnapshot, "road_states").flatMap((entry) =>
     isRecord(entry) ? [entry] : [],
   );
   const anomalies = readArray(aiAssist, "anomalies").flatMap((entry) => (isRecord(entry) ? [entry] : []));
+  const congestedRoadCount = trafficRoadStates.filter((roadState) => readNumber(roadState, "congestion_intensity", 0) > 0.2).length;
+  const queuedVehicleCount = trafficRoadStates.reduce(
+    (count, roadState) => count + readNumberList(roadState, "queued_vehicle_ids").length,
+    0,
+  );
 
   const alerts = [
     ...(blockedEdgeIds.length > 0 ? [`${blockedEdgeIds.length} blocked edge(s)`] : []),
-    ...(trafficRoadStates.some((roadState) => readNumber(roadState, "congestion_intensity", 0) > 0.2)
-      ? [`${trafficRoadStates.filter((roadState) => readNumber(roadState, "congestion_intensity", 0) > 0.2).length} congested road(s)`]
-      : []),
+    ...(congestedRoadCount > 0 ? [`${congestedRoadCount} congested road(s)`] : []),
+    ...(queuedVehicleCount > 0 ? [`${queuedVehicleCount} queued vehicle(s)`] : []),
+    ...(queueRecords.length > 0 ? [`${queueRecords.length} queue record(s)`] : []),
     ...(anomalies.length > 0 ? [`${anomalies.length} anomaly signal(s)`] : []),
   ];
 
@@ -288,6 +364,7 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
       previewEndpoint: readString(sessionControl, "route_preview_endpoint", "unknown"),
     },
     map: {
+      nodes,
       roads,
       areas,
       vehicles,
@@ -302,6 +379,65 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
     commandCenter: {
       routePreviews,
       vehicleInspections,
+    },
+    traffic: {
+      sampleTimeS: readNumberOrNull(trafficSnapshot, "timestamp_s"),
+      roadStates: trafficRoadStates.flatMap((roadState, index) => {
+        const roadStateRecord = isRecord(roadState) ? roadState : null;
+        if (roadStateRecord === null) {
+          return [];
+        }
+
+        return [
+          {
+            roadId: readString(roadStateRecord, "road_id", `road-${index}`),
+            activeVehicleIds: readNumberList(roadStateRecord, "active_vehicle_ids"),
+            queuedVehicleIds: readNumberList(roadStateRecord, "queued_vehicle_ids"),
+            occupancyCount: readNumber(roadStateRecord, "occupancy_count", 0),
+            minSpacingM: readNumberOrNull(roadStateRecord, "min_spacing_m"),
+            congestionIntensity: readNumber(roadStateRecord, "congestion_intensity", 0),
+            congestionLevel: readString(roadStateRecord, "congestion_level", "free"),
+            controlState: readString(roadStateRecord, "control_state", "free_flow"),
+            stopLineIds: readStringList(roadStateRecord, "stop_line_ids"),
+            protectedConflictZoneIds: readStringList(roadStateRecord, "protected_conflict_zone_ids"),
+          },
+        ];
+      }),
+      queueRecords: queueRecords.flatMap((queueRecord) => {
+        const queueRecordRecord = isRecord(queueRecord) ? queueRecord : null;
+        if (queueRecordRecord === null) {
+          return [];
+        }
+
+        return [
+          {
+            vehicleId: readNumber(queueRecordRecord, "vehicle_id", -1),
+            nodeId: readNumber(queueRecordRecord, "node_id", -1),
+            roadId: readStringOrNull(queueRecordRecord, "road_id"),
+            queueStartS: readNumber(queueRecordRecord, "queue_start_s", 0),
+            queueEndS: readNumber(queueRecordRecord, "queue_end_s", 0),
+            reason: readString(queueRecordRecord, "reason", "queue"),
+          },
+        ];
+      }),
+      controlPoints: controlPoints.flatMap((controlPoint) => {
+        const controlPointRecord = isRecord(controlPoint) ? controlPoint : null;
+        if (controlPointRecord === null) {
+          return [];
+        }
+
+        return [
+          {
+            controlId: readString(controlPointRecord, "control_id", "control"),
+            nodeId: readNumber(controlPointRecord, "node_id", -1),
+            controlType: readString(controlPointRecord, "control_type", "unknown"),
+            controlledRoadIds: readStringList(controlPointRecord, "controlled_road_ids"),
+            stopLineIds: readStringList(controlPointRecord, "stop_line_ids"),
+            protectedConflictZoneIds: readStringList(controlPointRecord, "protected_conflict_zone_ids"),
+            signalReady: Boolean(controlPointRecord.signal_ready),
+          },
+        ];
+      }),
     },
     utility: {
       frontendOwnedState: [
@@ -407,6 +543,12 @@ function readNumberList(value: JsonRecord, key: string): number[] {
   );
 }
 
+function readStringList(value: JsonRecord, key: string): string[] {
+  return readArray(value, key).flatMap((entry) =>
+    typeof entry === "string" && entry.trim().length > 0 ? [entry] : [],
+  );
+}
+
 function readNumberArray(value: JsonRecord | null, key: string): number[] {
   return readArray(value, key).flatMap((entry) =>
     typeof entry === "number" && Number.isFinite(entry) ? [entry] : [],
@@ -429,6 +571,22 @@ function readPointList(points: unknown[]): Point2[] {
     const resolved = readPoint(point);
     return resolved === null ? [] : [resolved];
   });
+}
+
+function averagePoint(points: Point2[]): Point2 | null {
+  if (points.length === 0) {
+    return null;
+  }
+
+  const total = points.reduce(
+    (accumulator, point) => {
+      accumulator.x += point[0];
+      accumulator.y += point[1];
+      return accumulator;
+    },
+    { x: 0, y: 0 },
+  );
+  return [total.x / points.length, total.y / points.length];
 }
 
 function collectScenePoints(bundle: JsonRecord | null): Point2[] {

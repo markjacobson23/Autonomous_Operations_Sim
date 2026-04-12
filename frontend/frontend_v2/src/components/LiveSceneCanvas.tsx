@@ -1,5 +1,5 @@
 import type { LiveBundleViewModel } from "../adapters/liveBundle";
-import type { LayerState } from "../state/frontendUiState";
+import type { FrontendModeId, LayerState } from "../state/frontendUiState";
 import type { ViewBox } from "../adapters/mapViewport";
 import type { SelectionTarget } from "../adapters/selectionModel";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
@@ -10,14 +10,17 @@ type LiveSceneCanvasProps = {
   sceneTransform: string;
   layers: LayerState;
   selectionTarget: SelectionTarget | null;
+  selectedVehicleIds: number[];
   onPointerDown?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onPointerMove?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onPointerUp?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onPointerLeave?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onWheel?: (event: ReactWheelEvent<SVGSVGElement>) => void;
-  onSelectVehicle: (vehicleId: number) => void;
+  onSelectVehicle: (vehicleId: number, additive: boolean) => void;
   onSelectRoad: (roadId: string) => void;
   onSelectArea: (areaId: string) => void;
+  activeRoutePreview: LiveBundleViewModel["commandCenter"]["routePreviews"][number] | null;
+  activeMode: FrontendModeId;
 };
 
 export function LiveSceneCanvas({
@@ -26,6 +29,7 @@ export function LiveSceneCanvas({
   sceneTransform,
   layers,
   selectionTarget,
+  selectedVehicleIds,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -34,8 +38,27 @@ export function LiveSceneCanvas({
   onSelectVehicle,
   onSelectRoad,
   onSelectArea,
+  activeRoutePreview,
+  activeMode,
 }: LiveSceneCanvasProps): JSX.Element {
-  const { bounds, roads, areas, vehicles } = model.map;
+  const { bounds, nodes, roads, areas, vehicles } = model.map;
+  const trafficRoadStates = model.traffic.roadStates;
+  const trafficControlPoints = model.traffic.controlPoints;
+  const trafficQueueRecords = model.traffic.queueRecords;
+  const showTrafficOverlay = activeMode === "traffic" && (trafficRoadStates.length > 0 || trafficControlPoints.length > 0 || trafficQueueRecords.length > 0);
+  const nodePositions = new Map(nodes.map((node) => [node.nodeId, node.position]));
+  const previewPathPoints =
+    layers.routes && activeRoutePreview !== null
+      ? activeRoutePreview.nodeIds.flatMap((nodeId) => {
+          const node = nodes.find((entry) => entry.nodeId === nodeId);
+          return node === undefined ? [] : [node.position];
+        })
+      : [];
+  const previewDestinationPoint =
+    layers.routes && activeRoutePreview !== null
+      ? nodes.find((entry) => entry.nodeId === activeRoutePreview.destinationNodeId)?.position ?? null
+      : null;
+  const selectedVehicleIdSet = new Set(selectedVehicleIds);
 
   return (
     <svg
@@ -83,6 +106,28 @@ export function LiveSceneCanvas({
               />
             );
           })}
+        {layers.routes && activeRoutePreview !== null && previewPathPoints.length > 0 ? (
+          <g className="route-preview-layer">
+            {previewPathPoints.length > 1 ? <path d={pointsToPath(previewPathPoints)} className="route-preview-path" /> : null}
+            {previewPathPoints.map((point, index) => (
+              <circle
+                key={`route-preview-node-${activeRoutePreview.vehicleId}-${index}`}
+                cx={point[0]}
+                cy={point[1]}
+                r={index === 0 ? 0.28 : 0.24}
+                className={index === 0 ? "route-preview-node route-preview-node-start" : "route-preview-node"}
+              />
+            ))}
+            {previewDestinationPoint !== null ? (
+              <circle
+                cx={previewDestinationPoint[0]}
+                cy={previewDestinationPoint[1]}
+                r={0.5}
+                className="route-preview-destination"
+              />
+            ) : null}
+          </g>
+        ) : null}
         {layers.roads &&
           roads.map((road) => {
             if (road.centerline.length < 2) {
@@ -114,10 +159,62 @@ export function LiveSceneCanvas({
               </g>
             );
           })}
+        {showTrafficOverlay ? (
+          <g className="traffic-overlay-layer">
+            {trafficRoadStates.map((roadState) => {
+              const road = roads.find((entry) => entry.roadId === roadState.roadId) ?? null;
+              if (road === null || road.centerline.length < 2 || roadState.congestionIntensity <= 0) {
+                return null;
+              }
+              const isSelected = selectionTarget?.kind === "road" && selectionTarget.roadId === roadState.roadId;
+              return (
+                <path
+                  key={`traffic-road-${roadState.roadId}`}
+                  d={pointsToPath(road.centerline)}
+                  className={`traffic-overlay-road${isSelected ? " traffic-overlay-road-selected" : ""}`}
+                  style={{
+                    strokeOpacity: Math.min(0.78, 0.12 + roadState.congestionIntensity * 0.72),
+                    strokeWidth: 0.24 + roadState.congestionIntensity * 0.72,
+                  }}
+                />
+              );
+            })}
+            {trafficControlPoints.map((controlPoint) => {
+              const position = nodePositions.get(controlPoint.nodeId) ?? null;
+              if (position === null) {
+                return null;
+              }
+              return (
+                <g key={controlPoint.controlId} className="traffic-control-point">
+                  <circle
+                    cx={position[0]}
+                    cy={position[1]}
+                    r={controlPoint.signalReady ? 0.42 : 0.34}
+                    className={controlPoint.signalReady ? "traffic-control-point-ready" : "traffic-control-point-waiting"}
+                  />
+                </g>
+              );
+            })}
+            {trafficQueueRecords.slice(0, 8).map((record, index) => {
+              const position = nodePositions.get(record.nodeId) ?? null;
+              if (position === null) {
+                return null;
+              }
+              return (
+                <circle
+                  key={`traffic-queue-${record.vehicleId}-${index}`}
+                  cx={position[0]}
+                  cy={position[1]}
+                  r={0.18}
+                  className="traffic-queue-marker"
+                />
+              );
+            })}
+          </g>
+        ) : null}
         {layers.vehicles &&
           vehicles.map((vehicle) => {
-            const isSelected =
-              selectionTarget?.kind === "vehicle" && selectionTarget.vehicleId === vehicle.vehicleId;
+            const isSelected = selectedVehicleIdSet.has(vehicle.vehicleId);
             return (
               <g
                 key={vehicle.vehicleId}
@@ -125,16 +222,17 @@ export function LiveSceneCanvas({
                 className={isSelected ? "vehicle-group vehicle-group-selected" : "vehicle-group"}
                 onPointerDown={(event) => {
                   event.stopPropagation();
-                  onSelectVehicle(vehicle.vehicleId);
+                  onSelectVehicle(vehicle.vehicleId, event.ctrlKey || event.metaKey || event.shiftKey);
                 }}
               >
+                {isSelected ? <circle className="vehicle-selection-ring" r="1.52" /> : null}
                 <circle className={`vehicle-core vehicle-core-${vehicle.stateClass}`} r={isSelected ? "0.72" : "0.55"} />
                 <circle className={`vehicle-halo${isSelected ? " vehicle-halo-selected" : ""}`} r={isSelected ? "1.18" : "0.95"} />
-              {layers.labels && (
-                <text className="vehicle-label" y="-1.1" textAnchor="middle">
-                  {`${vehicle.vehicleId} · ${vehicle.state}`}
-                </text>
-              )}
+                {layers.labels && (
+                  <text className="vehicle-label" y="-1.1" textAnchor="middle">
+                    {`${vehicle.vehicleId} · ${vehicle.state}`}
+                  </text>
+                )}
               </g>
             );
           })}

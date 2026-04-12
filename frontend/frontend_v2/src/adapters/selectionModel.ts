@@ -22,6 +22,41 @@ export type SelectionPresentation = {
   focusPoints: Point2[];
 };
 
+export type FleetVehicleContext = {
+  vehicleId: number;
+  selected: boolean;
+  state: string;
+  stateClass: "moving" | "waiting" | "idle";
+  title: string;
+  summary: string;
+  context: string;
+  detail: string;
+};
+
+export type FleetVehicleGroup = {
+  key: string;
+  label: string;
+  summary: string;
+  count: number;
+  selectedCount: number;
+  vehicleIds: number[];
+  vehicleSummaries: string[];
+};
+
+export type FleetRosterSummary = {
+  selectionSource: "local" | "bundle" | "none";
+  selectedVehicleIds: number[];
+  leadVehicleId: number | null;
+  totalVehicleCount: number;
+  selectedVehicleCount: number;
+  visibleVehicles: FleetVehicleContext[];
+  selectedVehicles: FleetVehicleContext[];
+  groups: FleetVehicleGroup[];
+  summary: string;
+  context: string;
+  notes: string[];
+};
+
 export function resolveActiveSelectionTarget(
   bundle: LiveBundleViewModel,
   uiState: FrontendUiState,
@@ -81,6 +116,60 @@ export function buildSelectionPresentation(
   }
 }
 
+export function buildFleetRosterSummary(
+  bundle: LiveBundleViewModel,
+  uiState: FrontendUiState,
+): FleetRosterSummary {
+  const selectedVehicleIds = resolveSelectionVehicleIds(bundle, uiState);
+  const selectionSource = resolveSelectionSource(bundle, uiState);
+  const selectedVehicleIdSet = new Set(selectedVehicleIds);
+  const visibleVehicles = bundle.map.vehicles
+    .map((vehicle) => buildFleetVehicleContext(bundle, vehicle.vehicleId, selectedVehicleIdSet.has(vehicle.vehicleId)))
+    .sort((left, right) => {
+      const selectedRank = Number(right.selected) - Number(left.selected);
+      if (selectedRank !== 0) {
+        return selectedRank;
+      }
+
+      const stateRank = fleetStateRank(left.stateClass) - fleetStateRank(right.stateClass);
+      if (stateRank !== 0) {
+        return stateRank;
+      }
+
+      return left.vehicleId - right.vehicleId;
+    });
+  const selectedVehicles = visibleVehicles.filter((vehicle) => vehicle.selected);
+  const groups = groupFleetVehicles(visibleVehicles);
+  const totalVehicleCount = visibleVehicles.length;
+  const selectedVehicleCount = selectedVehicles.length;
+  const leadVehicleId = selectedVehicleIds[0] ?? null;
+
+  return {
+    selectionSource,
+    selectedVehicleIds,
+    leadVehicleId,
+    totalVehicleCount,
+    selectedVehicleCount,
+    visibleVehicles,
+    selectedVehicles,
+    groups,
+    summary:
+      selectedVehicleCount > 0
+        ? `${selectedVehicleCount} selected from ${totalVehicleCount} visible vehicle(s)`
+        : `${totalVehicleCount} visible vehicle(s) with no current fleet selection`,
+    context:
+      selectionSource === "local"
+        ? "Frontend selection is carrying the current fleet focus."
+        : selectionSource === "bundle"
+          ? "Simulator bundle selection is driving the current fleet focus."
+          : "No fleet selection is active yet.",
+    notes: [
+      `${groups.length} context group(s) across the visible fleet.`,
+      selectedVehicleCount > 0 ? `Lead vehicle ${leadVehicleId}` : "Use the map to select one or more vehicles.",
+    ],
+  };
+}
+
 export function focusPointsForSelection(
   bundle: LiveBundleViewModel,
   selection: SelectionTarget | null,
@@ -104,6 +193,101 @@ export function focusPointsForSelection(
     }
     default:
       return [];
+  }
+}
+
+function buildFleetVehicleContext(
+  bundle: LiveBundleViewModel,
+  vehicleId: number,
+  selected: boolean,
+): FleetVehicleContext {
+  const vehicle = bundle.map.vehicles.find((entry) => entry.vehicleId === vehicleId) ?? null;
+  const inspection = bundle.commandCenter.vehicleInspections.find((entry) => entry.vehicleId === vehicleId) ?? null;
+  const preview = bundle.commandCenter.routePreviews.find((entry) => entry.vehicleId === vehicleId) ?? null;
+  const title = vehicle === null ? `Vehicle ${vehicleId}` : `Vehicle ${vehicle.vehicleId}`;
+  const stateClass = vehicle?.stateClass ?? "idle";
+  const state = vehicle?.state ?? inspection?.operationalState ?? "unknown";
+  const summary = `${humanize(stateClass)} · ${humanize(state)}`;
+  const contextParts = [
+    inspection !== null && inspection.currentNodeId !== null ? `Node ${inspection.currentNodeId}` : null,
+    inspection !== null && inspection.currentTaskType !== null ? humanize(inspection.currentTaskType) : null,
+    inspection !== null && inspection.waitReason !== null ? `Wait ${humanize(inspection.waitReason)}` : null,
+    inspection !== null && inspection.trafficControlState !== null ? humanize(inspection.trafficControlState) : null,
+    inspection !== null && inspection.etaSeconds !== null ? `ETA ${inspection.etaSeconds.toFixed(1)}s` : null,
+    preview !== null
+      ? preview.isActionable
+        ? `Preview to node ${preview.destinationNodeId}`
+        : `Preview blocked: ${humanize(preview.reason ?? "unavailable")}`
+      : null,
+  ].filter((part): part is string => part !== null);
+  const detail = contextParts.length > 0 ? contextParts.join(" · ") : "No additional vehicle context available.";
+
+  return {
+    vehicleId,
+    selected,
+    state,
+    stateClass,
+    title,
+    summary,
+    context: detail,
+    detail,
+  };
+}
+
+function groupFleetVehicles(vehicles: FleetVehicleContext[]): FleetVehicleGroup[] {
+  const groups = new Map<string, FleetVehicleContext[]>();
+  for (const vehicle of vehicles) {
+    const entries = groups.get(vehicle.stateClass);
+    if (entries === undefined) {
+      groups.set(vehicle.stateClass, [vehicle]);
+    } else {
+      entries.push(vehicle);
+    }
+  }
+
+  const orderedKeys: Array<FleetVehicleContext["stateClass"]> = ["moving", "waiting", "idle"];
+  return orderedKeys
+    .filter((key) => groups.has(key))
+    .map((key) => {
+      const entries = [...(groups.get(key) ?? [])].sort((left, right) => left.vehicleId - right.vehicleId);
+      const selectedCount = entries.filter((entry) => entry.selected).length;
+      return {
+        key,
+        label: humanize(key),
+        summary:
+          selectedCount > 0
+            ? `${selectedCount} selected of ${entries.length}`
+            : `${entries.length} vehicle(s) in ${humanize(key)} state`,
+        count: entries.length,
+        selectedCount,
+        vehicleIds: entries.map((entry) => entry.vehicleId),
+        vehicleSummaries: entries.map((entry) => `${entry.vehicleId} · ${entry.state}`),
+      };
+    });
+}
+
+function resolveSelectionSource(bundle: LiveBundleViewModel, uiState: FrontendUiState): "local" | "bundle" | "none" {
+  if (uiState.selection.vehicleIds.length > 0) {
+    return "local";
+  }
+
+  if (bundle.selectedVehicleIds.length > 0) {
+    return "bundle";
+  }
+
+  return "none";
+}
+
+function fleetStateRank(stateClass: FleetVehicleContext["stateClass"]): number {
+  switch (stateClass) {
+    case "moving":
+      return 0;
+    case "waiting":
+      return 1;
+    case "idle":
+      return 2;
+    default:
+      return 3;
   }
 }
 
@@ -180,9 +364,21 @@ function buildRoadPresentation(bundle: LiveBundleViewModel, roadId: string): Sel
     details.push({ label: "Class", value: humanize(road.roadClass) });
     details.push({ label: "Direction", value: humanize(road.directionality) });
     details.push({ label: "Lanes", value: String(road.laneCount) });
+    if (road.edgeIds.length > 0) {
+      details.push({ label: "Edges", value: summarizeIdList(road.edgeIds, 4) });
+    }
   }
 
-  const notes = road === null ? [] : [describeRoadImportance(road), describeRoadContext(bundle, road)];
+  const notes =
+    road === null
+      ? []
+      : [
+          describeRoadImportance(road),
+          describeRoadContext(bundle, road),
+          road.edgeIds.length > 0
+            ? `Road edge entry points: ${summarizeIdList(road.edgeIds, 4)}`
+            : "No edge entry points are available for this road.",
+        ];
 
   return {
     target: { kind: "road", roadId },
@@ -277,6 +473,14 @@ function formatAreaLabel(area: { kind: string; label: string | null; areaId: str
 
 function humanize(value: string): string {
   return value.replace(/[_-]+/gu, " ").replace(/\s+/gu, " ").trim();
+}
+
+function summarizeIdList(values: number[], limit: number): string {
+  const visibleValues = values.slice(0, limit).join(", ");
+  if (values.length <= limit) {
+    return visibleValues;
+  }
+  return `${visibleValues}, …`;
 }
 
 function uniqueNumbers(values: number[]): number[] {

@@ -595,6 +595,20 @@ dl {
   stroke-linejoin: round;
 }
 
+.vehicle-group {
+  cursor: pointer;
+}
+
+.vehicle-group-selected {
+  filter: drop-shadow(0 0 6px rgba(14, 104, 114, 0.2));
+}
+
+.vehicle-selection-ring {
+  fill: rgba(14, 104, 114, 0.06);
+  stroke: rgba(14, 104, 114, 0.78);
+  stroke-width: 0.12;
+}
+
 .map-legend {
   display: flex;
   flex-wrap: wrap;
@@ -667,6 +681,633 @@ dl {
   background: rgba(14, 104, 114, 0.08);
   border: 1px solid rgba(14, 104, 114, 0.16);
   color: var(--ink);
+}
+
+.command-center-context {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.command-context-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.command-center-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.command-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(248, 244, 236, 0.92));
+  border: 1px solid rgba(95, 85, 71, 0.12);
+}
+
+.command-card-preview {
+  background: linear-gradient(180deg, rgba(14, 104, 114, 0.1), rgba(255, 255, 255, 0.82));
+}
+
+.command-card-move {
+  background: linear-gradient(180deg, rgba(36, 116, 81, 0.08), rgba(255, 255, 255, 0.82));
+}
+
+.command-card-road {
+  background: linear-gradient(180deg, rgba(181, 92, 51, 0.1), rgba(255, 255, 255, 0.82));
+}
+
+.command-card-session {
+  background: linear-gradient(180deg, rgba(47, 66, 136, 0.09), rgba(255, 255, 255, 0.82));
+}
+
+.command-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px 14px;
+  align-items: start;
+}
+
+.command-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.command-card-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.command-feedback {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(95, 85, 71, 0.14);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.command-feedback-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.command-feedback strong {
+  color: var(--ink);
+  font-size: 0.98rem;
+}
+
+.command-feedback p {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.command-feedback-detail {
+  color: var(--ink) !important;
+}
+
+.command-feedback-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+}
+
+.command-feedback-pill {
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.command-feedback-pill-idle {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.command-feedback-pill-pending {
+  background: rgba(181, 92, 51, 0.1);
+  color: var(--warn);
+}
+
+.command-feedback-pill-success {
+  background: rgba(36, 116, 81, 0.12);
+  color: var(--good);
+}
+
+.command-feedback-pill-error {
+  background: rgba(181, 92, 51, 0.14);
+  color: var(--warn);
+}
+
+.command-feedback-pending {
+  border-color: rgba(181, 92, 51, 0.24);
+  background: linear-gradient(180deg, rgba(181, 92, 51, 0.09), rgba(255, 255, 255, 0.76));
+}
+
+.command-feedback-success {
+  border-color: rgba(36, 116, 81, 0.24);
+  background: linear-gradient(180deg, rgba(36, 116, 81, 0.08), rgba(255, 255, 255, 0.76));
+}
+
+.command-feedback-error {
+  border-color: rgba(181, 92, 51, 0.28);
+  background: linear-gradient(180deg, rgba(181, 92, 51, 0.11), rgba(255, 255, 255, 0.76));
+}
+
+.traffic-rail {
+  display: grid;
+  gap: 14px;
+}
+
+.fleet-rail {
+  display: grid;
+  gap: 14px;
+}
+
+.fleet-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fleet-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.fleet-selection-card {
+  background: linear-gradient(180deg, rgba(14, 104, 114, 0.08), rgba(255, 255, 255, 0.82));
+}
+
+.fleet-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.fleet-selection-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fleet-selection-chip {
+  border: 1px solid rgba(14, 104, 114, 0.18);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.fleet-selection-chip-muted {
+  color: var(--muted);
+  cursor: default;
+}
+
+.fleet-selection-actions,
+.fleet-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fleet-roster-list {
+  display: grid;
+  gap: 10px;
+}
+
+.fleet-roster-row {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 12px 13px;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fleet-roster-row-selected {
+  border-color: rgba(14, 104, 114, 0.34);
+  box-shadow: 0 8px 20px rgba(14, 104, 114, 0.08);
+}
+
+.fleet-roster-row-head,
+.fleet-group-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.fleet-roster-row p,
+.fleet-roster-row-detail,
+.fleet-batch-note,
+.fleet-section p,
+.fleet-group-card p {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.fleet-roster-row-detail {
+  font-size: 0.86rem;
+}
+
+.fleet-group-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.fleet-group-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+}
+
+.fleet-group-card-kicker {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+}
+
+.fleet-group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fleet-group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(14, 104, 114, 0.09);
+  border: 1px solid rgba(14, 104, 114, 0.14);
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+
+.fleet-batch-hub {
+  background: linear-gradient(180deg, rgba(36, 116, 81, 0.08), rgba(255, 255, 255, 0.82));
+}
+
+.fleet-batch-actions .scene-button-primary:disabled {
+  opacity: 0.6;
+}
+
+.fleet-batch-note {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.traffic-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.traffic-focus-card,
+.traffic-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.traffic-focus-card {
+  background: linear-gradient(180deg, rgba(14, 104, 114, 0.08), rgba(255, 255, 255, 0.82));
+}
+
+.traffic-focus-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.traffic-focus-meta span {
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.traffic-section-head,
+.traffic-road-card-header,
+.traffic-queue-card-head,
+.traffic-control-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.traffic-section-head p,
+.traffic-road-card-summary,
+.traffic-queue-card p,
+.traffic-control-card p,
+.traffic-empty-state,
+.traffic-footnote {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.traffic-road-list,
+.traffic-queue-list,
+.traffic-control-list {
+  display: grid;
+  gap: 10px;
+}
+
+.traffic-road-card,
+.traffic-queue-card,
+.traffic-control-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+}
+
+.traffic-road-card.selected {
+  border-color: rgba(14, 104, 114, 0.34);
+  box-shadow: 0 8px 20px rgba(14, 104, 114, 0.08);
+}
+
+.traffic-road-card-hot {
+  background: linear-gradient(180deg, rgba(181, 92, 51, 0.1), rgba(255, 255, 255, 0.84));
+}
+
+.traffic-road-card-queued {
+  background: linear-gradient(180deg, rgba(14, 104, 114, 0.1), rgba(255, 255, 255, 0.84));
+}
+
+.traffic-road-card-calm {
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.traffic-road-card-kicker {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+}
+
+.traffic-road-card-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(14, 104, 114, 0.11);
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.traffic-road-card-metrics,
+.traffic-queue-card-meta,
+.traffic-control-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.traffic-road-card-metrics strong {
+  color: var(--ink);
+}
+
+.traffic-road-card-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(14, 104, 114, 0.08);
+  overflow: hidden;
+}
+
+.traffic-road-card-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(181, 92, 51, 0.94), rgba(14, 104, 114, 0.94));
+}
+
+.traffic-empty-state {
+  padding: 10px 0 0;
+}
+
+.traffic-footnote {
+  padding: 0 2px;
+  font-size: 0.86rem;
+}
+
+.route-plan-builder {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px 14px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+}
+
+.route-plan-builder-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 240px;
+}
+
+.route-plan-builder-copy strong {
+  color: var(--ink);
+}
+
+.route-plan-builder-copy p {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.route-plan-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.route-plan-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid var(--line);
+}
+
+.route-plan-card.selected {
+  border-color: rgba(14, 104, 114, 0.32);
+  box-shadow: 0 10px 22px rgba(14, 104, 114, 0.1);
+}
+
+.route-plan-card.committed {
+  border-color: rgba(36, 116, 81, 0.24);
+}
+
+.route-plan-card-main {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.route-plan-card-main strong {
+  color: var(--ink);
+  font-size: 0.98rem;
+}
+
+.route-plan-card-main p {
+  color: var(--muted);
+  line-height: 1.42;
+}
+
+.route-plan-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.route-plan-card-detail {
+  color: var(--ink) !important;
+}
+
+.route-plan-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.route-plan-card-actions .selection-pill {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.route-preview-layer {
+  pointer-events: none;
+}
+
+.route-preview-path {
+  fill: none;
+  stroke: rgba(14, 104, 114, 0.96);
+  stroke-width: 0.48;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 0.18px rgba(14, 104, 114, 0.22));
+}
+
+.route-preview-node {
+  fill: rgba(14, 104, 114, 0.9);
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.1;
+}
+
+.route-preview-node-start {
+  fill: rgba(36, 116, 81, 0.92);
+}
+
+.route-preview-destination {
+  fill: rgba(181, 92, 51, 0.92);
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-width: 0.12;
+}
+
+.traffic-overlay-layer {
+  pointer-events: none;
+}
+
+.traffic-overlay-road {
+  fill: none;
+  stroke: rgba(181, 92, 51, 0.88);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 0.18px rgba(181, 92, 51, 0.24));
+}
+
+.traffic-overlay-road-selected {
+  stroke: rgba(14, 104, 114, 0.94);
+}
+
+.traffic-control-point {
+  pointer-events: none;
+}
+
+.traffic-control-point-ready {
+  fill: rgba(36, 116, 81, 0.9);
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-width: 0.1;
+}
+
+.traffic-control-point-waiting {
+  fill: rgba(181, 92, 51, 0.9);
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-width: 0.1;
+}
+
+.traffic-queue-marker {
+  fill: rgba(14, 104, 114, 0.92);
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-width: 0.1;
+  pointer-events: none;
 }
 
 .operate-field {
@@ -760,6 +1401,10 @@ code {
 
 @media (max-width: 1140px) {
   .shell-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .command-center-grid {
     grid-template-columns: 1fr;
   }
 
