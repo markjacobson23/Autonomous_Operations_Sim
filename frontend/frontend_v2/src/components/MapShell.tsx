@@ -50,6 +50,7 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
   const hasRenderableScene =
     bundle.map.nodes.length > 0 ||
     bundle.map.roads.length > 0 ||
+    bundle.map.intersections.length > 0 ||
     bundle.map.areas.length > 0 ||
     bundle.map.vehicles.length > 0 ||
     bundle.commandCenter.routePreviews.length > 0;
@@ -156,6 +157,10 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
     commitSelection({ kind: "road", roadId }, []);
   }
 
+  function handleSelectIntersection(intersectionId: string) {
+    commitSelection({ kind: "intersection", intersectionId }, []);
+  }
+
   function handleSelectArea(areaId: string) {
     commitSelection({ kind: "area", areaId }, []);
   }
@@ -257,6 +262,7 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
             onWheelZoom={handleWheel}
             onSelectVehicle={handleSelectVehicle}
             onSelectRoad={handleSelectRoad}
+            onSelectIntersection={handleSelectIntersection}
             onSelectArea={handleSelectArea}
           />
         ) : (

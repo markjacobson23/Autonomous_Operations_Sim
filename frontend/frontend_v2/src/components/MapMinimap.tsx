@@ -10,7 +10,7 @@ type MapMinimapProps = {
 };
 
 export function MapMinimap({ model, camera, viewport, onCenterAt }: MapMinimapProps): JSX.Element {
-  const { bounds, roads, vehicles } = model.map;
+  const { bounds, roads, intersections, areas, vehicles } = model.map;
   const scaleX = 220 / bounds.width;
   const scaleY = 152 / bounds.height;
 
@@ -44,6 +44,20 @@ export function MapMinimap({ model, camera, viewport, onCenterAt }: MapMinimapPr
         aria-label="Map minimap"
       >
         <rect x="0" y="0" width="220" height="152" className="minimap-bg" />
+        {areas.map((area) => (
+          <path
+            key={area.areaId}
+            d={pointsToMinimapPath(area.polygon, bounds)}
+            className={`minimap-area minimap-area-${area.category}`}
+          />
+        ))}
+        {intersections.map((intersection) => (
+          <path
+            key={intersection.intersectionId}
+            d={pointsToMinimapPath(intersection.polygon, bounds)}
+            className={`minimap-intersection minimap-intersection-${intersectionKindToken(intersection.intersectionType)}`}
+          />
+        ))}
         {roads.map((road) => (
           <path key={road.roadId} d={pointsToMinimapPath(road.centerline, bounds)} className="minimap-road" />
         ))}
@@ -59,6 +73,8 @@ export function MapMinimap({ model, camera, viewport, onCenterAt }: MapMinimapPr
         <rect x={viewport.x} y={viewport.y} width={viewport.width} height={viewport.height} className="minimap-viewport-shadow" />
       </svg>
       <div className="minimap-context-strip">
+        <span>{areas.length} areas</span>
+        <span>{intersections.length} intersections</span>
         <span>{roads.length} roads</span>
         <span>{vehicles.length} vehicles</span>
       </div>
@@ -77,6 +93,10 @@ function pointsToPath(points: readonly (readonly [number, number])[]): string {
     commands.push(`L ${point[0]} ${point[1]}`);
   }
   return commands.join(" ");
+}
+
+function intersectionKindToken(kind: string): string {
+  return kind.trim().toLowerCase().replace(/[^a-z0-9]+/gu, "-");
 }
 
 function pointsToMinimapPath(

@@ -59,6 +59,8 @@ It should represent:
 * initial actors/resources/tasks
 * environment semantics for mining, yard, and city scenes
 
+It should also define one shared world-form taxonomy so roads, lanes, intersections, zones, structures, terrain forms, and anchors mean the same thing across mine, yard, and city.
+
 ## 2.2 Owns
 
 * scenario schema
@@ -204,6 +206,16 @@ A live session should be able to:
 This layer converts authoritative runtime state into stable consumer-facing surfaces.
 
 It exists so consumers do not need to know internal engine details.
+
+This is also the boundary where render-ready geometry is derived from world-model-v2 semantics. The world model owns the static meaning of the scene; derived surfaces own the presentation-ready shape of that scene; frontend adapters only translate those derived surfaces into UI state.
+
+The derived surface contract should preserve the shared taxonomy, not collapse it into generic miscellaneous geometry.
+
+The static world surface should expose a stable feature inventory and semantic feature groups so later rendering and inspection can consume the same world truth without reinterpretation.
+
+The render geometry contract should also expose a layer manifest that names the semantic and projection layers explicitly, so map consumers can reason about organization without re-inferring meaning from raw polygons.
+
+Scene bounds and framing inputs should likewise be derived from the shared world/render surfaces, including world-form context such as boundaries, terrain, structures, and asset coverage when those exist. Frontend consumers may fit or focus using those derived bounds, but they should not invent their own extents from a thin subset of geometry.
 
 ## 5.2 Owns
 

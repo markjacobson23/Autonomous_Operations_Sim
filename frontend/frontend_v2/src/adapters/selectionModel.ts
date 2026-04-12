@@ -4,6 +4,7 @@ import type { FrontendUiState } from "../state/frontendUiState";
 export type SelectionTarget =
   | { kind: "vehicle"; vehicleId: number }
   | { kind: "road"; roadId: string }
+  | { kind: "intersection"; intersectionId: string }
   | { kind: "area"; areaId: string };
 
 export type SelectionDetail = {
@@ -109,6 +110,8 @@ export function buildSelectionPresentation(
       return buildVehiclePresentation(bundle, target.vehicleId);
     case "road":
       return buildRoadPresentation(bundle, target.roadId);
+    case "intersection":
+      return buildIntersectionPresentation(bundle, target.intersectionId);
     case "area":
       return buildAreaPresentation(bundle, target.areaId);
     default:
@@ -186,6 +189,10 @@ export function focusPointsForSelection(
     case "road": {
       const road = bundle.map.roads.find((entry) => entry.roadId === selection.roadId);
       return road === undefined ? [] : road.centerline;
+    }
+    case "intersection": {
+      const intersection = bundle.map.intersections.find((entry) => entry.intersectionId === selection.intersectionId);
+      return intersection === undefined ? [] : intersection.polygon;
     }
     case "area": {
       const area = bundle.map.areas.find((entry) => entry.areaId === selection.areaId);
@@ -393,25 +400,79 @@ function buildRoadPresentation(bundle: LiveBundleViewModel, roadId: string): Sel
   };
 }
 
+function buildIntersectionPresentation(bundle: LiveBundleViewModel, intersectionId: string): SelectionPresentation {
+  const intersection = bundle.map.intersections.find((entry) => entry.intersectionId === intersectionId) ?? null;
+  const title = intersection === null ? `Intersection ${intersectionId}` : formatIntersectionLabel(intersection);
+  const badge = intersection === null ? "Intersection" : humanize(intersection.intersectionType);
+  const summary =
+    intersection === null
+      ? "Junction geometry"
+      : describeIntersectionImportance(intersection.intersectionType, intersection.polygon.length);
+  const context =
+    intersection === null
+      ? "Intersection detail unavailable."
+      : `${humanize(intersection.intersectionType)} junction in ${bundle.map.environment.displayName}`;
+  const details: SelectionDetail[] = [
+    { label: "Identity", value: title },
+    { label: "Role", value: badge },
+  ];
+
+  if (intersection !== null) {
+    details.push({ label: "Feature", value: "Control-relevant junction" });
+    details.push({ label: "Vertices", value: String(intersection.polygon.length) });
+  }
+
+  const notes =
+    intersection === null
+      ? []
+      : [
+          describeIntersectionImportance(intersection.intersectionType, intersection.polygon.length),
+          `Part of the ${bundle.map.environment.displayName} junction network.`,
+        ];
+
+  return {
+    target: { kind: "intersection", intersectionId },
+    title,
+    badge,
+    summary,
+    context,
+    details,
+    notes,
+    focusPoints: intersection === null ? [] : intersection.polygon,
+  };
+}
+
 function buildAreaPresentation(bundle: LiveBundleViewModel, areaId: string): SelectionPresentation {
   const area = bundle.map.areas.find((entry) => entry.areaId === areaId) ?? null;
   const title = area === null ? `Area ${areaId}` : formatAreaLabel(area);
-  const badge = area === null ? "Area" : humanize(area.kind);
-  const summary = area === null ? "Environmental context" : describeAreaImportance(area.kind);
-  const context = area === null ? "Area detail unavailable." : `World form: ${bundle.map.environment.displayName}`;
+  const badge = area === null ? "Area" : humanize(area.category);
+  const summary = area === null ? "Environmental context" : describeAreaImportance(area.category, area.kind);
+  const context =
+    area === null
+      ? "Area detail unavailable."
+      : `${humanize(area.category)} surface in ${bundle.map.environment.displayName}`;
   const details: SelectionDetail[] = [
     { label: "Identity", value: title },
-    { label: "Type", value: badge },
+    { label: "Role", value: badge },
   ];
 
   if (bundle.map.environment.displayName !== "unknown environment") {
     details.push({ label: "Environment", value: bundle.map.environment.displayName });
   }
-  if (area !== null && area.label !== null) {
-    details.push({ label: "Label", value: area.label });
+  if (area !== null) {
+    details.push({ label: "Kind", value: humanize(area.kind) });
+  }
+  if (area !== null && area.groupId !== null) {
+    details.push({ label: "Group", value: humanize(area.groupId) });
   }
 
-  const notes = area === null ? [] : [describeAreaImportance(area.kind), `Part of the ${bundle.map.environment.displayName} surface.`];
+  const notes =
+    area === null
+      ? []
+      : [
+          describeAreaImportance(area.category, area.kind),
+          `Part of the ${bundle.map.environment.displayName} surface.`,
+        ];
 
   return {
     target: { kind: "area", areaId },
@@ -453,15 +514,47 @@ function describeRoadContext(bundle: LiveBundleViewModel, road: { blocked: boole
     : "Current context: open and available for routing.";
 }
 
-function describeAreaImportance(kind: string): string {
-  const normalized = kind.toLowerCase();
-  if (normalized.includes("depot") || normalized.includes("yard") || normalized.includes("loading")) {
+function describeIntersectionImportance(intersectionType: string, vertices: number): string {
+  const normalized = intersectionType.toLowerCase();
+  if (normalized.includes("signal")) {
+    return "Signalized junction that controls movement through the scene.";
+  }
+  if (normalized.includes("yard") || normalized.includes("staging")) {
+    return "Operational junction that organizes access through the work site.";
+  }
+  return vertices > 4
+    ? "Control-relevant junction with a larger footprint than a simple crossing."
+    : "Control-relevant junction that anchors the road network.";
+}
+
+function describeAreaImportance(category: string, kind: string): string {
+  const normalizedKind = kind.toLowerCase();
+  if (category === "structure") {
+    return "Built mass that gives the scene a real-world envelope.";
+  }
+  if (category === "terrain") {
+    return "Terrain form that shapes the worksite and the map’s spatial depth.";
+  }
+  if (category === "boundary") {
+    return "Boundary surface that frames the environment and protects the site edge.";
+  }
+  if (category === "hazard") {
+    return "Restricted surface that stays visible without dominating the scene.";
+  }
+  if (category === "surface") {
+    return "Movement surface that supports pedestrian or shared-site circulation.";
+  }
+  if (normalizedKind.includes("depot") || normalizedKind.includes("yard") || normalizedKind.includes("loading")) {
     return "Operational area that usually frames staging or loading activity.";
   }
-  if (normalized.includes("building") || normalized.includes("office") || normalized.includes("warehouse")) {
+  if (normalizedKind.includes("building") || normalizedKind.includes("office") || normalizedKind.includes("warehouse")) {
     return "Built area that gives the map its world form and local context.";
   }
   return "Context surface that helps anchor the world form around the route network.";
+}
+
+function formatIntersectionLabel(intersection: { intersectionType: string; polygon: Point2[]; intersectionId: string }): string {
+  return `${humanize(intersection.intersectionType)} junction`;
 }
 
 function formatRoadLabel(road: { roadClass: string; directionality: string }): string {

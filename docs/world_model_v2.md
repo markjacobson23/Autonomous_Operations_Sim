@@ -7,6 +7,8 @@
 
 ## Purpose
 
+This document is the Phase B architecture note for the world-model boundary lock.
+
 World Model v2 defines the unified internal representation for the environments Autonomous Operations Sim must support.
 
 Its job is to make sure that:
@@ -26,6 +28,46 @@ This is the scene/world model the rest of the system should build on:
 * hazards/weather/resource systems
 
 The execution plan explicitly calls this out as a major foundational step: the project needs a stronger world/scene model before richer realism and editing can land cleanly, and that model must represent mining, yard, and city without hacks. 
+
+## 0. Phase B boundary lock
+
+World Model v2 is the simulator-owned source of truth for static world semantics.
+
+It owns:
+
+* scene identity and metadata
+* environment family and archetype
+* topology and spatial world structure
+* zones, surfaces, structures, terrain-like forms, and operational anchors
+* imported/authored static scene representation
+
+It must not own:
+
+* runtime vehicle truth
+* live queue or congestion truth
+* reservations or per-run closures
+* frontend selection, viewport, or panel state
+* render-only presentation state
+
+The render-facing contract is separate:
+
+* world model v2 describes what the world is
+* render-ready geometry describes how the world is presented
+* scene framing and spatial extents are derived from the shared world/render surfaces, not guessed locally by frontend consumers
+* frontend adapters translate derived bundle surfaces into UI state
+
+The frontend may consume the derived surfaces, but it must not become a competing authority for topology, route truth, or world truth.
+
+## 0.1 Explicit terminology
+
+Use these terms consistently:
+
+* `world-model-v2`: the unified simulator-owned world semantics and static scene model
+* `render-ready geometry`: derived geometry surfaces prepared for visualization and selection
+* `frontend adapters`: consumer-side translators from derived bundles into presentable UI state
+* `derived bundle surfaces`: backend-emitted read models for frontend, replay, analysis, and authoring consumers
+
+Mine, yard, and city are all environment families inside the same world-model-v2 architecture.
 
 ---
 
@@ -169,6 +211,12 @@ An archetype provides reusable semantics and defaults, such as:
 * yard with staging pads, unloading bays, forklift corridors
 * city street with blocks, intersections, lanes, sidewalks, buildings
 
+Known Phase B archetypes are expected to remain family-scoped and reusable:
+
+* `mine` family: `mine_depot`, `legacy_mine_depot`
+* `construction_yard` family: `construction_staging_yard`, `legacy_construction_yard`
+* `city_street` family: `urban_delivery_corridor`, `legacy_city_street`
+
 An archetype can influence:
 
 * default zone meanings
@@ -176,8 +224,16 @@ An archetype can influence:
 * common vehicle classes
 * default task/resource patterns
 * render/presentation hints
+* allowed world-form combinations
 
-### 4.3 Why this distinction matters
+### 4.3 Shared taxonomy rule
+
+Environment family and archetype do not replace the shared world-form taxonomy.
+They only scope defaults and capability emphasis.
+
+The same category names should mean the same things across mine, yard, and city, even when the underlying geometry differs.
+
+### 4.4 Why this distinction matters
 
 Environment family tells us what broad world we are in.
 Archetype tells us what specific style/operational pattern that world uses.
@@ -547,6 +603,8 @@ Below is a starting skeleton.
 
 ### 11.1 Road / mobility types
 
+These are mobility-bearing world forms, not just drawable road shapes.
+
 * haul_road
 * service_road
 * arterial_street
@@ -555,8 +613,14 @@ Below is a starting skeleton.
 * connector
 * ramp
 * access_lane
+* lane
+* turn_connector
+* stop_line
+* merge_zone
 
 ### 11.2 Intersection / junction types
+
+These are control-relevant junction forms, including places where right-of-way or merge behavior matters.
 
 * uncontrolled
 * stop_controlled
@@ -565,8 +629,13 @@ Below is a starting skeleton.
 * merge_junction
 * depot_gate
 * yard_crossing
+* control_point
+* crossing
+* junction
 
-### 11.3 Surface / zone types
+### 11.3 Zone / surface types
+
+These are semantic operational surfaces. They may be flat, sloped, bounded, or partially enclosed.
 
 * loading_zone
 * unloading_zone
@@ -581,21 +650,49 @@ Below is a starting skeleton.
 * stockpile_zone
 * pit_floor_zone
 * pad_zone
+* service_surface
+* boundary_surface
+* access_surface
 
-### 11.4 Structure / terrain types
+### 11.4 Structure types
+
+These are physical world objects with meaningful presence beyond a polygonal surface.
 
 * building
 * warehouse
 * office
 * crusher
+* gatehouse
+* wall
+* barrier
+
+### 11.5 Terrain form types
+
+These are earth/grade forms whose shape matters to navigation, visibility, or operational behavior.
+
 * berm
 * stockpile
 * hill
 * mountain
 * pit
 * trench
+* embankment
+* cut
+* basin
 * retaining_wall
-* barrier
+
+### 11.6 Anchor / operational point types
+
+These are stable points or regions that connect world form to runtime activity.
+
+* spawn_point
+* task_point
+* loading_point
+* unloading_point
+* service_point
+* staging_point
+* resource_point
+* control_point
 
 This taxonomy can evolve, but v2 should make these concepts natural rather than awkward.
 
@@ -751,6 +848,8 @@ This is not final code schema, but the conceptual object layout should look some
 * initial_actors
 * initial_tasks
 * scenario_defaults
+
+The implemented world-model surface v2 should expose a stable `feature_inventory` plus categorized `feature_groups` and layered feature views for roads, intersections, zones, structures, terrain forms, anchors, sidewalks, boundaries, and no-go areas.
 
 ### Environment
 

@@ -4,6 +4,31 @@ export type LoadState = "loading" | "ready" | "error";
 
 export type Point2 = readonly [number, number];
 
+export type SceneBoundsPayload = {
+  min_x?: number;
+  min_y?: number;
+  max_x?: number;
+  max_y?: number;
+  width?: number;
+  height?: number;
+};
+
+export type SceneExtentPayload = {
+  extent_id?: string;
+  source?: string;
+  category?: string;
+  label?: string;
+  feature_ids?: string[];
+  bounds?: SceneBoundsPayload;
+};
+
+export type SceneFramePayload = {
+  frame_id?: string;
+  environment_family?: string;
+  scene_bounds?: SceneBoundsPayload;
+  extents?: SceneExtentPayload[];
+};
+
 export type LiveBundleResource = {
   bundleUrl: string;
   loadState: LoadState;
@@ -24,9 +49,18 @@ export type LiveRoadViewModel = {
 
 export type LiveAreaViewModel = {
   areaId: string;
+  category: string;
   kind: string;
   polygon: Point2[];
   label: string | null;
+  groupId: string | null;
+};
+
+export type LiveIntersectionViewModel = {
+  intersectionId: string;
+  nodeId: number;
+  polygon: Point2[];
+  intersectionType: string;
 };
 
 export type LiveTrafficControlPointViewModel = {
@@ -147,6 +181,7 @@ export type LiveBundleViewModel = {
   map: {
     nodes: LiveNodeViewModel[];
     roads: LiveRoadViewModel[];
+    intersections: LiveIntersectionViewModel[];
     areas: LiveAreaViewModel[];
     vehicles: LiveVehicleViewModel[];
     blockedEdgeIds: number[];
@@ -154,6 +189,33 @@ export type LiveBundleViewModel = {
       family: string;
       archetypeId: string;
       displayName: string;
+    };
+    sceneFrame: {
+      frameId: string;
+      environmentFamily: string;
+      sceneBounds: {
+        minX: number;
+        minY: number;
+        maxX: number;
+        maxY: number;
+        width: number;
+        height: number;
+      };
+      extents: Array<{
+        extentId: string;
+        source: string;
+        category: string;
+        label: string;
+        featureIds: string[];
+        bounds: {
+          minX: number;
+          minY: number;
+          maxX: number;
+          maxY: number;
+          width: number;
+          height: number;
+        };
+      }>;
     };
     bounds: {
       minX: number;
@@ -221,6 +283,7 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
   const aiAssist = readRecord(commandCenter, "ai_assist");
   const worldModel = readRecord(renderGeometry, "world_model");
   const worldEnvironment = readRecord(worldModel, "environment");
+  const sceneFrame = resolveSceneFrame(renderGeometry, bundle);
 
   const nodes = readArray(mapSurface, "nodes").flatMap((node, index) => {
     const nodeRecord = isRecord(node) ? node : null;
@@ -263,6 +326,22 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
     ];
   });
 
+  const intersections = readArray(renderGeometry, "intersections").flatMap((intersection, index) => {
+    const intersectionRecord = isRecord(intersection) ? intersection : null;
+    if (intersectionRecord === null) {
+      return [];
+    }
+
+    return [
+      {
+        intersectionId: readString(intersectionRecord, "intersection_id", `intersection-${index}`),
+        nodeId: readNumber(intersectionRecord, "node_id", index + 1),
+        polygon: readPointList(readArray(intersectionRecord, "polygon")),
+        intersectionType: readString(intersectionRecord, "intersection_type", "junction"),
+      },
+    ];
+  });
+
   const areas = readArray(renderGeometry, "areas").flatMap((area, index) => {
     const areaRecord = isRecord(area) ? area : null;
     if (areaRecord === null) {
@@ -272,9 +351,11 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
     return [
       {
         areaId: readString(areaRecord, "area_id", `area-${index}`),
+        category: readString(areaRecord, "category", classifyAreaCategory(readString(areaRecord, "kind", "context"))),
         kind: readString(areaRecord, "kind", "context"),
         polygon: readPointList(readArray(areaRecord, "polygon")),
         label: areaRecord.label === null || areaRecord.label === undefined ? null : String(areaRecord.label),
+        groupId: readStringOrNull(areaRecord, "group_id"),
       },
     ];
   });
@@ -529,6 +610,7 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
     map: {
       nodes,
       roads,
+      intersections,
       areas,
       vehicles: liveVehicles,
       blockedEdgeIds,
@@ -537,7 +619,8 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
         archetypeId: readString(worldEnvironment, "archetype_id", "unknown"),
         displayName: readString(worldEnvironment, "display_name", "unknown environment"),
       },
-      bounds: padBounds(computeBounds(collectScenePoints(bundle)), 2),
+      sceneFrame,
+      bounds: padBounds(sceneFrame.sceneBounds, 2),
     },
     commandCenter: {
       routePreviews,
@@ -764,6 +847,50 @@ function readPointList(points: unknown[]): Point2[] {
   });
 }
 
+function classifyAreaCategory(kind: string): string {
+  const normalized = kind.trim().toLowerCase();
+  if (
+    [
+      "building",
+      "maintenance_building",
+      "office",
+      "warehouse",
+      "crusher",
+      "gatehouse",
+      "wall",
+      "barrier",
+    ].includes(normalized)
+  ) {
+    return "structure";
+  }
+  if (
+    [
+      "berm",
+      "stockpile",
+      "hill",
+      "mountain",
+      "pit",
+      "trench",
+      "embankment",
+      "cut",
+      "basin",
+      "retaining_wall",
+    ].includes(normalized)
+  ) {
+    return "terrain";
+  }
+  if (["sidewalk", "walkway", "pedestrian_route", "sidewalk_zone"].includes(normalized)) {
+    return "surface";
+  }
+  if (["site_boundary", "boundary", "perimeter", "boundary_surface"].includes(normalized)) {
+    return "boundary";
+  }
+  if (["no_go", "no_go_area", "no_go_zone", "hazard_zone", "blast_zone", "hazard_exclusion"].includes(normalized)) {
+    return "hazard";
+  }
+  return "zone";
+}
+
 function collectScenePoints(bundle: JsonRecord | null): Point2[] {
   const points: Point2[] = [];
   const mapSurface = readRecord(bundle, "map_surface");
@@ -801,6 +928,71 @@ function collectScenePoints(bundle: JsonRecord | null): Point2[] {
   }
 
   return points.length > 0 ? points : [[-10, -6], [10, 6]];
+}
+
+function resolveSceneFrame(
+  renderGeometry: JsonRecord | null,
+  bundle: JsonRecord | null,
+): LiveBundleViewModel["map"]["sceneFrame"] {
+  const sceneFrameRecord = readRecord(renderGeometry, "scene_frame");
+  if (sceneFrameRecord !== null) {
+    return {
+      frameId: readString(sceneFrameRecord, "frame_id", "scene-frame"),
+      environmentFamily: readString(sceneFrameRecord, "environment_family", "unknown"),
+      sceneBounds: readSceneBounds(sceneFrameRecord.scene_bounds),
+      extents: readArray(sceneFrameRecord, "extents").flatMap((extent, index) => {
+        const extentRecord = isRecord(extent) ? extent : null;
+        if (extentRecord === null) {
+          return [];
+        }
+        return [
+          {
+            extentId: readString(extentRecord, "extent_id", `extent-${index + 1}`),
+            source: readString(extentRecord, "source", "render_geometry"),
+            category: readString(extentRecord, "category", "operational"),
+            label: readString(extentRecord, "label", "Scene extent"),
+            featureIds: readStringList(extentRecord, "feature_ids"),
+            bounds: readSceneBounds(extentRecord.bounds),
+          },
+        ];
+      }),
+    };
+  }
+
+  const points = collectScenePoints(bundle);
+  const fallback = padBounds(computeBounds(points), 2);
+  return {
+    frameId: "scene-frame",
+    environmentFamily: readString(readRecord(readRecord(renderGeometry, "world_model"), "environment"), "family", "unknown"),
+    sceneBounds: {
+      minX: fallback.minX,
+      minY: fallback.minY,
+      maxX: fallback.maxX,
+      maxY: fallback.maxY,
+      width: fallback.width,
+      height: fallback.height,
+    },
+    extents: [],
+  };
+}
+
+function readSceneBounds(boundsRecord: unknown): {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  width: number;
+  height: number;
+} {
+  const record = isRecord(boundsRecord) ? boundsRecord : null;
+  return {
+    minX: readNumber(record, "min_x", 0),
+    minY: readNumber(record, "min_y", 0),
+    maxX: readNumber(record, "max_x", 0),
+    maxY: readNumber(record, "max_y", 0),
+    width: Math.max(readNumber(record, "width", 1), 1),
+    height: Math.max(readNumber(record, "height", 1), 1),
+  };
 }
 
 function computeBounds(points: Point2[]): {

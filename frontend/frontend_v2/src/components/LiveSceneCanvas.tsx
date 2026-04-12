@@ -20,6 +20,7 @@ type LiveSceneCanvasProps = {
   onWheelZoom?: (deltaY: number) => void;
   onSelectVehicle: (vehicleId: number, additive: boolean) => void;
   onSelectRoad: (roadId: string) => void;
+  onSelectIntersection: (intersectionId: string) => void;
   onSelectArea: (areaId: string) => void;
   activeRoutePreview: LiveBundleViewModel["commandCenter"]["routePreviews"][number] | null;
   activeMode: FrontendModeId;
@@ -39,12 +40,13 @@ export function LiveSceneCanvas({
   onWheelZoom,
   onSelectVehicle,
   onSelectRoad,
+  onSelectIntersection,
   onSelectArea,
   activeRoutePreview,
   activeMode,
 }: LiveSceneCanvasProps): JSX.Element {
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const { bounds, nodes, roads, areas, vehicles } = model.map;
+  const { bounds, nodes, roads, intersections, areas, vehicles, sceneFrame } = model.map;
   const trafficRoadStates = model.traffic.roadStates;
   const trafficControlPoints = model.traffic.controlPoints;
   const trafficQueueRecords = model.traffic.queueRecords;
@@ -55,6 +57,10 @@ export function LiveSceneCanvas({
   const previewDestinationPoint = layers.routes && activeRoutePreview !== null ? activeRoutePreview.destinationPoint : null;
   const previewDiagnostics = layers.routes && activeRoutePreview !== null ? activeRoutePreview.renderDiagnostics : [];
   const selectedVehicleIdSet = new Set(selectedVehicleIds);
+  const orderedAreas = [...areas].sort((left, right) => areaSortRank(left.category) - areaSortRank(right.category));
+  const hasWorldFormContext =
+    sceneFrame.extents.some((extent) => extent.source === "world_model" && extent.category !== "operational") ||
+    orderedAreas.some((area) => area.category !== "zone");
 
   useEffect(() => {
     const svgElement = svgRef.current;
@@ -111,9 +117,18 @@ export function LiveSceneCanvas({
         height={bounds.height}
         className="map-ground-vignette"
       />
-      <g transform={sceneTransform}>
+      <g transform={sceneTransform} className={hasWorldFormContext ? "scene-world-form-layer" : undefined}>
+        {hasWorldFormContext ? (
+          <rect
+            x={sceneFrame.sceneBounds.minX}
+            y={sceneFrame.sceneBounds.minY}
+            width={sceneFrame.sceneBounds.width}
+            height={sceneFrame.sceneBounds.height}
+            className="scene-world-form-backdrop"
+          />
+        ) : null}
         {layers.areas &&
-          areas.map((area) => {
+          orderedAreas.map((area) => {
             if (area.polygon.length < 3) {
               return null;
             }
@@ -122,7 +137,12 @@ export function LiveSceneCanvas({
               <path
                 key={area.areaId}
                 d={pointsToClosedPath(area.polygon)}
-                className={`area-surface area-surface-${areaKindToken(area.kind)}${isSelected ? " area-surface-selected" : ""}`}
+                className={[
+                  "area-surface",
+                  `area-surface-${area.category}`,
+                  `area-surface-kind-${areaKindToken(area.kind)}`,
+                  isSelected ? " area-surface-selected" : "",
+                ].join(" ")}
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   onSelectArea(area.areaId);
@@ -130,6 +150,28 @@ export function LiveSceneCanvas({
               />
             );
           })}
+        {intersections.length > 0 ? (
+          <g className="intersection-layer">
+            {intersections.map((intersection) => {
+              if (intersection.polygon.length < 3) {
+                return null;
+              }
+              const isSelected =
+                selectionTarget?.kind === "intersection" && selectionTarget.intersectionId === intersection.intersectionId;
+              return (
+                <path
+                  key={intersection.intersectionId}
+                  d={pointsToClosedPath(intersection.polygon)}
+                  className={`intersection-footprint intersection-footprint-${intersectionKindToken(intersection.intersectionType)}${isSelected ? " intersection-footprint-selected" : ""}`}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    onSelectIntersection(intersection.intersectionId);
+                  }}
+                />
+              );
+            })}
+          </g>
+        ) : null}
         {layers.routes && activeRoutePreview !== null && previewPathPoints.length > 0 ? (
           <g className="route-preview-layer">
             {previewPathPoints.length > 1 ? <path d={pointsToPath(previewPathPoints)} className="route-preview-path" /> : null}
@@ -293,5 +335,28 @@ function pointsToClosedPath(points: readonly (readonly [number, number])[]): str
 }
 
 function areaKindToken(kind: string): string {
+  return kind.trim().toLowerCase().replace(/[^a-z0-9]+/gu, "-");
+}
+
+function areaSortRank(category: string): number {
+  switch (category) {
+    case "terrain":
+      return 0;
+    case "boundary":
+      return 1;
+    case "zone":
+      return 2;
+    case "structure":
+      return 3;
+    case "surface":
+      return 4;
+    case "hazard":
+      return 5;
+    default:
+      return 6;
+  }
+}
+
+function intersectionKindToken(kind: string): string {
   return kind.trim().toLowerCase().replace(/[^a-z0-9]+/gu, "-");
 }

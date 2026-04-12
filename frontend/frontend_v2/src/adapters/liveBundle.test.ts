@@ -96,6 +96,65 @@ function makeBaseBundle(): any {
           display_name: "Test Yard",
         },
       },
+      scene_frame: {
+        frame_id: "scene-frame",
+        environment_family: "industrial",
+        scene_bounds: {
+          min_x: -2,
+          min_y: -2,
+          max_x: 12,
+          max_y: 12,
+          width: 14,
+          height: 14,
+        },
+        extents: [
+          {
+            extent_id: "scene:operational",
+            source: "render_geometry",
+            category: "operational",
+            label: "Operational Geometry",
+            feature_ids: ["road-1"],
+            bounds: {
+              min_x: 0,
+              min_y: 0,
+              max_x: 10,
+              max_y: 10,
+              width: 10,
+              height: 10,
+            },
+          },
+          {
+            extent_id: "world:boundary:boundaries",
+            source: "world_model",
+            category: "boundary",
+            label: "Boundaries",
+            feature_ids: ["mine-boundary"],
+            bounds: {
+              min_x: -2,
+              min_y: -2,
+              max_x: 12,
+              max_y: 12,
+              width: 14,
+              height: 14,
+            },
+          },
+          {
+            extent_id: "world:asset_layer:terrain-base",
+            source: "world_model",
+            category: "asset_layer",
+            label: "Mine Gravel",
+            feature_ids: ["terrain-base"],
+            bounds: {
+              min_x: -2,
+              min_y: -2,
+              max_x: 12,
+              max_y: 12,
+              width: 14,
+              height: 14,
+            },
+          },
+        ],
+      },
       roads: [
         {
           road_id: "road-1",
@@ -132,6 +191,7 @@ function makeBaseBundle(): any {
             [11, 1, 0],
             [9, 1, 0],
           ],
+          intersection_type: "yard_junction",
         },
       ],
       lanes: [],
@@ -191,8 +251,26 @@ describe("live bundle adapter contracts", () => {
     expect(bundle.map.vehicles).toHaveLength(1);
     expect(bundle.map.vehicles[0]?.position).toEqual([1, 2]);
     expect(bundle.map.vehicles[0]?.positionSource).toBe("inspection_exact_position");
-    expect(bundle.map.bounds.maxX).toBeLessThan(20);
-    expect(bundle.map.bounds.maxY).toBeLessThan(20);
+    expect(bundle.map.intersections).toHaveLength(1);
+    expect(bundle.map.intersections[0]?.intersectionType).toBe("yard_junction");
+    expect(bundle.map.areas[0]?.category).toBe("zone");
+    expect(bundle.map.sceneFrame.environmentFamily).toBe("industrial");
+    expect(bundle.map.sceneFrame.sceneBounds).toEqual({
+      minX: -2,
+      minY: -2,
+      maxX: 12,
+      maxY: 12,
+      width: 14,
+      height: 14,
+    });
+    expect(bundle.map.bounds).toEqual({
+      minX: -4,
+      minY: -4,
+      maxX: 14,
+      maxY: 14,
+      width: 18,
+      height: 18,
+    });
   });
 
   it("resolves route preview geometry against canonical map_surface nodes", () => {

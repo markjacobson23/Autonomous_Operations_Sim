@@ -389,6 +389,53 @@ p {
   stroke-linejoin: round;
 }
 
+.minimap-area {
+  vector-effect: non-scaling-stroke;
+}
+
+.minimap-area-zone {
+  fill: rgba(214, 204, 186, 0.26);
+  stroke: rgba(112, 102, 86, 0.16);
+  stroke-width: 0.6;
+}
+
+.minimap-area-structure {
+  fill: rgba(195, 182, 165, 0.36);
+  stroke: rgba(121, 108, 90, 0.24);
+  stroke-width: 0.6;
+}
+
+.minimap-area-terrain {
+  fill: rgba(174, 152, 117, 0.26);
+  stroke: rgba(118, 98, 66, 0.24);
+  stroke-width: 0.6;
+}
+
+.minimap-area-boundary {
+  fill: rgba(245, 239, 227, 0.12);
+  stroke: rgba(84, 95, 100, 0.28);
+  stroke-dasharray: 1.8 1.2;
+  stroke-width: 0.6;
+}
+
+.minimap-area-hazard {
+  fill: rgba(241, 204, 186, 0.22);
+  stroke: rgba(198, 91, 61, 0.3);
+  stroke-width: 0.6;
+}
+
+.minimap-area-surface {
+  fill: rgba(224, 219, 208, 0.18);
+  stroke: rgba(112, 102, 86, 0.14);
+  stroke-width: 0.6;
+}
+
+.minimap-intersection {
+  fill: rgba(80, 111, 116, 0.2);
+  stroke: rgba(57, 68, 75, 0.22);
+  stroke-width: 0.6;
+}
+
 .minimap-vehicle-core {
   fill: rgba(14, 104, 114, 0.95);
   stroke: rgba(255, 255, 255, 0.92);
@@ -654,20 +701,85 @@ p {
   vector-effect: non-scaling-stroke;
 }
 
-.area-surface-depot,
-.area-surface-yard,
-.area-surface-facility {
+.scene-world-form-layer {
+  isolation: isolate;
+}
+
+.scene-world-form-backdrop {
+  fill: rgba(255, 248, 236, 0.2);
+  stroke: rgba(124, 112, 90, 0.08);
+  stroke-width: 0.08;
+  vector-effect: non-scaling-stroke;
+}
+
+.area-surface-zone {
+  fill: rgba(214, 204, 186, 0.42);
+}
+
+.area-surface-structure {
+  fill: rgba(195, 182, 165, 0.54);
+  stroke: rgba(121, 108, 90, 0.28);
+  stroke-width: 0.13;
+}
+
+.area-surface-terrain {
+  fill: rgba(174, 152, 117, 0.34);
+  stroke: rgba(118, 98, 66, 0.22);
+  stroke-width: 0.12;
+}
+
+.area-surface-boundary {
+  fill: rgba(245, 239, 227, 0.18);
+  stroke: rgba(84, 95, 100, 0.34);
+  stroke-dasharray: 0.28 0.22;
+  stroke-width: 0.13;
+}
+
+.area-surface-surface {
+  fill: rgba(224, 219, 208, 0.44);
+}
+
+.area-surface-hazard {
+  fill: rgba(241, 204, 186, 0.28);
+  stroke: rgba(198, 91, 61, 0.28);
+  stroke-dasharray: 0.22 0.16;
+  stroke-width: 0.12;
+}
+
+.area-surface-kind-depot,
+.area-surface-kind-yard,
+.area-surface-kind-facility {
   fill: rgba(214, 204, 186, 0.56);
 }
 
-.area-surface-building,
-.area-surface-structure {
+.area-surface-kind-building,
+.area-surface-kind-structure {
   fill: rgba(195, 182, 165, 0.52);
 }
 
-.area-surface-plant,
-.area-surface-lot {
+.area-surface-kind-plant,
+.area-surface-kind-lot {
   fill: rgba(224, 219, 208, 0.44);
+}
+
+.intersection-footprint {
+  fill: rgba(92, 106, 112, 0.16);
+  stroke: rgba(57, 68, 75, 0.22);
+  stroke-width: 0.12;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+}
+
+.intersection-footprint-signalized,
+.intersection-footprint-yard-junction,
+.intersection-footprint-staging-junction {
+  fill: rgba(80, 111, 116, 0.16);
+}
+
+.intersection-footprint-selected {
+  fill: rgba(14, 104, 114, 0.2);
+  stroke: rgba(14, 104, 114, 0.64);
+  stroke-width: 0.16;
 }
 
 .road-path {

@@ -1093,9 +1093,9 @@ function humanizePreviewReason(reason: string): string {
       <section className="panel">
         <h2>Inspector</h2>
         {selectionPresentation === null ? (
-          <p className="stack-copy">
-            Click a vehicle, road, or area to inspect it. The command center will stay aligned with the same selection state.
-          </p>
+            <p className="stack-copy">
+              Click a vehicle, road, intersection, or area to inspect it. The command center stays aligned with the same selection state.
+            </p>
         ) : (
           <>
             <div className="selection-inspector-head">

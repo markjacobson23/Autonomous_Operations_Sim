@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 
 from autonomous_ops_sim.maps.map import Map
 from autonomous_ops_sim.vehicles.vehicle import Position
 from autonomous_ops_sim.world.model import (
     WorldAssetLayerSurface,
+    WorldFeatureGroupSurface,
     WorldFeatureSurface,
     WorldModelSurface,
     build_world_model_surface,
@@ -42,9 +43,11 @@ class AreaGeometrySurface:
     """Rendered non-road contextual area such as depots or buildings."""
 
     area_id: str
+    category: str
     kind: str
     polygon: tuple[Position, ...]
     label: str | None = None
+    group_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -92,6 +95,51 @@ class MergeZoneSurface:
 
 
 @dataclass(frozen=True)
+class SceneBoundsSurface:
+    """Axis-aligned scene bounds derived from world and render extents."""
+
+    min_x: float
+    min_y: float
+    max_x: float
+    max_y: float
+    width: float
+    height: float
+
+
+@dataclass(frozen=True)
+class SceneExtentSurface:
+    """Named extent used to frame a meaningful subset of the scene."""
+
+    extent_id: str
+    source: str
+    category: str
+    label: str
+    feature_ids: tuple[str, ...]
+    bounds: SceneBoundsSurface
+
+
+@dataclass(frozen=True)
+class SceneFrameSurface:
+    """Derived scene framing contract built from simulator-owned truth."""
+
+    frame_id: str
+    environment_family: str
+    scene_bounds: SceneBoundsSurface
+    extents: tuple[SceneExtentSurface, ...]
+
+
+@dataclass(frozen=True)
+class RenderGeometryLayerSurface:
+    """Named projection layer bridging world semantics and render-ready geometry."""
+
+    layer_id: str
+    source: str
+    category: str
+    label: str
+    feature_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class RenderGeometrySurface:
     """Static rendered geometry layer separate from routing truth."""
 
@@ -102,6 +150,8 @@ class RenderGeometrySurface:
     turn_connectors: tuple[TurnConnectorSurface, ...]
     stop_lines: tuple[StopLineSurface, ...]
     merge_zones: tuple[MergeZoneSurface, ...]
+    layer_manifest: tuple[RenderGeometryLayerSurface, ...]
+    scene_frame: SceneFrameSurface
     world_model: WorldModelSurface
 
 
@@ -110,42 +160,92 @@ def build_render_geometry_surface(simulation_map: Map) -> RenderGeometrySurface:
 
     metadata = simulation_map.render_geometry
     if metadata:
+        world_model = build_world_model_surface(simulation_map)
         roads = _build_roads_from_metadata(simulation_map, metadata)
         intersections = _build_intersections_from_metadata(simulation_map, metadata)
         areas = _build_areas_from_metadata(metadata)
         lanes = _build_lanes_from_metadata(metadata, roads=roads)
+        turn_connectors = _build_turn_connectors_from_metadata(
+            metadata,
+            roads=roads,
+            lanes=lanes,
+        )
+        stop_lines = _build_stop_lines_from_metadata(metadata, lanes=lanes)
+        merge_zones = _build_merge_zones_from_metadata(
+            metadata,
+            roads=roads,
+            lanes=lanes,
+        )
         return RenderGeometrySurface(
             roads=roads,
             intersections=intersections,
             areas=areas,
             lanes=lanes,
-            turn_connectors=_build_turn_connectors_from_metadata(
-                metadata,
+            turn_connectors=turn_connectors,
+            stop_lines=stop_lines,
+            merge_zones=merge_zones,
+            layer_manifest=_build_layer_manifest(
                 roads=roads,
+                intersections=intersections,
+                areas=areas,
                 lanes=lanes,
+                turn_connectors=turn_connectors,
+                stop_lines=stop_lines,
+                merge_zones=merge_zones,
+                world_model=world_model,
             ),
-            stop_lines=_build_stop_lines_from_metadata(metadata, lanes=lanes),
-            merge_zones=_build_merge_zones_from_metadata(
-                metadata,
+            scene_frame=_build_scene_frame_surface(
+                simulation_map=simulation_map,
+                world_model=world_model,
                 roads=roads,
+                intersections=intersections,
+                areas=areas,
                 lanes=lanes,
+                turn_connectors=turn_connectors,
+                stop_lines=stop_lines,
+                merge_zones=merge_zones,
             ),
-            world_model=build_world_model_surface(simulation_map),
+            world_model=world_model,
         )
 
     roads = _build_default_roads(simulation_map)
     intersections = _build_default_intersections(simulation_map)
     areas = _build_default_areas(simulation_map)
     lanes = _build_default_lanes(roads)
+    turn_connectors = _build_default_turn_connectors(roads=roads, lanes=lanes)
+    stop_lines = _build_default_stop_lines(lanes=lanes)
+    merge_zones = _build_default_merge_zones(roads=roads, lanes=lanes)
+    world_model = build_world_model_surface(simulation_map)
     return RenderGeometrySurface(
         roads=roads,
         intersections=intersections,
         areas=areas,
         lanes=lanes,
-        turn_connectors=_build_default_turn_connectors(roads=roads, lanes=lanes),
-        stop_lines=_build_default_stop_lines(lanes=lanes),
-        merge_zones=_build_default_merge_zones(roads=roads, lanes=lanes),
-        world_model=build_world_model_surface(simulation_map),
+        turn_connectors=turn_connectors,
+        stop_lines=stop_lines,
+        merge_zones=merge_zones,
+        layer_manifest=_build_layer_manifest(
+            roads=roads,
+            intersections=intersections,
+            areas=areas,
+            lanes=lanes,
+            turn_connectors=turn_connectors,
+            stop_lines=stop_lines,
+            merge_zones=merge_zones,
+            world_model=world_model,
+        ),
+        scene_frame=_build_scene_frame_surface(
+            simulation_map=simulation_map,
+            world_model=world_model,
+            roads=roads,
+            intersections=intersections,
+            areas=areas,
+            lanes=lanes,
+            turn_connectors=turn_connectors,
+            stop_lines=stop_lines,
+            merge_zones=merge_zones,
+        ),
+        world_model=world_model,
     )
 
 
@@ -179,7 +279,9 @@ def render_geometry_surface_to_dict(
         "areas": [
             {
                 "area_id": area.area_id,
+                "category": area.category,
                 "kind": area.kind,
+                "group_id": area.group_id,
                 "polygon": [list(point) for point in area.polygon],
                 "label": area.label,
             }
@@ -225,7 +327,44 @@ def render_geometry_surface_to_dict(
             }
             for merge_zone in surface.merge_zones
         ],
+        "layer_manifest": [
+            {
+                "layer_id": layer.layer_id,
+                "source": layer.source,
+                "category": layer.category,
+                "label": layer.label,
+                "feature_ids": list(layer.feature_ids),
+            }
+            for layer in surface.layer_manifest
+        ],
+        "scene_frame": {
+            "frame_id": surface.scene_frame.frame_id,
+            "environment_family": surface.scene_frame.environment_family,
+            "scene_bounds": _scene_bounds_to_dict(surface.scene_frame.scene_bounds),
+            "extents": [
+                {
+                    "extent_id": extent.extent_id,
+                    "source": extent.source,
+                    "category": extent.category,
+                    "label": extent.label,
+                    "feature_ids": list(extent.feature_ids),
+                    "bounds": _scene_bounds_to_dict(extent.bounds),
+                }
+                for extent in surface.scene_frame.extents
+            ],
+        },
         "world_model": world_model_surface_to_dict(surface.world_model),
+    }
+
+
+def _scene_bounds_to_dict(bounds: SceneBoundsSurface) -> dict[str, Any]:
+    return {
+        "min_x": bounds.min_x,
+        "min_y": bounds.min_y,
+        "max_x": bounds.max_x,
+        "max_y": bounds.max_y,
+        "width": bounds.width,
+        "height": bounds.height,
     }
 
 
@@ -279,14 +418,18 @@ def _build_areas_from_metadata(
 ) -> tuple[AreaGeometrySurface, ...]:
     areas = metadata.get("areas", [])
     assert isinstance(areas, list)
-    return tuple(
-        AreaGeometrySurface(
-            area_id=str(area["id"]),
-            kind=str(area["kind"]),
-            polygon=tuple(_position(point) for point in area["polygon"]),
-            label=str(area["label"]) if area.get("label") is not None else None,
-        )
-        for area in areas
+    return tuple(_build_area_surface(area) for area in areas)
+
+
+def _build_area_surface(area: dict[str, object]) -> AreaGeometrySurface:
+    category, group_id = _classify_area_kind(str(area["kind"]))
+    return AreaGeometrySurface(
+        area_id=str(area["id"]),
+        category=category,
+        kind=str(area["kind"]),
+        polygon=tuple(_position(point) for point in area["polygon"]),
+        label=str(area["label"]) if area.get("label") is not None else None,
+        group_id=group_id,
     )
 
 
@@ -556,22 +699,382 @@ def _build_default_areas(simulation_map: Map) -> tuple[AreaGeometrySurface, ...]
         kind = node.node_type.name.lower()
         if kind == "intersection":
             continue
-        x, y, z = node.position
-        size = 0.55
-        areas.append(
-            AreaGeometrySurface(
-                area_id=f"{kind}-{node_id}",
-                kind=kind,
-                polygon=(
-                    (x - size, y - size, z),
-                    (x + size, y - size, z),
-                    (x + size, y + size, z),
-                    (x - size, y + size, z),
-                ),
-                label=f"{kind.replace('_', ' ')} {node_id}",
+        areas.append(_build_default_area_surface(kind=kind, node_id=node_id, position=node.position))
+    return tuple(areas)
+
+
+def _build_default_area_surface(
+    *,
+    kind: str,
+    node_id: int,
+    position: Position,
+) -> AreaGeometrySurface:
+    x, y, z = position
+    size = 0.55
+    category, group_id = _classify_area_kind(kind)
+    return AreaGeometrySurface(
+        area_id=f"{kind}-{node_id}",
+        category=category,
+        kind=kind,
+        polygon=(
+            (x - size, y - size, z),
+            (x + size, y - size, z),
+            (x + size, y + size, z),
+            (x - size, y + size, z),
+        ),
+        label=f"{kind.replace('_', ' ')} {node_id}",
+        group_id=group_id,
+    )
+
+
+def _build_layer_manifest(
+    *,
+    roads: tuple[RoadGeometrySurface, ...],
+    intersections: tuple[IntersectionGeometrySurface, ...],
+    areas: tuple[AreaGeometrySurface, ...],
+    lanes: tuple[LaneGeometrySurface, ...],
+    turn_connectors: tuple[TurnConnectorSurface, ...],
+    stop_lines: tuple[StopLineSurface, ...],
+    merge_zones: tuple[MergeZoneSurface, ...],
+    world_model: WorldModelSurface,
+) -> tuple[RenderGeometryLayerSurface, ...]:
+    layers: list[RenderGeometryLayerSurface] = []
+    layers.extend(
+        _world_model_layer_to_render_layer(group)
+        for group in world_model.feature_groups
+    )
+    layers.append(
+        _render_feature_layer(
+            layer_id="render:roads",
+            category="mobility",
+            label="Roads",
+            source="render_geometry",
+            feature_ids=tuple(road.road_id for road in roads),
+        )
+    )
+    layers.append(
+        _render_feature_layer(
+            layer_id="render:intersections",
+            category="junction",
+            label="Intersections",
+            source="render_geometry",
+            feature_ids=tuple(intersection.intersection_id for intersection in intersections),
+        )
+    )
+    layers.extend(_area_layers_from_areas(areas))
+    layers.append(
+        _render_feature_layer(
+            layer_id="render:lanes",
+            category="lane",
+            label="Lanes",
+            source="render_geometry",
+            feature_ids=tuple(lane.lane_id for lane in lanes),
+        )
+    )
+    layers.append(
+        _render_feature_layer(
+            layer_id="render:turn_connectors",
+            category="control",
+            label="Turn Connectors",
+            source="render_geometry",
+            feature_ids=tuple(connector.connector_id for connector in turn_connectors),
+        )
+    )
+    layers.append(
+        _render_feature_layer(
+            layer_id="render:stop_lines",
+            category="control",
+            label="Stop Lines",
+            source="render_geometry",
+            feature_ids=tuple(stop_line.stop_line_id for stop_line in stop_lines),
+        )
+    )
+    layers.append(
+        _render_feature_layer(
+            layer_id="render:merge_zones",
+            category="conflict",
+            label="Merge Zones",
+            source="render_geometry",
+            feature_ids=tuple(zone.merge_zone_id for zone in merge_zones),
+        )
+    )
+    return tuple(layers)
+
+
+def _build_scene_frame_surface(
+    *,
+    simulation_map: Map,
+    world_model: WorldModelSurface,
+    roads: tuple[RoadGeometrySurface, ...],
+    intersections: tuple[IntersectionGeometrySurface, ...],
+    areas: tuple[AreaGeometrySurface, ...],
+    lanes: tuple[LaneGeometrySurface, ...],
+    turn_connectors: tuple[TurnConnectorSurface, ...],
+    stop_lines: tuple[StopLineSurface, ...],
+    merge_zones: tuple[MergeZoneSurface, ...],
+) -> SceneFrameSurface:
+    roads_by_id = {road.road_id: road for road in roads}
+    intersections_by_id = {intersection.intersection_id: intersection for intersection in intersections}
+    areas_by_id = {area.area_id: area for area in areas}
+    feature_lookup = {feature.feature_id: feature for feature in world_model.feature_inventory}
+
+    extents: list[SceneExtentSurface] = []
+
+    operational_points = _collect_points(
+        *[road.centerline for road in roads],
+        *[intersection.polygon for intersection in intersections],
+        *[lane.centerline for lane in lanes],
+        *[connector.centerline for connector in turn_connectors],
+        *[stop_line.segment for stop_line in stop_lines],
+        *[zone.polygon for zone in merge_zones],
+        *[(simulation_map.get_position(node_id),) for node_id in sorted(simulation_map.graph.nodes)],
+    )
+    extents.append(
+        _build_scene_extent(
+            extent_id="scene:operational",
+            source="render_geometry",
+            category="operational",
+            label="Operational Geometry",
+            feature_ids=tuple(
+                [
+                    *(road.road_id for road in roads),
+                    *(intersection.intersection_id for intersection in intersections),
+                    *(lane.lane_id for lane in lanes),
+                    *(connector.connector_id for connector in turn_connectors),
+                    *(stop_line.stop_line_id for stop_line in stop_lines),
+                    *(zone.merge_zone_id for zone in merge_zones),
+                ]
+            ),
+            points=operational_points,
+        )
+    )
+
+    for group in world_model.feature_groups:
+        group_features = tuple(
+            feature_lookup[feature_id]
+            for feature_id in group.feature_ids
+            if feature_id in feature_lookup
+        )
+        points = _collect_points(
+            *[
+                _feature_points_for_scene(feature, roads_by_id, intersections_by_id, areas_by_id)
+                for feature in group_features
+            ],
+        )
+        if not points:
+            continue
+        extents.append(
+            _build_scene_extent(
+                extent_id=f"world:{group.group_id}",
+                source="world_model",
+                category=group.category,
+                label=group.label,
+                feature_ids=group.feature_ids,
+                points=points,
             )
         )
-    return tuple(areas)
+
+    for asset_layer in world_model.asset_layers:
+        if not asset_layer.coverage:
+            continue
+        extents.append(
+            _build_scene_extent(
+                extent_id=f"world:asset_layer:{asset_layer.layer_id}",
+                source="world_model",
+                category="asset_layer",
+                label=asset_layer.asset_key.replace("_", " ").title(),
+                feature_ids=(asset_layer.layer_id,),
+                points=asset_layer.coverage,
+            )
+        )
+
+    scene_bounds = _union_scene_bounds(
+        extent.bounds for extent in extents if extent.bounds.width > 0 and extent.bounds.height > 0
+    )
+    return SceneFrameSurface(
+        frame_id="scene-frame",
+        environment_family=world_model.environment.family,
+        scene_bounds=scene_bounds,
+        extents=tuple(extents),
+    )
+
+
+def _build_scene_extent(
+    *,
+    extent_id: str,
+    source: str,
+    category: str,
+    label: str,
+    feature_ids: tuple[str, ...],
+    points: tuple[Position, ...],
+) -> SceneExtentSurface:
+    bounds = _bounds_from_points(points)
+    return SceneExtentSurface(
+        extent_id=extent_id,
+        source=source,
+        category=category,
+        label=label,
+        feature_ids=feature_ids,
+        bounds=bounds,
+    )
+
+
+def _feature_points_for_scene(
+    feature: WorldFeatureSurface,
+    roads_by_id: dict[str, RoadGeometrySurface],
+    intersections_by_id: dict[str, IntersectionGeometrySurface],
+    areas_by_id: dict[str, AreaGeometrySurface],
+) -> tuple[Position, ...]:
+    if feature.polygon:
+        return feature.polygon
+    reference_id = feature.reference_id
+    if reference_id is None:
+        return ()
+    if feature.layer == "roads":
+        road = roads_by_id.get(reference_id)
+        return road.centerline if road is not None else ()
+    if feature.layer == "intersections":
+        intersection = intersections_by_id.get(reference_id)
+        return intersection.polygon if intersection is not None else ()
+    area = areas_by_id.get(reference_id)
+    return area.polygon if area is not None else ()
+
+
+def _collect_points(*groups: tuple[Position, ...]) -> tuple[Position, ...]:
+    points: list[Position] = []
+    for group in groups:
+        points.extend(group)
+    return tuple(points)
+
+
+def _bounds_from_points(points: tuple[Position, ...]) -> SceneBoundsSurface:
+    if not points:
+        return SceneBoundsSurface(
+            min_x=-10.0,
+            min_y=-6.0,
+            max_x=10.0,
+            max_y=6.0,
+            width=20.0,
+            height=12.0,
+        )
+
+    min_x = points[0][0]
+    min_y = points[0][1]
+    max_x = points[0][0]
+    max_y = points[0][1]
+    for x, y, _ in points:
+        min_x = min(min_x, x)
+        min_y = min(min_y, y)
+        max_x = max(max_x, x)
+        max_y = max(max_y, y)
+    return SceneBoundsSurface(
+        min_x=min_x,
+        min_y=min_y,
+        max_x=max_x,
+        max_y=max_y,
+        width=max(max_x - min_x, 1.0),
+        height=max(max_y - min_y, 1.0),
+    )
+
+
+def _union_scene_bounds(bounds_list: Iterable[SceneBoundsSurface]) -> SceneBoundsSurface:
+    iterator = iter(bounds_list)
+    first = next(iterator, None)
+    if first is None:
+        return SceneBoundsSurface(
+            min_x=-10.0,
+            min_y=-6.0,
+            max_x=10.0,
+            max_y=6.0,
+            width=20.0,
+            height=12.0,
+        )
+
+    min_x = first.min_x
+    min_y = first.min_y
+    max_x = first.max_x
+    max_y = first.max_y
+    for bounds in iterator:
+        min_x = min(min_x, bounds.min_x)
+        min_y = min(min_y, bounds.min_y)
+        max_x = max(max_x, bounds.max_x)
+        max_y = max(max_y, bounds.max_y)
+    return SceneBoundsSurface(
+        min_x=min_x,
+        min_y=min_y,
+        max_x=max_x,
+        max_y=max_y,
+        width=max(max_x - min_x, 1.0),
+        height=max(max_y - min_y, 1.0),
+    )
+
+
+def _area_layers_from_areas(
+    areas: tuple[AreaGeometrySurface, ...],
+) -> tuple[RenderGeometryLayerSurface, ...]:
+    grouped: dict[str, list[str]] = {}
+    categories: dict[str, str] = {}
+    labels: dict[str, str] = {}
+    for area in areas:
+        group_id = area.group_id or f"area:{area.category}"
+        grouped.setdefault(group_id, []).append(area.area_id)
+        categories.setdefault(group_id, area.category)
+        labels.setdefault(group_id, area.category.replace("_", " ").title())
+
+    return tuple(
+        RenderGeometryLayerSurface(
+            layer_id=f"render:{group_id}",
+            source="render_geometry",
+            category=categories[group_id],
+            label=label,
+            feature_ids=tuple(feature_ids),
+        )
+        for group_id, feature_ids in grouped.items()
+        for label in [labels[group_id]]
+    )
+
+
+def _world_model_layer_to_render_layer(
+    group: WorldFeatureGroupSurface,
+) -> RenderGeometryLayerSurface:
+    return RenderGeometryLayerSurface(
+        layer_id=f"world:{group.group_id}",
+        source="world_model",
+        category=group.category,
+        label=group.label,
+        feature_ids=group.feature_ids,
+    )
+
+
+def _render_feature_layer(
+    *,
+    layer_id: str,
+    source: str,
+    category: str,
+    label: str,
+    feature_ids: tuple[str, ...],
+) -> RenderGeometryLayerSurface:
+    return RenderGeometryLayerSurface(
+        layer_id=layer_id,
+        source=source,
+        category=category,
+        label=label,
+        feature_ids=feature_ids,
+    )
+
+
+def _classify_area_kind(kind: str) -> tuple[str, str]:
+    if kind in {"building", "maintenance_building", "office", "warehouse", "crusher", "gatehouse", "wall", "barrier"}:
+        return "structure", "structure:buildings"
+    if kind in {"berm", "stockpile", "hill", "mountain", "pit", "trench", "embankment", "cut", "basin", "retaining_wall"}:
+        return "terrain", "terrain:terrain_forms"
+    if kind in {"sidewalk", "walkway", "pedestrian_route", "sidewalk_zone"}:
+        return "surface", "surface:sidewalks"
+    if kind in {"site_boundary", "boundary", "perimeter", "boundary_surface"}:
+        return "boundary", "boundary:boundaries"
+    if kind in {"no_go", "no_go_area", "no_go_zone", "hazard_zone", "blast_zone", "hazard_exclusion"}:
+        return "hazard", "hazard:no_go_areas"
+    return "zone", "zone:zones"
 
 
 def _default_centerline_for_road(
@@ -652,6 +1155,10 @@ __all__ = [
     "IntersectionGeometrySurface",
     "LaneGeometrySurface",
     "MergeZoneSurface",
+    "SceneBoundsSurface",
+    "SceneExtentSurface",
+    "SceneFrameSurface",
+    "RenderGeometryLayerSurface",
     "RenderGeometrySurface",
     "RoadGeometrySurface",
     "StopLineSurface",

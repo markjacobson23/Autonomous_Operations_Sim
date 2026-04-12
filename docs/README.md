@@ -45,7 +45,7 @@ If you want the big picture first:
    Which subsystem owns what, and how truth flows through the system.
 
 4. `world_model_v2.md`  
-   The unified internal world model for mining, yard, and city scenes.
+   The unified internal world model for mining, yard, and city scenes, and the Phase B architecture note for the world-model boundary lock.
 
 5. `frontend_v2.md`  
    What the serious frontend should be, own, and feel like.
@@ -55,6 +55,9 @@ If you want the big picture first:
 
 7. `acceptance_demos.md`  
    The concrete demo scenarios that should prove the system is actually good.
+
+8. `phase_b_acceptance_runbook.md`
+   The concise operator-facing launch and walkthrough note for the Phase B mining acceptance pass.
 
 If you are doing implementation work, also keep `execution_plan.md` open.
 

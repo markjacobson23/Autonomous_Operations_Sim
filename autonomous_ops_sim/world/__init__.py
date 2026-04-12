@@ -1,6 +1,7 @@
 from autonomous_ops_sim.world.model import (
     EnvironmentArchetypeSurface,
     WorldAssetLayerSurface,
+    WorldFeatureGroupSurface,
     WorldFeatureSurface,
     WorldModelSurface,
     build_world_model_surface,
@@ -10,6 +11,7 @@ from autonomous_ops_sim.world.model import (
 __all__ = [
     "EnvironmentArchetypeSurface",
     "WorldAssetLayerSurface",
+    "WorldFeatureGroupSurface",
     "WorldFeatureSurface",
     "WorldModelSurface",
     "build_world_model_surface",

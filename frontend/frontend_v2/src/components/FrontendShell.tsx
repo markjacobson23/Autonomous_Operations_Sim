@@ -155,7 +155,7 @@ export function FrontendShell({ bundle, uiState, actions, refreshBundle }: Front
                 {selectionPresentation === null ? (
                   <>
                     <p className="stack-copy">
-                      Click a vehicle, road, or area on the map to inspect it. The inspector stays compact until a selection exists.
+                      Click a vehicle, road, intersection, or area on the map to inspect it. The inspector stays compact until a selection exists.
                     </p>
                     <ul className="list-copy">
                       <li>Current mode: {uiState.modePanel.activeMode}</li>
