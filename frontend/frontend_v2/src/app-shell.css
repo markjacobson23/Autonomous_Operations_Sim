@@ -44,6 +44,7 @@ textarea {
 
 h1,
 h2,
+h3,
 p,
 dl {
   margin: 0;
@@ -188,6 +189,171 @@ dl {
   min-height: calc(100vh - 176px);
 }
 
+.map-shell {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-height: calc(100vh - 176px);
+}
+
+.map-shell-cursor-grab {
+  cursor: grab;
+}
+
+.map-shell-cursor-grabbing {
+  cursor: grabbing;
+}
+
+.map-shell-toolbar {
+  display: grid;
+  gap: 10px;
+}
+
+.map-shell-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.map-shell-stage {
+  position: relative;
+  min-height: 58vh;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 18%, rgba(14, 104, 114, 0.08), transparent 22%),
+    radial-gradient(circle at 82% 72%, rgba(181, 92, 51, 0.08), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(241, 236, 226, 0.96));
+  border: 1px solid rgba(95, 85, 71, 0.12);
+}
+
+.map-shell-stage .map-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.map-shell-footer {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.1fr) 256px;
+  align-items: start;
+}
+
+.overview-card-minimap {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.minimap-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.minimap-orientation-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(14, 104, 114, 0.12);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.minimap {
+  width: 100%;
+  min-height: 152px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  cursor: pointer;
+  background:
+    radial-gradient(circle at top left, rgba(14, 104, 114, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(240, 235, 225, 0.96));
+}
+
+.minimap-bg {
+  fill: rgba(255, 255, 255, 0.42);
+}
+
+.minimap-road {
+  fill: none;
+  stroke: rgba(77, 90, 100, 0.7);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.minimap-vehicle-core {
+  fill: rgba(14, 104, 114, 0.95);
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.8;
+}
+
+.minimap-viewport-shadow {
+  fill: rgba(14, 104, 114, 0.1);
+  stroke: rgba(14, 104, 114, 0.72);
+  stroke-width: 1.4;
+}
+
+.minimap-context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.minimap-caption {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.layer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.layer-controls-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-right: 4px;
+}
+
+.layer-chip,
+.scene-button-primary {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.scene-button-primary:hover,
+.layer-chip:hover {
+  border-color: rgba(14, 104, 114, 0.3);
+}
+
+.scene-button-active,
+.layer-chip-active {
+  background: linear-gradient(180deg, rgba(14, 104, 114, 0.14), rgba(14, 104, 114, 0.08));
+  border-color: rgba(14, 104, 114, 0.34);
+}
+
+.scene-button-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .panel {
   padding: 18px;
 }
@@ -247,29 +413,66 @@ dl {
   font-size: 1.04rem;
 }
 
-.road-path {
-  fill: none;
-  stroke: rgba(52, 64, 71, 0.7);
-  stroke-width: 0.42;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.map-ground {
+  fill: #ebe3d4;
 }
 
-.road-path-glow {
-  stroke: rgba(255, 255, 255, 0.58);
-  stroke-width: 1.1;
-  filter: blur(0.02px);
-  opacity: 0.58;
+.map-ground-vignette {
+  fill: url(#map-ground-vignette);
+  opacity: 0.8;
+}
+
+.area-surface {
+  fill: rgba(255, 255, 255, 0.42);
+  stroke: rgba(112, 102, 86, 0.16);
+  stroke-width: 0.1;
+  vector-effect: non-scaling-stroke;
+}
+
+.area-surface-depot,
+.area-surface-yard,
+.area-surface-facility {
+  fill: rgba(214, 204, 186, 0.56);
+}
+
+.area-surface-building,
+.area-surface-structure {
+  fill: rgba(195, 182, 165, 0.52);
+}
+
+.area-surface-plant,
+.area-surface-lot {
+  fill: rgba(224, 219, 208, 0.44);
+}
+
+.road-path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.road-path-casing {
+  stroke: rgba(255, 253, 248, 0.72);
+  stroke-width: 0.9;
+  opacity: 0.88;
+}
+
+.road-path-core {
+  stroke: rgba(64, 74, 80, 0.78);
+  stroke-width: 0.42;
 }
 
 .road-path-blocked {
-  stroke: var(--warn);
-  stroke-width: 0.56;
+  stroke: rgba(181, 92, 51, 0.92);
+  stroke-width: 0.78;
+  stroke-dasharray: 0.42 0.3;
 }
 
 .vehicle-core {
-  stroke: rgba(255, 255, 255, 0.95);
+  stroke: rgba(255, 255, 255, 0.96);
   stroke-width: 0.18;
+  vector-effect: non-scaling-stroke;
 }
 
 .vehicle-core-moving {
@@ -285,8 +488,8 @@ dl {
 }
 
 .vehicle-halo {
-  fill: rgba(255, 255, 255, 0.22);
-  stroke: rgba(14, 104, 114, 0.18);
+  fill: rgba(255, 255, 255, 0.18);
+  stroke: rgba(14, 104, 114, 0.12);
   stroke-width: 0.12;
 }
 

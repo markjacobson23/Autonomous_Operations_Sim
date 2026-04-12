@@ -67,3 +67,78 @@ def test_frontend_v2_vite_config_uses_relative_base_for_nested_live_launch_path(
     ).read_text(encoding="utf-8")
 
     assert 'base: "./"' in vite_config
+
+
+def test_frontend_v2_shell_is_thin_and_defers_to_adapter_layers() -> None:
+    app_source = (
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "App.tsx"
+    ).read_text(encoding="utf-8")
+
+    assert "useLiveSessionBundle" in app_source
+    assert "buildLiveBundleViewModel" in app_source
+    assert "useFrontendUiState" in app_source
+    assert "FrontendShell" in app_source
+    assert "fetch(" not in app_source
+    assert "readRecord(" not in app_source
+    assert "pointsToPath(" not in app_source
+
+
+def test_frontend_v2_adapter_and_local_state_layers_exist() -> None:
+    expected_files = (
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "adapters" / "liveBundle.ts",
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "adapters" / "mapViewport.ts",
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "hooks" / "useLiveSessionBundle.ts",
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "state" / "frontendUiState.ts",
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "components" / "FrontendShell.tsx",
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "components" / "MapShell.tsx",
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "components" / "MapMinimap.tsx",
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "components" / "LiveSceneCanvas.tsx",
+    )
+
+    for path in expected_files:
+        assert path.exists(), f"Expected frontend v2 layer file at {path}"
+
+
+def test_frontend_v2_map_shell_exposes_camera_and_layer_controls() -> None:
+    map_shell_source = (
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "components" / "MapShell.tsx"
+    ).read_text(encoding="utf-8")
+    minimap_source = (
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "components" / "MapMinimap.tsx"
+    ).read_text(encoding="utf-8")
+    scene_source = (
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "components" / "LiveSceneCanvas.tsx"
+    ).read_text(encoding="utf-8")
+
+    assert "Fit Scene" in map_shell_source
+    assert "Focus Selected" in map_shell_source
+    assert "Zoom In" in map_shell_source
+    assert "Zoom Out" in map_shell_source
+    assert "Iso" in map_shell_source
+    assert "Birdseye" in map_shell_source
+    assert "layer-chip" in map_shell_source
+    assert "MapMinimap" in map_shell_source
+    assert "viewBox" in minimap_source
+    assert "Click to re-center" in minimap_source
+    assert "sceneTransform" in scene_source
+    assert "layers.roads" in scene_source
+    assert "layers.vehicles" in scene_source
+    assert "layers.areas" in scene_source
+    assert "layers.labels" in scene_source
+
+
+def test_frontend_v2_scene_defaults_are_quiet_and_world_form_readable() -> None:
+    scene_source = (
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "components" / "LiveSceneCanvas.tsx"
+    ).read_text(encoding="utf-8")
+    ui_state_source = (
+        REPO_ROOT / "frontend" / "frontend_v2" / "src" / "state" / "frontendUiState.ts"
+    ).read_text(encoding="utf-8")
+
+    assert "map-ground" in scene_source
+    assert "area-surface" in scene_source
+    assert "vehicle-label" in scene_source
+    assert "layers.labels &&" in scene_source
+    assert "<pattern id=\"grid\"" not in scene_source
+    assert "areas: true" in ui_state_source
+    assert "labels: false" in ui_state_source
