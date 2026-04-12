@@ -107,6 +107,13 @@ export type LiveVehicleInspectionViewModel = {
   }>;
 };
 
+export type LiveAnalysisSignalViewModel = {
+  code: string;
+  severity: string;
+  message: string;
+  vehicleId: number | null;
+};
+
 export type LiveBundleViewModel = {
   bundleUrl: string;
   loadState: LoadState;
@@ -157,6 +164,9 @@ export type LiveBundleViewModel = {
     roadStates: LiveTrafficRoadStateViewModel[];
     queueRecords: LiveTrafficQueueRecordViewModel[];
     controlPoints: LiveTrafficControlPointViewModel[];
+  };
+  analysis: {
+    anomalySignals: LiveAnalysisSignalViewModel[];
   };
   utility: {
     frontendOwnedState: readonly string[];
@@ -325,6 +335,12 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
     isRecord(entry) ? [entry] : [],
   );
   const anomalies = readArray(aiAssist, "anomalies").flatMap((entry) => (isRecord(entry) ? [entry] : []));
+  const anomalySignals = anomalies.map((entry, index) => ({
+    code: readString(entry, "code", `anomaly-${index + 1}`),
+    severity: readString(entry, "severity", "info"),
+    message: readString(entry, "message", "No detail available."),
+    vehicleId: readNumberOrNull(entry, "vehicle_id"),
+  }));
   const congestedRoadCount = trafficRoadStates.filter((roadState) => readNumber(roadState, "congestion_intensity", 0) > 0.2).length;
   const queuedVehicleCount = trafficRoadStates.reduce(
     (count, roadState) => count + readNumberList(roadState, "queued_vehicle_ids").length,
@@ -438,6 +454,9 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
           },
         ];
       }),
+    },
+    analysis: {
+      anomalySignals,
     },
     utility: {
       frontendOwnedState: [

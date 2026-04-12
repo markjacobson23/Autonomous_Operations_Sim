@@ -4,6 +4,8 @@ import { frontendOwnedState, frontendV2Home, repoLayoutDecision, simulatorOwnedT
 import type { LiveBundleViewModel, LiveRoutePreviewViewModel } from "../adapters/liveBundle";
 import { buildSelectionPresentation } from "../adapters/selectionModel";
 import type { FrontendModeId, FrontendUiActions, FrontendUiState } from "../state/frontendUiState";
+import { AnalyzeRail } from "./AnalyzeRail";
+import { EditorRail } from "./EditorRail";
 import { FleetRail } from "./FleetRail";
 import { MapShell } from "./MapShell";
 import { OperateRail } from "./OperateRail";
@@ -21,7 +23,7 @@ const modeDetails: Array<{ id: FrontendModeId; label: string; summary: string }>
   { id: "traffic", label: "Traffic", summary: "Congestion and blockage context" },
   { id: "fleet", label: "Fleet", summary: "Multi-vehicle overview and batch lane" },
   { id: "editor", label: "Editor", summary: "Authoring entry point" },
-  { id: "analyze", label: "Analyze", summary: "Diagnostics and explanation" },
+  { id: "analyze", label: "Analyze", summary: "Diagnostics, explanation, and route context" },
 ];
 
 export function FrontendShell({ bundle, uiState, actions, refreshBundle }: FrontendShellProps): JSX.Element {
@@ -31,7 +33,7 @@ export function FrontendShell({ bundle, uiState, actions, refreshBundle }: Front
   const isOperateMode = activeMode === "operate";
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell app-shell-mode-${activeMode}`}>
       <header className="shell-header">
         <div className="shell-title-block">
           <p className="eyebrow">Frontend v2 live shell</p>
@@ -81,11 +83,15 @@ export function FrontendShell({ bundle, uiState, actions, refreshBundle }: Front
               setActiveRoutePreview={setActiveRoutePreview}
             />
           ) : uiState.modePanel.activeMode === "traffic" ? (
-              <TrafficRail bundle={bundle} uiState={uiState} />
-            ) : activeMode === "fleet" ? (
-              <FleetRail bundle={bundle} uiState={uiState} actions={actions} />
-            ) : (
-              <>
+            <TrafficRail bundle={bundle} uiState={uiState} />
+          ) : activeMode === "fleet" ? (
+            <FleetRail bundle={bundle} uiState={uiState} actions={actions} />
+          ) : activeMode === "editor" ? (
+            <EditorRail bundle={bundle} uiState={uiState} refreshBundle={refreshBundle} />
+          ) : activeMode === "analyze" ? (
+            <AnalyzeRail bundle={bundle} uiState={uiState} activeRoutePreview={activeRoutePreview} />
+          ) : (
+            <>
               <section className="panel">
                 <h2>Session identity</h2>
                 <dl className="info-grid">

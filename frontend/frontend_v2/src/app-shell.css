@@ -50,12 +50,58 @@ dl {
   margin: 0;
 }
 
+h1,
+h2,
+h3 {
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+p {
+  line-height: 1.48;
+}
+
 .app-shell {
   min-height: 100vh;
   padding: 24px;
   display: grid;
   gap: 16px;
   grid-template-rows: auto auto 1fr;
+}
+
+.app-shell-mode-operate {
+  background:
+    radial-gradient(circle at top left, rgba(14, 104, 114, 0.1), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(181, 92, 51, 0.08), transparent 22%),
+    linear-gradient(180deg, #fbf8f2 0%, var(--bg) 100%);
+}
+
+.app-shell-mode-traffic {
+  background:
+    radial-gradient(circle at top left, rgba(181, 92, 51, 0.1), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(14, 104, 114, 0.08), transparent 22%),
+    linear-gradient(180deg, #fbf8f2 0%, var(--bg) 100%);
+}
+
+.app-shell-mode-fleet {
+  background:
+    radial-gradient(circle at top left, rgba(36, 116, 81, 0.1), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(14, 104, 114, 0.08), transparent 22%),
+    linear-gradient(180deg, #fbf8f2 0%, var(--bg) 100%);
+}
+
+.app-shell-mode-editor {
+  background:
+    radial-gradient(circle at top left, rgba(47, 66, 136, 0.12), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(36, 116, 81, 0.1), transparent 22%),
+    linear-gradient(180deg, #fbf8f2 0%, var(--bg) 100%);
+}
+
+.app-shell-mode-analyze {
+  background:
+    radial-gradient(circle at top left, rgba(181, 92, 51, 0.12), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(47, 66, 136, 0.1), transparent 22%),
+    linear-gradient(180deg, #fbf8f2 0%, var(--bg) 100%);
 }
 
 .shell-header,
@@ -71,6 +117,7 @@ dl {
   padding: 18px;
   display: grid;
   gap: 16px;
+  backdrop-filter: blur(10px);
 }
 
 .shell-title-block {
@@ -92,7 +139,12 @@ dl {
 .list-copy,
 .info-grid dd,
 .global-alert span,
-.panel-metrics span {
+.panel-metrics span,
+.operate-field span,
+.traffic-section-head p,
+.fleet-section p,
+.editor-section p,
+.analyze-section p {
   color: var(--muted);
 }
 
@@ -112,6 +164,7 @@ dl {
   color: var(--accent);
   font-size: 0.82rem;
   font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(14, 104, 114, 0.04);
 }
 
 .status-badge-emphasis {
@@ -140,7 +193,8 @@ dl {
     transform 160ms ease,
     border-color 160ms ease,
     background-color 160ms ease,
-    color 160ms ease;
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .mode-button strong {
@@ -150,12 +204,14 @@ dl {
 .mode-button:hover {
   transform: translateY(-1px);
   border-color: rgba(14, 104, 114, 0.32);
+  box-shadow: 0 10px 20px rgba(37, 42, 48, 0.08);
 }
 
 .mode-button-active {
   background: linear-gradient(180deg, rgba(14, 104, 114, 0.14), rgba(14, 104, 114, 0.08));
   border-color: rgba(14, 104, 114, 0.34);
   color: var(--ink);
+  box-shadow: 0 12px 24px rgba(14, 104, 114, 0.08);
 }
 
 .global-alert {
@@ -194,6 +250,7 @@ dl {
   gap: 14px;
   align-content: start;
   min-height: calc(100vh - 176px);
+  padding: 18px;
 }
 
 .map-shell-cursor-grab {
@@ -207,6 +264,10 @@ dl {
 .map-shell-toolbar {
   display: grid;
   gap: 10px;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.56);
+  border: 1px solid rgba(95, 85, 71, 0.12);
 }
 
 .map-shell-toolbar-group {
@@ -225,6 +286,7 @@ dl {
     radial-gradient(circle at 82% 72%, rgba(181, 92, 51, 0.08), transparent 22%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(241, 236, 226, 0.96));
   border: 1px solid rgba(95, 85, 71, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .map-shell-stage .map-canvas {
@@ -274,6 +336,16 @@ dl {
   background:
     radial-gradient(circle at top left, rgba(14, 104, 114, 0.08), transparent 30%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(240, 235, 225, 0.96));
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.minimap:hover {
+  border-color: rgba(14, 104, 114, 0.24);
+  box-shadow: 0 10px 22px rgba(37, 42, 48, 0.08);
+  transform: translateY(-1px);
 }
 
 .minimap-bg {
@@ -336,26 +408,49 @@ dl {
   border-radius: 999px;
   padding: 8px 12px;
   cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .scene-button-primary:hover,
 .layer-chip:hover {
   border-color: rgba(14, 104, 114, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(37, 42, 48, 0.08);
 }
 
 .scene-button-active,
 .layer-chip-active {
   background: linear-gradient(180deg, rgba(14, 104, 114, 0.14), rgba(14, 104, 114, 0.08));
   border-color: rgba(14, 104, 114, 0.34);
+  box-shadow: 0 10px 20px rgba(14, 104, 114, 0.08);
 }
 
 .scene-button-primary:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.scene-button-primary:focus-visible,
+.layer-chip:focus-visible,
+.mode-button:focus-visible,
+.fleet-roster-row:focus-visible,
+.fleet-selection-chip:focus-visible,
+.map-shell-toolbar button:focus-visible,
+.minimap:focus-visible {
+  outline: 2px solid rgba(14, 104, 114, 0.42);
+  outline-offset: 2px;
 }
 
 .panel {
   padding: 18px;
+  backdrop-filter: blur(10px);
 }
 
 .panel-topline {
@@ -377,6 +472,7 @@ dl {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.62);
   border: 1px solid var(--line);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
 }
 
 .map-stage {
@@ -477,6 +573,27 @@ dl {
   margin-top: 10px;
   color: var(--ink);
   font-size: 0.88rem;
+}
+
+.selection-popup,
+.selection-inspector-details > div,
+.info-grid > div,
+.traffic-section,
+.traffic-focus-card,
+.fleet-section,
+.editor-summary-card,
+.editor-section,
+.editor-feedback,
+.analyze-overview-card,
+.analyze-section,
+.analyze-comparison-card,
+.analyze-diagnostic-card,
+.analyze-signal-card,
+.analyze-note-card,
+.route-plan-card,
+.command-card,
+.route-plan-builder {
+  box-shadow: 0 12px 28px rgba(37, 42, 48, 0.08);
 }
 
 .map-ground {
@@ -621,6 +738,15 @@ dl {
   display: grid;
   gap: 16px;
   align-content: start;
+}
+
+.operate-rail,
+.traffic-rail,
+.fleet-rail,
+.editor-rail,
+.analyze-rail {
+  display: grid;
+  gap: 14px;
 }
 
 .selection-inspector-details {
@@ -1000,6 +1126,285 @@ dl {
   font-size: 0.86rem;
 }
 
+.editor-rail {
+  display: grid;
+  gap: 14px;
+}
+
+.editor-summary-card,
+.editor-section,
+.editor-feedback {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.editor-summary-card {
+  background: linear-gradient(180deg, rgba(47, 66, 136, 0.08), rgba(255, 255, 255, 0.84));
+}
+
+.editor-section-head,
+.editor-summary-head,
+.editor-validation-card-head,
+.editor-flow-card {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.editor-validation-list {
+  display: grid;
+  gap: 10px;
+}
+
+.editor-validation-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+}
+
+.editor-validation-card-head span {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.editor-validation-info {
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.editor-validation-warn {
+  background: linear-gradient(180deg, rgba(181, 92, 51, 0.09), rgba(255, 255, 255, 0.84));
+}
+
+.editor-validation-error {
+  background: linear-gradient(180deg, rgba(181, 92, 51, 0.14), rgba(255, 255, 255, 0.84));
+}
+
+.editor-flow-card {
+  align-items: center;
+  padding: 13px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.editor-flow-card-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.editor-flow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editor-flow-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
+  font-size: 0.86rem;
+}
+
+.editor-roadmap-card {
+  background: linear-gradient(180deg, rgba(14, 104, 114, 0.06), rgba(255, 255, 255, 0.84));
+}
+
+.editor-feedback {
+  background: linear-gradient(180deg, rgba(47, 66, 136, 0.08), rgba(255, 255, 255, 0.82));
+}
+
+.editor-feedback-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.editor-feedback strong {
+  color: var(--ink);
+}
+
+.editor-feedback p {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.editor-feedback-badge-idle {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.editor-feedback-badge-pending {
+  background: rgba(181, 92, 51, 0.12);
+  color: var(--warn);
+}
+
+.editor-feedback-badge-success {
+  background: rgba(36, 116, 81, 0.12);
+  color: var(--good);
+}
+
+.editor-feedback-badge-warn {
+  background: rgba(181, 92, 51, 0.14);
+  color: var(--warn);
+}
+
+.analyze-rail {
+  display: grid;
+  gap: 14px;
+}
+
+.analyze-overview-card,
+.analyze-section,
+.analyze-comparison-card,
+.analyze-diagnostic-card,
+.analyze-signal-card,
+.analyze-note-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.analyze-overview-card {
+  background: linear-gradient(180deg, rgba(181, 92, 51, 0.08), rgba(255, 255, 255, 0.84));
+}
+
+.analyze-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.analyze-explanation-copy,
+.analyze-comparison-copy,
+.analyze-note-card p,
+.analyze-empty-state,
+.analyze-section p,
+.analyze-diagnostic-card p,
+.analyze-signal-card p {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.analyze-signal-list,
+.analyze-diagnostic-list,
+.analyze-notes-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.analyze-signal-card {
+  background: var(--panel-strong);
+}
+
+.analyze-signal-error {
+  background: linear-gradient(180deg, rgba(181, 92, 51, 0.12), rgba(255, 255, 255, 0.86));
+}
+
+.analyze-signal-warn {
+  background: linear-gradient(180deg, rgba(181, 92, 51, 0.08), rgba(255, 255, 255, 0.86));
+}
+
+.analyze-signal-info {
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.analyze-signal-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.analyze-signal-head span {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.analyze-signal-meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.analyze-comparison-card {
+  background: linear-gradient(180deg, rgba(47, 66, 136, 0.08), rgba(255, 255, 255, 0.86));
+}
+
+.analyze-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.analyze-comparison-grid > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+}
+
+.analyze-comparison-grid span {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+}
+
+.analyze-comparison-grid strong {
+  color: var(--ink);
+}
+
+.analyze-diagnostic-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.analyze-diagnostic-card {
+  background: var(--panel-strong);
+}
+
+.analyze-diagnostic-error {
+  background: linear-gradient(180deg, rgba(181, 92, 51, 0.14), rgba(255, 255, 255, 0.86));
+}
+
+.analyze-diagnostic-warn {
+  background: linear-gradient(180deg, rgba(181, 92, 51, 0.09), rgba(255, 255, 255, 0.86));
+}
+
+.analyze-diagnostic-info {
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.analyze-note-card {
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.analyze-empty-state {
+  padding: 10px 0 0;
+}
+
 .traffic-summary-strip {
   display: flex;
   flex-wrap: wrap;
@@ -1206,6 +1611,20 @@ dl {
   background: none;
   text-align: left;
   cursor: pointer;
+}
+
+.route-plan-card-main:hover,
+.operate-chip-row .operate-chip:hover,
+.fleet-selection-chip:hover,
+.fleet-roster-row:hover,
+.traffic-road-card:hover,
+.traffic-queue-card:hover,
+.traffic-control-card:hover,
+.editor-validation-card:hover,
+.analyze-signal-card:hover,
+.analyze-diagnostic-card:hover,
+.analyze-note-card:hover {
+  transform: translateY(-1px);
 }
 
 .route-plan-card-main strong {

@@ -769,7 +769,7 @@ function humanizePreviewReason(reason: string): string {
 
   return (
     <>
-    <section className="panel">
+    <section className="panel operate-rail">
         <div className="panel-topline">
           <div>
             <p className="panel-kicker">Planning</p>
