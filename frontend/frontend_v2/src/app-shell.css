@@ -295,6 +295,35 @@ p {
   display: block;
 }
 
+.map-shell-notice {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 2;
+  max-width: min(360px, calc(100% - 28px));
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 253, 248, 0.94);
+  border: 1px solid rgba(95, 85, 71, 0.14);
+  box-shadow: 0 14px 30px rgba(37, 42, 48, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.map-shell-notice strong {
+  color: var(--ink);
+}
+
+.map-shell-notice span {
+  color: var(--muted);
+  line-height: 1.38;
+}
+
+.map-shell-notice-error {
+  border-color: rgba(181, 92, 51, 0.24);
+}
+
 .map-shell-footer {
   display: grid;
   gap: 12px;
@@ -507,6 +536,19 @@ p {
 .map-loading strong {
   color: var(--ink);
   font-size: 1.04rem;
+}
+
+.map-canvas-diagnostic {
+  pointer-events: none;
+  fill: rgba(255, 253, 248, 0.94);
+  stroke: rgba(181, 92, 51, 0.32);
+  stroke-width: 0.08;
+}
+
+.map-canvas-diagnostic text {
+  fill: var(--ink);
+  font-size: 0.52rem;
+  font-weight: 700;
 }
 
 .selection-popup {

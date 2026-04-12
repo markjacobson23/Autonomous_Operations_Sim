@@ -53,7 +53,17 @@ export function focusPoints(points: Point2[], fallbackBounds: SceneBounds, scene
 
   const bounds = boundsFromPoints(points);
   const paddedBounds = padBounds(bounds, Math.max(Math.min(bounds.width, bounds.height) * 0.2, 2));
-  return fitCameraToBounds(paddedBounds, sceneViewMode);
+  const zoom = clamp(
+    Math.min(fallbackBounds.width / paddedBounds.width, fallbackBounds.height / paddedBounds.height),
+    minZoom,
+    maxZoom,
+  );
+  return {
+    x: paddedBounds.minX + paddedBounds.width / 2,
+    y: paddedBounds.minY + paddedBounds.height / 2,
+    zoom,
+    sceneViewMode,
+  };
 }
 
 export function panCamera(camera: CameraState, deltaX: number, deltaY: number): CameraState {

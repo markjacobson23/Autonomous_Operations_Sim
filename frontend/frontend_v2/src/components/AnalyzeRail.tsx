@@ -23,6 +23,7 @@ export function AnalyzeRail({ bundle, uiState, activeRoutePreview }: AnalyzeRail
       ? bundle.commandCenter.routePreviews.find((preview) => preview.vehicleId === selectedVehicleId) ?? null
       : null;
   const comparisonPreview = activeRoutePreview ?? selectedBundlePreview;
+  const previewDiagnostics = comparisonPreview?.renderDiagnostics ?? [];
   const diagnostics = bundle.commandCenter.vehicleInspections.flatMap((inspection) =>
     inspection.diagnostics.map((diagnostic) => ({
       ...diagnostic,
@@ -102,6 +103,23 @@ export function AnalyzeRail({ bundle, uiState, activeRoutePreview }: AnalyzeRail
           )}
         </div>
       </section>
+
+      {previewDiagnostics.length > 0 ? (
+        <section className="analyze-section">
+          <div className="analyze-section-head">
+            <div>
+              <h3>Preview geometry diagnostics</h3>
+              <p>The active route preview exists, but some node references could not be resolved against the canonical node map.</p>
+            </div>
+            <span className="selection-popup-badge">{previewDiagnostics.length} issue(s)</span>
+          </div>
+          <ul className="list-copy">
+            {previewDiagnostics.slice(0, 3).map((diagnostic) => (
+              <li key={diagnostic}>{diagnostic}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="analyze-section">
         <div className="analyze-section-head">

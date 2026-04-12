@@ -73,7 +73,7 @@ const defaultLayers: LayerState = {
   vehicles: true,
   areas: true,
   labels: false,
-  routes: false,
+  routes: true,
   hazards: false,
   reservations: false,
   intersections: false,

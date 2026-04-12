@@ -31,6 +31,7 @@ export function FrontendShell({ bundle, uiState, actions, refreshBundle }: Front
   const selectionPresentation = buildSelectionPresentation(bundle, uiState);
   const activeMode = uiState.modePanel.activeMode;
   const isOperateMode = activeMode === "operate";
+  const resolvedActiveRoutePreview = resolveActiveRoutePreview(bundle, activeRoutePreview);
 
   return (
     <div className={`app-shell app-shell-mode-${activeMode}`}>
@@ -71,26 +72,31 @@ export function FrontendShell({ bundle, uiState, actions, refreshBundle }: Front
       </section>
 
       <main className="shell-grid">
-        <MapShell bundle={bundle} uiState={uiState} actions={actions} activeRoutePreview={activeRoutePreview} />
+        <MapShell bundle={bundle} uiState={uiState} actions={actions} activeRoutePreview={resolvedActiveRoutePreview} />
 
         <aside className="shell-rail">
-          {isOperateMode ? (
+          <div className="shell-rail-pane" style={{ display: isOperateMode ? "grid" : "none" }}>
             <OperateRail
               bundle={bundle}
               uiState={uiState}
               refreshBundle={refreshBundle}
-              activeRoutePreview={activeRoutePreview}
+              activeRoutePreview={resolvedActiveRoutePreview}
               setActiveRoutePreview={setActiveRoutePreview}
             />
-          ) : uiState.modePanel.activeMode === "traffic" ? (
+          </div>
+          <div className="shell-rail-pane" style={{ display: activeMode === "traffic" ? "grid" : "none" }}>
             <TrafficRail bundle={bundle} uiState={uiState} />
-          ) : activeMode === "fleet" ? (
+          </div>
+          <div className="shell-rail-pane" style={{ display: activeMode === "fleet" ? "grid" : "none" }}>
             <FleetRail bundle={bundle} uiState={uiState} actions={actions} />
-          ) : activeMode === "editor" ? (
+          </div>
+          <div className="shell-rail-pane" style={{ display: activeMode === "editor" ? "grid" : "none" }}>
             <EditorRail bundle={bundle} uiState={uiState} refreshBundle={refreshBundle} />
-          ) : activeMode === "analyze" ? (
-            <AnalyzeRail bundle={bundle} uiState={uiState} activeRoutePreview={activeRoutePreview} />
-          ) : (
+          </div>
+          <div className="shell-rail-pane" style={{ display: activeMode === "analyze" ? "grid" : "none" }}>
+            <AnalyzeRail bundle={bundle} uiState={uiState} activeRoutePreview={resolvedActiveRoutePreview} />
+          </div>
+          <div className="shell-rail-pane" style={{ display: activeMode === "operate" || activeMode === "traffic" || activeMode === "fleet" || activeMode === "editor" || activeMode === "analyze" ? "none" : "grid" }}>
             <>
               <section className="panel">
                 <h2>Session identity</h2>
@@ -203,7 +209,7 @@ export function FrontendShell({ bundle, uiState, actions, refreshBundle }: Front
                 </div>
               </section>
             </>
-          )}
+          </div>
         </aside>
       </main>
     </div>
@@ -223,4 +229,20 @@ function connectionLabel(loadState: LiveBundleViewModel["loadState"]): string {
 function describeViewport(uiState: FrontendUiState): string {
   const { x, y, zoom, sceneViewMode } = uiState.camera;
   return `${sceneViewMode} @ ${x.toFixed(1)}, ${y.toFixed(1)} · ${zoom.toFixed(2)}x`;
+}
+
+function resolveActiveRoutePreview(
+  bundle: LiveBundleViewModel,
+  activeRoutePreview: LiveRoutePreviewViewModel | null,
+): LiveRoutePreviewViewModel | null {
+  if (activeRoutePreview === null) {
+    return null;
+  }
+
+  const bundlePreview = bundle.commandCenter.routePreviews.find(
+    (preview) =>
+      preview.vehicleId === activeRoutePreview.vehicleId &&
+      preview.destinationNodeId === activeRoutePreview.destinationNodeId,
+  );
+  return bundlePreview ?? activeRoutePreview;
 }

@@ -28,6 +28,9 @@ export function TrafficRail({ bundle, uiState }: TrafficRailProps): JSX.Element 
   const blockedRoadCount = bundle.map.roads.filter((road) => road.blocked).length;
   const controlPointCount = bundle.traffic.controlPoints.length;
   const signalReadyCount = bundle.traffic.controlPoints.filter((controlPoint) => controlPoint.signalReady).length;
+  const trafficDiagnostics = bundle.utility.renderDiagnostics.filter(
+    (entry) => entry.includes("Control point") || entry.includes("Queue record"),
+  );
   const queueRecords = [...bundle.traffic.queueRecords].sort(
     (left, right) =>
       (right.queueEndS - right.queueStartS) - (left.queueEndS - left.queueStartS) ||
@@ -59,6 +62,23 @@ export function TrafficRail({ bundle, uiState }: TrafficRailProps): JSX.Element 
         <span className="selection-pill">{signalReadyCount} signal-ready</span>
         <span className="selection-pill">{bundle.traffic.queueRecords.length} queue record(s)</span>
       </div>
+
+      {trafficDiagnostics.length > 0 ? (
+        <section className="traffic-diagnostics-card">
+          <div className="traffic-section-head">
+            <div>
+              <h3>Geometry diagnostics</h3>
+              <p>Node-driven traffic overlays are using the canonical node map, and these are the items that could not resolve.</p>
+            </div>
+            <span className="selection-popup-badge">{trafficDiagnostics.length} issue(s)</span>
+          </div>
+          <ul className="list-copy">
+            {trafficDiagnostics.slice(0, 3).map((diagnostic) => (
+              <li key={diagnostic}>{diagnostic}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="traffic-focus-card">
         <div className="command-card-head">

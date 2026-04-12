@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import type { JsonRecord, LiveBundleViewModel, LiveRoutePreviewViewModel } from "../adapters/liveBundle";
+import type { JsonRecord, LiveBundleViewModel, LiveRoutePreviewViewModel, Point2 } from "../adapters/liveBundle";
 import { buildSelectionPresentation, resolveSelectionVehicleIds } from "../adapters/selectionModel";
 import type { FrontendUiState } from "../state/frontendUiState";
 
@@ -187,17 +187,23 @@ export function OperateRail({
 
     refreshBundle();
     const previewCount = countPreviewResults(response.payload, vehicleIds.length);
-    const preview = extractRoutePreview(response.payload, vehicleIds[0] ?? null, destinationNode);
+    const preview = extractRoutePreview(bundle, response.payload, vehicleIds[0] ?? null, destinationNode);
     if (preview !== null) {
       setActiveRoutePreview(preview);
     }
+    const previewPainted = preview !== null && (preview.pathPoints.length > 0 || preview.destinationPoint !== null);
     setCommandFeedback(
       createCommandFeedback(
-        "success",
-        "Route preview loaded",
-        previewCount === 1 ? "One authoritative preview returned from the Python session." : `${previewCount} authoritative previews returned from the Python session.`,
-        describeRoutePreviewResponse(response.payload) ??
-          `Vehicles: ${selectedVehicleSummary} · Destination node: ${destinationNode}`,
+        previewPainted ? "success" : "error",
+        previewPainted ? "Route preview loaded" : "Route preview geometry unavailable",
+        previewPainted
+          ? previewCount === 1
+            ? "One authoritative preview returned from the Python session."
+            : `${previewCount} authoritative previews returned from the Python session.`
+          : "The backend returned a preview, but the canonical node map could not resolve it for painting.",
+        previewPainted
+          ? describeRoutePreviewResponse(response.payload) ?? `Vehicles: ${selectedVehicleSummary} · Destination node: ${destinationNode}`
+          : preview?.renderDiagnostics[0] ?? `Vehicles: ${selectedVehicleSummary} · Destination node: ${destinationNode}`,
       ),
     );
   }
@@ -526,7 +532,7 @@ export function OperateRail({
       return;
     }
 
-    const preview = extractRoutePreview(response.payload, plan.vehicleIds[0] ?? null, plan.destinationNodeId);
+    const preview = extractRoutePreview(bundle, response.payload, plan.vehicleIds[0] ?? null, plan.destinationNodeId);
     if (preview === null) {
       setCommandFeedback(
         createCommandFeedback(
@@ -538,6 +544,7 @@ export function OperateRail({
       );
       return;
     }
+    const previewPainted = preview.pathPoints.length > 0 || preview.destinationPoint !== null;
 
     setRoutePlans((current) =>
       current.map((entry) =>
@@ -555,10 +562,12 @@ export function OperateRail({
     refreshBundle();
     setCommandFeedback(
       createCommandFeedback(
-        "success",
-        "Plan preview loaded",
-        buildPlanPreviewSummary(preview),
-        buildPlanPreviewDetail({ ...plan, preview }),
+        previewPainted ? "success" : "error",
+        previewPainted ? "Plan preview loaded" : "Plan preview geometry unavailable",
+        previewPainted
+          ? buildPlanPreviewSummary(preview)
+          : "The selected plan preview could not be painted because the canonical node map did not resolve it.",
+        previewPainted ? buildPlanPreviewDetail({ ...plan, preview }) : preview.renderDiagnostics[0] ?? buildPlanPreviewDetail({ ...plan, preview }),
       ),
     );
   }
@@ -701,6 +710,7 @@ export function OperateRail({
   }
 
 function extractRoutePreview(
+  bundle: LiveBundleViewModel,
   payload: JsonRecord | null,
   vehicleId: number | null,
   destinationNodeId: number,
@@ -724,6 +734,7 @@ function extractRoutePreview(
     return null;
   }
 
+  const nodePositions = new Map(bundle.map.nodes.map((node) => [node.nodeId, node.position]));
   const nodeIds = Array.isArray(previewRecord.node_ids)
     ? previewRecord.node_ids.flatMap((value) => (typeof value === "number" ? [value] : []))
     : [];
@@ -736,6 +747,27 @@ function extractRoutePreview(
     typeof previewRecord.total_distance === "number" && Number.isFinite(previewRecord.total_distance)
       ? previewRecord.total_distance
       : null;
+  const renderDiagnostics: string[] = [];
+  const pathPoints: Point2[] = [];
+
+  for (const nodeId of nodeIds) {
+    const point = nodePositions.get(nodeId) ?? null;
+    if (point === null) {
+      renderDiagnostics.push(`Route preview for vehicle ${vehicleId ?? "unknown"} could not resolve node ${nodeId}.`);
+      continue;
+    }
+    pathPoints.push(point);
+  }
+
+  const destinationPoint = nodePositions.get(destinationNodeId) ?? null;
+  if (destinationNodeId >= 0 && destinationPoint === null) {
+    renderDiagnostics.push(
+      `Route preview for vehicle ${vehicleId ?? "unknown"} could not resolve destination node ${destinationNodeId}.`,
+    );
+  }
+  if (nodeIds.length === 0) {
+    renderDiagnostics.push(`Route preview for vehicle ${vehicleId ?? "unknown"} did not include any route nodes.`);
+  }
 
   return {
     vehicleId: typeof previewRecord.vehicle_id === "number" ? previewRecord.vehicle_id : vehicleId ?? -1,
@@ -747,6 +779,9 @@ function extractRoutePreview(
     nodeIds,
     edgeIds,
     totalDistance,
+    pathPoints,
+    destinationPoint,
+    renderDiagnostics,
   };
 }
 

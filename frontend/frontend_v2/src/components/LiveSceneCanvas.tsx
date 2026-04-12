@@ -1,8 +1,10 @@
+import { useEffect, useRef } from "react";
+
 import type { LiveBundleViewModel } from "../adapters/liveBundle";
 import type { FrontendModeId, LayerState } from "../state/frontendUiState";
 import type { ViewBox } from "../adapters/mapViewport";
 import type { SelectionTarget } from "../adapters/selectionModel";
-import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 
 type LiveSceneCanvasProps = {
   model: LiveBundleViewModel;
@@ -15,7 +17,7 @@ type LiveSceneCanvasProps = {
   onPointerMove?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onPointerUp?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onPointerLeave?: (event: ReactPointerEvent<SVGSVGElement>) => void;
-  onWheel?: (event: ReactWheelEvent<SVGSVGElement>) => void;
+  onWheelZoom?: (deltaY: number) => void;
   onSelectVehicle: (vehicleId: number, additive: boolean) => void;
   onSelectRoad: (roadId: string) => void;
   onSelectArea: (areaId: string) => void;
@@ -34,34 +36,57 @@ export function LiveSceneCanvas({
   onPointerMove,
   onPointerUp,
   onPointerLeave,
-  onWheel,
+  onWheelZoom,
   onSelectVehicle,
   onSelectRoad,
   onSelectArea,
   activeRoutePreview,
   activeMode,
 }: LiveSceneCanvasProps): JSX.Element {
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const { bounds, nodes, roads, areas, vehicles } = model.map;
   const trafficRoadStates = model.traffic.roadStates;
   const trafficControlPoints = model.traffic.controlPoints;
   const trafficQueueRecords = model.traffic.queueRecords;
-  const showTrafficOverlay = activeMode === "traffic" && (trafficRoadStates.length > 0 || trafficControlPoints.length > 0 || trafficQueueRecords.length > 0);
+  const showTrafficOverlay =
+    activeMode === "traffic" && (trafficRoadStates.length > 0 || trafficControlPoints.length > 0 || trafficQueueRecords.length > 0);
   const nodePositions = new Map(nodes.map((node) => [node.nodeId, node.position]));
-  const previewPathPoints =
-    layers.routes && activeRoutePreview !== null
-      ? activeRoutePreview.nodeIds.flatMap((nodeId) => {
-          const node = nodes.find((entry) => entry.nodeId === nodeId);
-          return node === undefined ? [] : [node.position];
-        })
-      : [];
-  const previewDestinationPoint =
-    layers.routes && activeRoutePreview !== null
-      ? nodes.find((entry) => entry.nodeId === activeRoutePreview.destinationNodeId)?.position ?? null
-      : null;
+  const previewPathPoints = layers.routes && activeRoutePreview !== null ? activeRoutePreview.pathPoints : [];
+  const previewDestinationPoint = layers.routes && activeRoutePreview !== null ? activeRoutePreview.destinationPoint : null;
+  const previewDiagnostics = layers.routes && activeRoutePreview !== null ? activeRoutePreview.renderDiagnostics : [];
   const selectedVehicleIdSet = new Set(selectedVehicleIds);
+
+  useEffect(() => {
+    const svgElement = svgRef.current;
+    if (svgElement === null || onWheelZoom === undefined) {
+      return undefined;
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      onWheelZoom(event.deltaY);
+    };
+
+    svgElement.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      svgElement.removeEventListener("wheel", handleWheel);
+    };
+  }, [onWheelZoom]);
+
+  const routeVisibilityMessage =
+    activeRoutePreview !== null && layers.routes
+      ? previewPathPoints.length > 0 || previewDestinationPoint !== null
+        ? previewDiagnostics.length > 0
+          ? previewDiagnostics[0]
+          : null
+        : "Route preview data could not be painted."
+      : activeRoutePreview !== null && !layers.routes
+        ? "Route layer is disabled, so the active preview is hidden."
+        : null;
 
   return (
     <svg
+      ref={svgRef}
       className="map-canvas"
       viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
       role="img"
@@ -71,7 +96,6 @@ export function LiveSceneCanvas({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerLeave}
-      onWheel={onWheel}
     >
       <defs>
         <radialGradient id="map-ground-vignette" cx="50%" cy="38%" r="85%">
@@ -182,7 +206,7 @@ export function LiveSceneCanvas({
               );
             })}
             {trafficControlPoints.map((controlPoint) => {
-              const position = nodePositions.get(controlPoint.nodeId) ?? null;
+              const position = controlPoint.position ?? nodePositions.get(controlPoint.nodeId) ?? null;
               if (position === null) {
                 return null;
               }
@@ -198,7 +222,7 @@ export function LiveSceneCanvas({
               );
             })}
             {trafficQueueRecords.slice(0, 8).map((record, index) => {
-              const position = nodePositions.get(record.nodeId) ?? null;
+              const position = record.position ?? nodePositions.get(record.nodeId) ?? null;
               if (position === null) {
                 return null;
               }
@@ -239,6 +263,14 @@ export function LiveSceneCanvas({
             );
           })}
       </g>
+      {routeVisibilityMessage !== null ? (
+        <g className="map-canvas-diagnostic">
+          <rect x={bounds.minX + 0.4} y={bounds.minY + 0.4} width={Math.min(bounds.width - 0.8, 8.8)} height={1.3} rx={0.18} />
+          <text x={bounds.minX + 0.7} y={bounds.minY + 1.18}>
+            {routeVisibilityMessage}
+          </text>
+        </g>
+      ) : null}
     </svg>
   );
 }

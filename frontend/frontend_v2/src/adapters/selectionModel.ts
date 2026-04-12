@@ -267,7 +267,7 @@ function groupFleetVehicles(vehicles: FleetVehicleContext[]): FleetVehicleGroup[
 }
 
 function resolveSelectionSource(bundle: LiveBundleViewModel, uiState: FrontendUiState): "local" | "bundle" | "none" {
-  if (uiState.selection.vehicleIds.length > 0) {
+  if (uiState.selection.target !== null || uiState.selection.vehicleIds.length > 0 || uiState.selection.hoveredTarget !== null) {
     return "local";
   }
 
@@ -327,6 +327,7 @@ function buildVehiclePresentation(bundle: LiveBundleViewModel, vehicleId: number
     hasInspection && inspection.waitReason !== null ? `Waiting because of ${humanize(inspection.waitReason)}` : null,
     hasInspection && inspection.trafficControlDetail !== null ? inspection.trafficControlDetail : null,
     hasRoutePreview && routePreview.reason !== null ? `Preview: ${humanize(routePreview.reason)}` : null,
+    hasRoutePreview && routePreview.renderDiagnostics.length > 0 ? routePreview.renderDiagnostics[0] : null,
   ].filter((item): item is string => item !== null);
 
   const context = [

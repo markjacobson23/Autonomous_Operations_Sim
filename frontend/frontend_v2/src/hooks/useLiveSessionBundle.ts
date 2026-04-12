@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { LiveBundleResource, LoadState, JsonRecord } from "../adapters/liveBundle";
 
@@ -7,6 +7,7 @@ export function useLiveSessionBundle(): LiveBundleResource {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [loadMessage, setLoadMessage] = useState("Connecting to live session bundle...");
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const hasLoadedRef = useRef(false);
   const [bundleUrl] = useState(() => {
     return new URLSearchParams(window.location.search).get("bundle") ?? "/live_session_bundle.json";
   });
@@ -20,8 +21,13 @@ export function useLiveSessionBundle(): LiveBundleResource {
     const resolvedBundleUrl = new URL(bundleUrl, window.location.href).toString();
 
     async function loadBundle() {
-      setLoadState((currentState) => (currentState === "ready" ? "loading" : currentState));
-      setLoadMessage(refreshNonce === 0 ? `Connecting to ${bundleUrl}...` : `Refreshing ${bundleUrl}...`);
+      if (!hasLoadedRef.current) {
+        setLoadState("loading");
+        setLoadMessage(refreshNonce === 0 ? `Connecting to ${bundleUrl}...` : `Refreshing ${bundleUrl}...`);
+      } else {
+        setLoadState("ready");
+        setLoadMessage(`Refreshing ${bundleUrl}...`);
+      }
       try {
         const response = await fetch(resolvedBundleUrl, { signal: controller.signal });
         if (!response.ok) {
@@ -34,14 +40,19 @@ export function useLiveSessionBundle(): LiveBundleResource {
         }
 
         setBundle(payload);
+        hasLoadedRef.current = true;
         setLoadState("ready");
         setLoadMessage("Live session connected");
       } catch (error) {
         if (controller.signal.aborted) {
           return;
         }
-        setBundle(null);
-        setLoadState("error");
+        if (!hasLoadedRef.current) {
+          setBundle(null);
+          setLoadState("error");
+        } else {
+          setLoadState("error");
+        }
         setLoadMessage(error instanceof Error ? error.message : "Unable to load live bundle");
       }
     }

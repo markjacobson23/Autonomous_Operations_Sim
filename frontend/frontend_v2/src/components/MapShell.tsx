@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import type { LiveBundleViewModel } from "../adapters/liveBundle";
 import {
@@ -28,6 +28,7 @@ type MapShellProps = {
 
 export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapShellProps): JSX.Element {
   const initialFitDoneRef = useRef(false);
+  const lastSessionKeyRef = useRef<string | null>(null);
   const [dragState, setDragState] = useState<{
     pointerId: number;
     lastClientX: number;
@@ -35,19 +36,24 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
   } | null>(null);
 
   useEffect(() => {
-    if (bundle.loadState !== "ready") {
+    if (bundle.sessionIdentity.key !== lastSessionKeyRef.current) {
+      lastSessionKeyRef.current = bundle.sessionIdentity.key;
       initialFitDoneRef.current = false;
-      return;
     }
 
-    if (!initialFitDoneRef.current) {
+    if (bundle.loadState === "ready" && !initialFitDoneRef.current) {
       actions.fitScene(bundle.map.bounds);
       initialFitDoneRef.current = true;
-      return;
     }
-  }, [actions, bundle.loadState, bundle.map.bounds]);
+  }, [actions, bundle.loadState, bundle.map.bounds, bundle.sessionIdentity.key]);
 
-  const camera = initialFitDoneRef.current
+  const hasRenderableScene =
+    bundle.map.nodes.length > 0 ||
+    bundle.map.roads.length > 0 ||
+    bundle.map.areas.length > 0 ||
+    bundle.map.vehicles.length > 0 ||
+    bundle.commandCenter.routePreviews.length > 0;
+  const camera = initialFitDoneRef.current && bundle.loadState !== "loading"
     ? uiState.camera
     : createInitialCamera(bundle.map.bounds, uiState.camera.sceneViewMode);
   const viewBox = cameraToViewBox(camera, bundle.map.bounds);
@@ -99,9 +105,8 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
     setDragState(null);
   }
 
-  function handleWheel(event: ReactWheelEvent<SVGSVGElement>) {
-    event.preventDefault();
-    const factor = event.deltaY > 0 ? 0.92 : 1.08;
+  function handleWheel(deltaY: number) {
+    const factor = deltaY > 0 ? 0.92 : 1.08;
     actions.zoomCamera(factor);
   }
 
@@ -235,7 +240,7 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
       </div>
 
       <div className="map-shell-stage">
-        {bundle.loadState === "ready" ? (
+        {hasRenderableScene ? (
           <LiveSceneCanvas
             model={bundle}
             viewBox={viewBox}
@@ -249,7 +254,7 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
             onPointerMove={handlePointerMove}
             onPointerUp={clearDragState}
             onPointerLeave={clearDragState}
-            onWheel={handleWheel}
+            onWheelZoom={handleWheel}
             onSelectVehicle={handleSelectVehicle}
             onSelectRoad={handleSelectRoad}
             onSelectArea={handleSelectArea}
@@ -257,9 +262,15 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
         ) : (
           <div className="map-loading">
             <strong>{bundle.loadState === "error" ? "Map unavailable" : "Loading live map..."}</strong>
-            <span>{bundle.loadState === "error" ? bundle.loadMessage : "Waiting for the authoritative bundle."}</span>
+            <span>{bundle.loadMessage}</span>
           </div>
         )}
+        {bundle.loadState === "error" && hasRenderableScene ? (
+          <div className="map-shell-notice map-shell-notice-error" role="status" aria-live="polite">
+            <strong>Refresh problem</strong>
+            <span>{bundle.loadMessage}</span>
+          </div>
+        ) : null}
         <SelectionPopup presentation={selectionPresentation} />
       </div>
 

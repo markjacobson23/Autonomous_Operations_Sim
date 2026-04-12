@@ -32,20 +32,24 @@ export type LiveAreaViewModel = {
 export type LiveTrafficControlPointViewModel = {
   controlId: string;
   nodeId: number;
+  position: Point2 | null;
   controlType: string;
   controlledRoadIds: string[];
   stopLineIds: string[];
   protectedConflictZoneIds: string[];
   signalReady: boolean;
+  renderDiagnostics: string[];
 };
 
 export type LiveTrafficQueueRecordViewModel = {
   vehicleId: number;
   nodeId: number;
+  position: Point2 | null;
   roadId: string | null;
   queueStartS: number;
   queueEndS: number;
   reason: string;
+  renderDiagnostics: string[];
 };
 
 export type LiveTrafficRoadStateViewModel = {
@@ -71,6 +75,7 @@ export type LiveVehicleViewModel = {
   position: Point2;
   state: string;
   stateClass: "moving" | "waiting" | "idle";
+  positionSource: "inspection_exact_position" | "snapshot_position" | "canonical_node_position" | "unavailable";
 };
 
 export type LiveRoutePreviewViewModel = {
@@ -82,6 +87,9 @@ export type LiveRoutePreviewViewModel = {
   nodeIds: number[];
   edgeIds: number[];
   totalDistance: number | null;
+  pathPoints: Point2[];
+  destinationPoint: Point2 | null;
+  renderDiagnostics: string[];
 };
 
 export type LiveVehicleInspectionViewModel = {
@@ -121,6 +129,7 @@ export type LiveBundleViewModel = {
   selectedVehicleIds: number[];
   alerts: string[];
   sessionIdentity: {
+    key: string;
     scenarioPath: string;
     scenarioName: string;
     surfaceName: string;
@@ -172,7 +181,30 @@ export type LiveBundleViewModel = {
     frontendOwnedState: readonly string[];
     simulatorOwnedTruth: readonly string[];
     repoLayoutDecision: readonly string[];
+    renderDiagnostics: readonly string[];
   };
+};
+
+type InspectionRecord = {
+  currentNodeId: number | null;
+  exactPosition: Point2 | null;
+  operationalState: string;
+  currentJobId: string | null;
+  currentTaskIndex: number | null;
+  currentTaskType: string | null;
+  assignedResourceId: string | null;
+  waitReason: string | null;
+  trafficControlState: string | null;
+  trafficControlDetail: string | null;
+  etaSeconds: number | null;
+  routeAheadNodeIds: number[];
+  routeAheadEdgeIds: number[];
+  recentCommands: JsonRecord[];
+  diagnostics: Array<{
+    code: string;
+    severity: string;
+    message: string;
+  }>;
 };
 
 export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBundleViewModel {
@@ -182,6 +214,7 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
   const sessionControl = readRecord(bundle, "session_control");
   const commandCenter = readRecord(bundle, "command_center");
   const snapshot = readRecord(bundle, "snapshot");
+  const mapSurface = readRecord(bundle, "map_surface");
   const renderGeometry = readRecord(bundle, "render_geometry");
   const trafficBaseline = readRecord(bundle, "traffic_baseline");
   const trafficSnapshot = readRecord(bundle, "traffic_snapshot");
@@ -189,40 +222,43 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
   const worldModel = readRecord(renderGeometry, "world_model");
   const worldEnvironment = readRecord(worldModel, "environment");
 
-  const roads = readArray(renderGeometry, "roads").flatMap((road, index) => {
-    const roadRecord = isRecord(road) ? road : null;
-    if (roadRecord === null) {
-      return [];
-    }
-    return [
-      {
-        roadId: readString(roadRecord, "road_id", `road-${index}`),
-        centerline: readPointList(readArray(roadRecord, "centerline")),
-        edgeIds: readNumberList(roadRecord, "edge_ids"),
-        blocked: readNumberArray(roadRecord, "edge_ids").some((edgeId) =>
-          readNumberArray(snapshot, "blocked_edge_ids").includes(edgeId),
-        ),
-        roadClass: readString(roadRecord, "road_class", "connector"),
-        directionality: readString(roadRecord, "directionality", "one_way"),
-        laneCount: readNumber(roadRecord, "lane_count", 1),
-      },
-    ];
-  });
-  const nodes = readArray(renderGeometry, "intersections").flatMap((intersection, index) => {
-    const intersectionRecord = isRecord(intersection) ? intersection : null;
-    if (intersectionRecord === null) {
+  const nodes = readArray(mapSurface, "nodes").flatMap((node, index) => {
+    const nodeRecord = isRecord(node) ? node : null;
+    if (nodeRecord === null) {
       return [];
     }
 
-    const position = averagePoint(readPointList(readArray(intersectionRecord, "polygon")));
+    const position = readPoint(nodeRecord.position);
     if (position === null) {
       return [];
     }
 
     return [
       {
-        nodeId: readNumber(intersectionRecord, "node_id", index + 1),
+        nodeId: readNumber(nodeRecord, "node_id", index + 1),
         position,
+      },
+    ];
+  });
+  const nodePositionsById = new Map<number, Point2>(nodes.map((node) => [node.nodeId, node.position]));
+
+  const roads = readArray(renderGeometry, "roads").flatMap((road, index) => {
+    const roadRecord = isRecord(road) ? road : null;
+    if (roadRecord === null) {
+      return [];
+    }
+
+    return [
+      {
+        roadId: readString(roadRecord, "road_id", `road-${index}`),
+        centerline: readPointList(readArray(roadRecord, "centerline")),
+        edgeIds: readNumberList(roadRecord, "edge_ids"),
+        blocked: readNumberArray(snapshot, "blocked_edge_ids").some((edgeId) =>
+          readNumberArray(roadRecord, "edge_ids").includes(edgeId),
+        ),
+        roadClass: readString(roadRecord, "road_class", "connector"),
+        directionality: readString(roadRecord, "directionality", "one_way"),
+        laneCount: readNumber(roadRecord, "lane_count", 1),
       },
     ];
   });
@@ -243,94 +279,195 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
     ];
   });
 
-  const vehicles = readArray(snapshot, "vehicles").flatMap((vehicle, index) => {
-    const vehicleRecord = isRecord(vehicle) ? vehicle : null;
-    if (vehicleRecord === null) {
-      return [];
-    }
-    const position = readPoint(vehicleRecord.position);
-    if (position === null) {
-      return [];
-    }
-    const state = readString(vehicleRecord, "operational_state", "idle");
-    return [
-      {
-        vehicleId: readNumber(vehicleRecord, "vehicle_id", index + 1),
-        position,
-        state,
-        stateClass: vehicleStateClass(state),
-      },
-    ];
-  });
-
-  const blockedEdgeIds = readNumberArray(snapshot, "blocked_edge_ids");
-  const selectedVehicleIds = readNumberArray(commandCenter, "selected_vehicle_ids");
-  const routePreviews = readArray(commandCenter, "route_previews").flatMap((preview, index) => {
-    const previewRecord = isRecord(preview) ? preview : null;
-    if (previewRecord === null) {
-      return [];
-    }
-
-    return [
-      {
-        vehicleId: readNumber(previewRecord, "vehicle_id", index + 1),
-        destinationNodeId: readNumber(previewRecord, "destination_node_id", -1),
-        isActionable: Boolean(previewRecord.is_actionable),
-        reason: readStringOrNull(previewRecord, "reason"),
-        reasonCode: readStringOrNull(previewRecord, "reason_code"),
-        nodeIds: readNumberList(previewRecord, "node_ids"),
-        edgeIds: readNumberList(previewRecord, "edge_ids"),
-        totalDistance: readNumberOrNull(previewRecord, "total_distance"),
-      },
-    ];
-  });
+  const inspectionsByVehicleId = new Map<number, InspectionRecord>();
   const vehicleInspections = readArray(commandCenter, "vehicle_inspections").flatMap((inspection, index) => {
     const inspectionRecord = isRecord(inspection) ? inspection : null;
     if (inspectionRecord === null) {
       return [];
     }
 
+    const vehicleId = readNumber(inspectionRecord, "vehicle_id", index + 1);
+    const normalizedInspection: InspectionRecord = {
+      currentNodeId: readNumberOrNull(inspectionRecord, "current_node_id"),
+      exactPosition: readPoint(inspectionRecord.exact_position),
+      operationalState: readString(inspectionRecord, "operational_state", "unknown"),
+      currentJobId: readStringOrNull(inspectionRecord, "current_job_id"),
+      currentTaskIndex: readNumberOrNull(inspectionRecord, "current_task_index"),
+      currentTaskType: readStringOrNull(inspectionRecord, "current_task_type"),
+      assignedResourceId: readStringOrNull(inspectionRecord, "assigned_resource_id"),
+      waitReason: readStringOrNull(inspectionRecord, "wait_reason"),
+      trafficControlState: readStringOrNull(inspectionRecord, "traffic_control_state"),
+      trafficControlDetail: readStringOrNull(inspectionRecord, "traffic_control_detail"),
+      etaSeconds: readNumberOrNull(inspectionRecord, "eta_s"),
+      routeAheadNodeIds: readNumberList(inspectionRecord, "route_ahead_node_ids"),
+      routeAheadEdgeIds: readNumberList(inspectionRecord, "route_ahead_edge_ids"),
+      recentCommands: readArray(inspectionRecord, "recent_commands").flatMap((entry) =>
+        isRecord(entry) ? [entry] : [],
+      ),
+      diagnostics: readArray(inspectionRecord, "diagnostics").flatMap((entry) => {
+        const diagnostic = isRecord(entry) ? entry : null;
+        if (diagnostic === null) {
+          return [];
+        }
+        return [
+          {
+            code: readString(diagnostic, "code", "unknown"),
+            severity: readString(diagnostic, "severity", "info"),
+            message: readString(diagnostic, "message", "No detail available."),
+          },
+        ];
+      }),
+    };
+
+    inspectionsByVehicleId.set(vehicleId, normalizedInspection);
     return [
       {
-        vehicleId: readNumber(inspectionRecord, "vehicle_id", index + 1),
-        currentNodeId: readNumberOrNull(inspectionRecord, "current_node_id"),
-        exactPosition: readPoint(inspectionRecord.exact_position) ?? ([0, 0] as Point2),
-        operationalState: readString(inspectionRecord, "operational_state", "unknown"),
-        currentJobId: readStringOrNull(inspectionRecord, "current_job_id"),
-        currentTaskIndex: readNumberOrNull(inspectionRecord, "current_task_index"),
-        currentTaskType: readStringOrNull(inspectionRecord, "current_task_type"),
-        assignedResourceId: readStringOrNull(inspectionRecord, "assigned_resource_id"),
-        waitReason: readStringOrNull(inspectionRecord, "wait_reason"),
-        trafficControlState: readStringOrNull(inspectionRecord, "traffic_control_state"),
-        trafficControlDetail: readStringOrNull(inspectionRecord, "traffic_control_detail"),
-        etaSeconds: readNumberOrNull(inspectionRecord, "eta_s"),
-        routeAheadNodeIds: readNumberList(inspectionRecord, "route_ahead_node_ids"),
-        routeAheadEdgeIds: readNumberList(inspectionRecord, "route_ahead_edge_ids"),
-        recentCommands: readArray(inspectionRecord, "recent_commands").flatMap((entry) =>
-          isRecord(entry) ? [entry] : [],
-        ),
-        diagnostics: readArray(inspectionRecord, "diagnostics").flatMap((entry) => {
-          const diagnostic = isRecord(entry) ? entry : null;
-          if (diagnostic === null) {
-            return [];
-          }
-          return [
-            {
-              code: readString(diagnostic, "code", "unknown"),
-              severity: readString(diagnostic, "severity", "info"),
-              message: readString(diagnostic, "message", "No detail available."),
-            },
-          ];
-        }),
+        vehicleId,
+        currentNodeId: normalizedInspection.currentNodeId,
+        exactPosition: normalizedInspection.exactPosition ?? nodePositionsById.get(normalizedInspection.currentNodeId ?? -1) ?? ([0, 0] as Point2),
+        operationalState: normalizedInspection.operationalState,
+        currentJobId: normalizedInspection.currentJobId,
+        currentTaskIndex: normalizedInspection.currentTaskIndex,
+        currentTaskType: normalizedInspection.currentTaskType,
+        assignedResourceId: normalizedInspection.assignedResourceId,
+        waitReason: normalizedInspection.waitReason,
+        trafficControlState: normalizedInspection.trafficControlState,
+        trafficControlDetail: normalizedInspection.trafficControlDetail,
+        etaSeconds: normalizedInspection.etaSeconds,
+        routeAheadNodeIds: normalizedInspection.routeAheadNodeIds,
+        routeAheadEdgeIds: normalizedInspection.routeAheadEdgeIds,
+        recentCommands: normalizedInspection.recentCommands,
+        diagnostics: normalizedInspection.diagnostics,
       },
     ];
   });
-  const controlPoints = readArray(trafficBaseline, "control_points").flatMap((entry) =>
-    isRecord(entry) ? [entry] : [],
-  );
-  const queueRecords = readArray(trafficBaseline, "queue_records").flatMap((entry) =>
-    isRecord(entry) ? [entry] : [],
-  );
+
+  const selectedVehicleIds = readNumberArray(commandCenter, "selected_vehicle_ids");
+  const renderDiagnostics: string[] = [];
+
+  const routePreviews = readArray(commandCenter, "route_previews").flatMap((preview, index) => {
+    const previewRecord = isRecord(preview) ? preview : null;
+    if (previewRecord === null) {
+      return [];
+    }
+
+    const vehicleId = readNumber(previewRecord, "vehicle_id", index + 1);
+    const destinationNodeId = readNumber(previewRecord, "destination_node_id", -1);
+    const nodeIds = readNumberList(previewRecord, "node_ids");
+    const edgeIds = readNumberList(previewRecord, "edge_ids");
+    const resolvedGeometry = resolveRoutePreviewGeometry(nodePositionsById, vehicleId, destinationNodeId, nodeIds);
+    renderDiagnostics.push(...resolvedGeometry.renderDiagnostics);
+
+    return [
+      {
+        vehicleId,
+        destinationNodeId,
+        isActionable: Boolean(previewRecord.is_actionable),
+        reason: readStringOrNull(previewRecord, "reason"),
+        reasonCode: readStringOrNull(previewRecord, "reason_code"),
+        nodeIds,
+        edgeIds,
+        totalDistance: readNumberOrNull(previewRecord, "total_distance"),
+        pathPoints: resolvedGeometry.pathPoints,
+        destinationPoint: resolvedGeometry.destinationPoint,
+        renderDiagnostics: resolvedGeometry.renderDiagnostics,
+      },
+    ];
+  });
+
+  const trafficControlPoints = readArray(trafficBaseline, "control_points").flatMap((controlPoint) => {
+    const controlPointRecord = isRecord(controlPoint) ? controlPoint : null;
+    if (controlPointRecord === null) {
+      return [];
+    }
+
+    const nodeId = readNumber(controlPointRecord, "node_id", -1);
+    const position = nodePositionsById.get(nodeId) ?? null;
+    const diagnostics = position === null ? [`Control point ${readString(controlPointRecord, "control_id", "control")} could not resolve node ${nodeId}.`] : [];
+    renderDiagnostics.push(...diagnostics);
+
+    return [
+      {
+        controlId: readString(controlPointRecord, "control_id", "control"),
+        nodeId,
+        position,
+        controlType: readString(controlPointRecord, "control_type", "unknown"),
+        controlledRoadIds: readStringList(controlPointRecord, "controlled_road_ids"),
+        stopLineIds: readStringList(controlPointRecord, "stop_line_ids"),
+        protectedConflictZoneIds: readStringList(controlPointRecord, "protected_conflict_zone_ids"),
+        signalReady: Boolean(controlPointRecord.signal_ready),
+        renderDiagnostics: diagnostics,
+      },
+    ];
+  });
+
+  const trafficQueueRecords = readArray(trafficBaseline, "queue_records").flatMap((queueRecord) => {
+    const queueRecordRecord = isRecord(queueRecord) ? queueRecord : null;
+    if (queueRecordRecord === null) {
+      return [];
+    }
+
+    const nodeId = readNumber(queueRecordRecord, "node_id", -1);
+    const position = nodePositionsById.get(nodeId) ?? null;
+    const diagnostics = position === null ? [`Queue record for vehicle ${readNumber(queueRecordRecord, "vehicle_id", -1)} could not resolve node ${nodeId}.`] : [];
+    renderDiagnostics.push(...diagnostics);
+
+    return [
+      {
+        vehicleId: readNumber(queueRecordRecord, "vehicle_id", -1),
+        nodeId,
+        position,
+        roadId: readStringOrNull(queueRecordRecord, "road_id"),
+        queueStartS: readNumber(queueRecordRecord, "queue_start_s", 0),
+        queueEndS: readNumber(queueRecordRecord, "queue_end_s", 0),
+        reason: readString(queueRecordRecord, "reason", "queue"),
+        renderDiagnostics: diagnostics,
+      },
+    ];
+  });
+
+  const liveVehicles = readArray(snapshot, "vehicles").flatMap((vehicle, index) => {
+    const vehicleRecord = isRecord(vehicle) ? vehicle : null;
+    if (vehicleRecord === null) {
+      return [];
+    }
+
+    const vehicleId = readNumber(vehicleRecord, "vehicle_id", index + 1);
+    const inspection = inspectionsByVehicleId.get(vehicleId) ?? null;
+    const snapshotPosition = readPoint(vehicleRecord.position);
+    const exactPosition = inspection?.exactPosition ?? null;
+    const canonicalNodePosition =
+      inspection?.currentNodeId !== null && inspection?.currentNodeId !== undefined
+        ? nodePositionsById.get(inspection.currentNodeId) ?? null
+        : null;
+    const position = exactPosition ?? snapshotPosition ?? canonicalNodePosition;
+    const positionSource: LiveVehicleViewModel["positionSource"] =
+      exactPosition !== null
+        ? "inspection_exact_position"
+        : snapshotPosition !== null
+          ? "snapshot_position"
+          : canonicalNodePosition !== null
+            ? "canonical_node_position"
+            : "unavailable";
+
+    if (position === null) {
+      renderDiagnostics.push(`Vehicle ${vehicleId} could not resolve a runtime position.`);
+      return [];
+    }
+
+    const state = inspection?.operationalState ?? readString(vehicleRecord, "operational_state", "unknown");
+
+    return [
+      {
+        vehicleId,
+        position,
+        state,
+        stateClass: vehicleStateClass(state),
+        positionSource,
+      },
+    ];
+  });
+
   const trafficRoadStates = readArray(trafficSnapshot, "road_states").flatMap((entry) =>
     isRecord(entry) ? [entry] : [],
   );
@@ -341,17 +478,18 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
     message: readString(entry, "message", "No detail available."),
     vehicleId: readNumberOrNull(entry, "vehicle_id"),
   }));
+
+  const blockedEdgeIds = readNumberArray(snapshot, "blocked_edge_ids");
   const congestedRoadCount = trafficRoadStates.filter((roadState) => readNumber(roadState, "congestion_intensity", 0) > 0.2).length;
   const queuedVehicleCount = trafficRoadStates.reduce(
     (count, roadState) => count + readNumberList(roadState, "queued_vehicle_ids").length,
     0,
   );
-
   const alerts = [
     ...(blockedEdgeIds.length > 0 ? [`${blockedEdgeIds.length} blocked edge(s)`] : []),
     ...(congestedRoadCount > 0 ? [`${congestedRoadCount} congested road(s)`] : []),
     ...(queuedVehicleCount > 0 ? [`${queuedVehicleCount} queued vehicle(s)`] : []),
-    ...(queueRecords.length > 0 ? [`${queueRecords.length} queue record(s)`] : []),
+    ...(trafficQueueRecords.length > 0 ? [`${trafficQueueRecords.length} queue record(s)`] : []),
     ...(anomalies.length > 0 ? [`${anomalies.length} anomaly signal(s)`] : []),
   ];
 
@@ -362,6 +500,15 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
     selectedVehicleIds,
     alerts,
     sessionIdentity: {
+      key: buildSessionIdentityKey({
+        scenarioPath: readString(authoring, "source_scenario_path", "unknown scenario"),
+        surfaceName: readString(metadata, "surface_name", "live_session_bundle"),
+        apiVersion: numberToString(readNumber(metadata, "api_version", Number.NaN), "unknown"),
+        seed: numberToString(readNumber(bundle, "seed", Number.NaN), "pending"),
+        sessionControlEndpoint: readString(sessionControl, "session_control_endpoint", "unknown"),
+        commandEndpoint: readString(sessionControl, "command_endpoint", "unknown"),
+        previewEndpoint: readString(sessionControl, "route_preview_endpoint", "unknown"),
+      }),
       scenarioPath: readString(authoring, "source_scenario_path", "unknown scenario"),
       scenarioName: readString(authoring, "source_scenario_path", "unknown scenario")
         .split("/")
@@ -383,7 +530,7 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
       nodes,
       roads,
       areas,
-      vehicles,
+      vehicles: liveVehicles,
       blockedEdgeIds,
       environment: {
         family: readString(worldEnvironment, "family", "unknown"),
@@ -419,41 +566,8 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
           },
         ];
       }),
-      queueRecords: queueRecords.flatMap((queueRecord) => {
-        const queueRecordRecord = isRecord(queueRecord) ? queueRecord : null;
-        if (queueRecordRecord === null) {
-          return [];
-        }
-
-        return [
-          {
-            vehicleId: readNumber(queueRecordRecord, "vehicle_id", -1),
-            nodeId: readNumber(queueRecordRecord, "node_id", -1),
-            roadId: readStringOrNull(queueRecordRecord, "road_id"),
-            queueStartS: readNumber(queueRecordRecord, "queue_start_s", 0),
-            queueEndS: readNumber(queueRecordRecord, "queue_end_s", 0),
-            reason: readString(queueRecordRecord, "reason", "queue"),
-          },
-        ];
-      }),
-      controlPoints: controlPoints.flatMap((controlPoint) => {
-        const controlPointRecord = isRecord(controlPoint) ? controlPoint : null;
-        if (controlPointRecord === null) {
-          return [];
-        }
-
-        return [
-          {
-            controlId: readString(controlPointRecord, "control_id", "control"),
-            nodeId: readNumber(controlPointRecord, "node_id", -1),
-            controlType: readString(controlPointRecord, "control_type", "unknown"),
-            controlledRoadIds: readStringList(controlPointRecord, "controlled_road_ids"),
-            stopLineIds: readStringList(controlPointRecord, "stop_line_ids"),
-            protectedConflictZoneIds: readStringList(controlPointRecord, "protected_conflict_zone_ids"),
-            signalReady: Boolean(controlPointRecord.signal_ready),
-          },
-        ];
-      }),
+      queueRecords: trafficQueueRecords,
+      controlPoints: trafficControlPoints,
     },
     analysis: {
       anomalySignals,
@@ -481,7 +595,65 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
         "Legacy serious UI remains frozen as a compatibility path only.",
         "Python simulator stays authoritative; the frontend consumes derived surfaces.",
       ],
+      renderDiagnostics,
     },
+  };
+}
+
+function buildSessionIdentityKey(input: {
+  scenarioPath: string;
+  surfaceName: string;
+  apiVersion: string;
+  seed: string;
+  sessionControlEndpoint: string;
+  commandEndpoint: string;
+  previewEndpoint: string;
+}): string {
+  return [
+    input.scenarioPath,
+    input.surfaceName,
+    input.apiVersion,
+    input.seed,
+    input.sessionControlEndpoint,
+    input.commandEndpoint,
+    input.previewEndpoint,
+  ].join("|");
+}
+
+function resolveRoutePreviewGeometry(
+  nodePositionsById: Map<number, Point2>,
+  vehicleId: number,
+  destinationNodeId: number,
+  nodeIds: number[],
+): {
+  pathPoints: Point2[];
+  destinationPoint: Point2 | null;
+  renderDiagnostics: string[];
+} {
+  const diagnostics: string[] = [];
+  const pathPoints: Point2[] = [];
+
+  for (const nodeId of nodeIds) {
+    const position = nodePositionsById.get(nodeId) ?? null;
+    if (position === null) {
+      diagnostics.push(`Route preview for vehicle ${vehicleId} could not resolve node ${nodeId}.`);
+      continue;
+    }
+    pathPoints.push(position);
+  }
+
+  const destinationPoint = nodePositionsById.get(destinationNodeId) ?? null;
+  if (destinationNodeId >= 0 && destinationPoint === null) {
+    diagnostics.push(`Route preview for vehicle ${vehicleId} could not resolve destination node ${destinationNodeId}.`);
+  }
+  if (nodeIds.length === 0) {
+    diagnostics.push(`Route preview for vehicle ${vehicleId} did not include any route nodes.`);
+  }
+
+  return {
+    pathPoints,
+    destinationPoint,
+    renderDiagnostics: diagnostics,
   };
 }
 
@@ -592,26 +764,20 @@ function readPointList(points: unknown[]): Point2[] {
   });
 }
 
-function averagePoint(points: Point2[]): Point2 | null {
-  if (points.length === 0) {
-    return null;
-  }
-
-  const total = points.reduce(
-    (accumulator, point) => {
-      accumulator.x += point[0];
-      accumulator.y += point[1];
-      return accumulator;
-    },
-    { x: 0, y: 0 },
-  );
-  return [total.x / points.length, total.y / points.length];
-}
-
 function collectScenePoints(bundle: JsonRecord | null): Point2[] {
   const points: Point2[] = [];
+  const mapSurface = readRecord(bundle, "map_surface");
   const renderGeometry = readRecord(bundle, "render_geometry");
-  const snapshot = readRecord(bundle, "snapshot");
+
+  for (const node of readArray(mapSurface, "nodes")) {
+    if (!isRecord(node)) {
+      continue;
+    }
+    const position = readPoint(node.position);
+    if (position !== null) {
+      points.push(position);
+    }
+  }
 
   for (const road of readArray(renderGeometry, "roads")) {
     if (!isRecord(road)) {
@@ -620,14 +786,18 @@ function collectScenePoints(bundle: JsonRecord | null): Point2[] {
     points.push(...readPointList(readArray(road, "centerline")));
   }
 
-  for (const vehicle of readArray(snapshot, "vehicles")) {
-    if (!isRecord(vehicle)) {
+  for (const intersection of readArray(renderGeometry, "intersections")) {
+    if (!isRecord(intersection)) {
       continue;
     }
-    const position = readPoint(vehicle.position);
-    if (position !== null) {
-      points.push(position);
+    points.push(...readPointList(readArray(intersection, "polygon")));
+  }
+
+  for (const area of readArray(renderGeometry, "areas")) {
+    if (!isRecord(area)) {
+      continue;
     }
+    points.push(...readPointList(readArray(area, "polygon")));
   }
 
   return points.length > 0 ? points : [[-10, -6], [10, 6]];
