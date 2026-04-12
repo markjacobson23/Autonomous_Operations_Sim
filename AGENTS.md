@@ -2,244 +2,294 @@
 
 ## Purpose
 
-This repository is a deterministic autonomous operations simulator focused on:
-- scenario-driven execution
-- operational tasks and dispatch
-- coordination and control
-- replay/export/live-sync surfaces
-- viewer/frontend consumption of authoritative simulator state
+This file gives repo-wide guidance for implementation agents working in this repository.
 
-This file is intentionally **repo-wide and step-independent**.
+The current active focus is:
 
-The single operational source of truth for roadmap status, active work, and step-by-step execution rules is:
+- **Phase A only**
+- **Frontend v2 product completion**
+- taking the serious frontend from prototype/debug quality to a genuinely good map-first operator product
+
+The active execution source of truth is:
 
 - `docs/execution_plan.md`
 
-If there is any conflict between broad guidance in this file and step-specific guidance in `docs/execution_plan.md`, follow `docs/execution_plan.md`.
+The active product/design references are:
+
+- `docs/frontend_v2.md`
+- `docs/operator_workflows.md`
+- `docs/architecture_v2.md`
+- `docs/acceptance_demos.md`
+
+If there is any conflict between this file and `docs/execution_plan.md`, follow `docs/execution_plan.md`.
 
 ---
 
-## Core architectural principles
+## Current mission
 
-### 1. Determinism is first-class
-The simulator should produce stable results for the same:
-- scenario
-- seed
-- command sequence
-- live-session progression
-- replay/export/live-sync inputs
+Right now, the goal is **not** to broadly improve the whole simulator.
 
-Preserve:
-- explicit seeds
-- stable ordering
-- deterministic tie-breaking
-- stable JSON and structured exports
-- replayable command/session/viewer behavior where applicable
+The goal is to complete **Frontend v2** as a real product foundation.
 
-Do not introduce hidden nondeterminism through:
-- unordered iteration where order matters
-- uncontrolled randomness
-- wall-clock-driven simulation semantics
-- UI-driven direct mutation of runtime truth
+That means delivering a frontend that is:
 
-### 2. Static topology is separate from runtime state
-Static world structure and mutable per-run state must remain distinct.
+- map-first
+- calm by default
+- selection-driven
+- operationally useful
+- previewable
+- trustworthy
+- presentation-worthy
 
-Examples:
-- `Graph` / `Map` are reusable topology assets
-- `WorldState` owns runtime blocked-edge conditions
-- reservations and live coordination state belong to runtime/session layers
-- visualization state, replay bundles, and live sync are derived surfaces, not authoritative truth
+Do not optimize for “less bad.”
+Optimize for “good enough to be the real foundation for later phases.”
 
-Do not mutate static topology objects to represent per-run conditions.
+---
 
-### 3. The simulator core is authoritative
-The core simulator owns:
-- execution semantics
-- vehicle/runtime truth
-- routing and coordination truth
-- typed commands and live sessions
-- replay/export/live-sync truth
+## Priority order
 
-Viewers and frontends must consume stable simulator surfaces.
-They must not become the source of truth.
+When making decisions during the current phase, optimize in this order:
 
-### 4. Commands and interactions must remain explicit
-Viewer-facing and operator-facing actions should translate into typed commands rather than bypassing runtime ownership.
+1. simulator authority and truth boundaries
+2. operator usefulness
+3. map readability and interaction quality
+4. product quality and visual coherence
+5. extensibility for later phases
+6. implementation neatness
+7. speculative future flexibility
 
-Preserve:
-- typed command surfaces
-- validated application
-- deterministic command ordering
-- replayable command/session history
+---
 
-Avoid:
-- direct viewer mutation of engine internals
-- hidden control paths outside the command/session surfaces
+## Core architectural rules
 
-### 5. Trace and structured surfaces are the main observability contract
-Trace events and explicit runtime state are the outward-facing execution record.
+### 1. Python simulator remains authoritative
+The simulator owns:
+- topology truth
+- runtime vehicle truth
+- routing truth
+- conflict/reservation truth
+- command/session truth
+- deterministic progression semantics
 
-Metrics, exports, replay bundles, visualization state, and live sync should derive from:
-- trace
-- explicit runtime/session state
-- stable structured contracts
+Do not move these into the frontend.
 
-Avoid shadow truth when existing trace or structured surfaces already capture the behavior.
+### 2. Frontend remains a consumer
+Frontend v2 may own:
+- camera/viewport state
+- scene mode/layer state
+- selection/highlight state
+- popup/inspector state
+- local planning workflow state
+- mode/panel state
+- editor gesture state
 
-### 6. Visualization is a consumer, not an owner
-Replay viewers, live viewers, and future higher-fidelity frontends must consume:
-- replay/export surfaces
-- live-sync surfaces
-- command/result surfaces
+Frontend v2 must not own:
+- authoritative runtime truth
+- final route truth
+- conflict truth
+- topology truth
 
-They should not own:
+### 3. No frontend shadow truth
+Do not create local frontend state that quietly becomes a competing source of truth for:
 - vehicle state
-- routing state
-- world-state mutation
-- coordination logic
+- route state
+- traffic/conflict state
+- world state
 
-### 7. Keep responsibilities explicit
-Maintain clean boundaries across:
-- parsing / validation
-- runtime instantiation
-- simulation execution
-- control / command application
-- live-session progression
-- replay / export / sync generation
-- viewer/frontend consumption
-- optional research/benchmark tooling
+Previews and workflows may exist locally, but authoritative results must come from backend truth.
 
-### 8. Keep the architecture language-flexible
-The repository is currently Python-first, but future components do not need to stay all-Python.
+### 4. Map-first product rule
+The map is the primary surface.
+Panels support the map and must not dominate it.
 
-Healthy future splits may include:
-- a higher-quality graphical frontend in another UI/rendering stack
-- performance-critical planners/kernels in Rust or C++
-- Python retained for orchestration, scenarios, experiments, exports, and authoritative runtime behavior
+Default UX should be:
+- quiet
+- readable
+- selection-driven
+- progressive disclosure
 
-Do not split by language prematurely.
-Only do so when there is a clear payoff in:
-- capability
-- UI/UX quality
-- performance
-- development efficiency
-- maintainability
+Not:
+- debug-heavy
+- form-first
+- stacked-card-first
+- label-spam-heavy
 
-### 9. Prefer additive refactoring over rewrites
+### 5. No environment forks
+Do not build separate frontend architectures for:
+- mining
+- yard
+- city
+
+Frontend v2 must stay environment-agnostic at the product-architecture level.
+
+### 6. Do not keep patching the old UI indefinitely
+If the old serious UI path is blocking Frontend v2 quality, prefer bounded replacement instead of endless patching.
+
+Do not preserve bad structure just because it already exists.
+
+---
+
+## Frontend v2 product rules
+
+### 1. Quiet default map
+The default map should show:
+- world/environment form
+- roads
+- vehicles
+- only essential context
+
+The default map should not show:
+- always-on node labels
+- always-on place labels
+- always-on vehicle labels
+- always-on destination labels
+- large explanatory chrome
+- debug clutter
+
+### 2. Selection-driven detail
+Details should appear through:
+- selection
+- preview
+- explicit mode/panel use
+- explicit layer toggles
+
+Not through constant always-on text.
+
+### 3. Primary interaction model
+The primary interaction model is:
+
+- click to select
+- inspect in popup + inspector
+- preview on the map
+- commit action from a compact workflow surface
+
+Not:
+- type raw IDs into the main workflow
+
+### 4. Operate mode is the heart of the product
+Operate mode should feel like:
+- large map
+- compact inspector
+- compact planning/command surface
+- minimal session controls
+
+Not:
+- a console with a map attached
+
+### 5. Every mode needs a real product role
+Frontend v2 must provide real homes for:
+- Operate
+- Traffic
+- Fleet
+- Editor
+- Analyze
+
+Do not create empty placeholder modes with no clear purpose.
+
+### 6. Popup and inspector rules
+Popup should be:
+- compact
+- map-friendly
+- selection-scoped
+
+Inspector should be:
+- useful
+- compact by default
+- expandable when needed
+- organized around operator questions, not raw dumps
+
+### 7. Command workflows must feel grounded
+Commands should be:
+- typed
+- explicit
+- previewable when appropriate
+- selection-aware
+- backed by authoritative results/errors
+
+Do not build fake or disconnected command UX.
+
+---
+
+## Working style for Codex
+
+### 1. Be implementation-first
 Prefer:
-- adding a focused module
-- extending a narrow interface
-- formalizing an existing stable concept
-- creating transport-agnostic boundaries
-- bounded subsystem replacement when justified
+- making the change
+- wiring the feature
+- updating tests
+- validating it
 
 Avoid:
-- speculative frameworks
-- giant rewrites without interface continuity
-- simulator-core changes made only for frontend convenience
+- long speculative discussion
+- unnecessary exploration
+- broad refactors outside the requested step
+
+### 2. Respect exact scope
+If asked for a specific step, do only that step.
+
+Do not silently implement adjacent future work unless a tiny seam is required.
+
+### 3. Bundle related work in one pass
+When a step clearly requires:
+- component changes
+- state plumbing
+- styles
+- tests
+
+do them together in one pass.
+
+Do not leave obvious half-finished wiring if the step clearly requires completion.
+
+### 4. Prefer replacement over patch-stacking when justified
+If a local area is too tangled to support the requested step cleanly, do a bounded replacement.
+
+Do not preserve bad structure out of habit.
+
+### 5. Keep communication concise
+When reporting back:
+- say what changed
+- say what files were touched
+- say how it was validated
+- say what remains
+
+Do not write long narrative summaries unless asked.
 
 ---
 
-## Development rules
+## Implementation boundaries
 
-### 1. Read the master plan first
-Before making changes, read:
-- `docs/execution_plan.md`
+### Acceptable during this phase
+- frontend-v2 app shell work
+- map shell work
+- renderer work
+- selection/popup/inspector work
+- mode/panel work
+- command/preview workflow work
+- frontend-specific styling/polish
+- small backend seams strictly required for Frontend v2 completion
 
-Do not rely on old step docs or outdated roadmap/current-phase files.
-
-### 2. Respect the single-step workflow
-Execution is step-driven through `docs/execution_plan.md`.
-
-If the user prompts with:
-- `step-x`
-
-then only that step should be worked on, subject to the rules in `docs/execution_plan.md`.
-
-Do not silently work on adjacent or future steps.
-
-### 3. Reuse existing execution paths
-Prefer wiring new work into the existing:
-- engine
-- trace
-- metrics
-- command/control
-- live session
-- replay/export
-- live sync
-- viewer-facing surfaces
-
-Do not build parallel systems unless a step explicitly justifies it.
-
-### 4. Keep schema and surface growth controlled
-When extending:
-- scenario formats
-- replay/export formats
-- live-sync contracts
-- viewer-facing state
-
-add only what is needed for the active step.
-Do not turn structured formats into catch-all containers.
-
-### 5. Protect regression surfaces
-Changes that alter:
-- trace ordering
-- metrics summaries
-- command/session history
-- visualization state
-- replay/export/live-sync contracts
-- golden fixtures
-
-must be intentional and covered by tests.
-
-### 6. Measure before optimizing or splitting
-When performance/scaling becomes relevant:
-- benchmark first
-- profile bottlenecks first
-- prefer data-informed optimization
-- consider mixed-language separation only after measurement justifies it
+### Not acceptable during this phase unless explicitly requested
+- deep simulator realism work
+- lane behavior systems
+- advanced kinematics
+- major hazard/weather systems
+- broad schema expansion
+- AI suggestion depth
+- native acceleration work
+- large backend read-model churn with weak frontend payoff
 
 ---
 
-## Testing expectations
+## Testing and validation
 
-All substantive changes should preserve or extend deterministic coverage.
-
+### Frontend changes
 Run:
 ```bash
+cd frontend/serious_ui && npm run build
+cd frontend/serious_ui && npm test
+
+### Backend changes
+run:
 python3 -m pytest
 python3 -m ruff check .
 python3 -m mypy autonomous_ops_sim tests
-```
-
-If a step adds or changes a CLI/tool entrypoint, verify that entrypoint explicitly.
-
-When changing:
-- replay/export surfaces
-- visualization state
-- live sync
-- benchmarks
-- protocol-like data contracts
-
-add or update deterministic tests and regression fixtures where appropriate.
-
----
-
-## Long-term direction
-
-This repository is evolving toward a broader autonomous operations platform with:
-- richer visualization
-- stronger live interactivity
-- smoother and more realistic motion
-- richer road/map/traffic realism
-- AI-assisted operator features later
-- performance/scaling work driven by benchmarks
-- possible mixed-stack viewer or runtime components where justified
-
-That expansion should preserve the core strengths of the project:
-- determinism
-- explicit state ownership
-- stable trace/export/replay/live-sync surfaces
-- modular layering
-- clean separation between simulator authority and frontend presentation
