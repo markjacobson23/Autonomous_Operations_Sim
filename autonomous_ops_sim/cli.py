@@ -172,7 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     live_parser = subparsers.add_parser(
         "live",
-        help="Prepare a live session and open the serious frontend launch path.",
+        help="Prepare a live session and open the Frontend v2 launch path.",
     )
     live_parser.add_argument(
         "--scenario",
@@ -187,7 +187,7 @@ def build_parser() -> argparse.ArgumentParser:
     live_parser.add_argument(
         "--frontend-dist-dir",
         default=str(DEFAULT_LIVE_FRONTEND_DIST_DIRECTORY),
-        help="Optional serious UI build directory override.",
+        help="Optional Frontend v2 build directory override.",
     )
     live_parser.add_argument(
         "--no-browser",
@@ -197,19 +197,19 @@ def build_parser() -> argparse.ArgumentParser:
     live_parser.add_argument(
         "--host",
         default="127.0.0.1",
-        help="Local host to bind when serving a built serious UI.",
+        help="Local host to bind when serving a built Frontend v2 workspace.",
     )
     live_parser.add_argument(
         "--port",
         type=int,
         default=0,
-        help="Local port to bind when serving a built serious UI. Use 0 for auto.",
+        help="Local port to bind when serving a built Frontend v2 workspace. Use 0 for auto.",
     )
     live_parser.add_argument(
         "--serve-seconds",
         type=float,
         default=None,
-        help="Optional finite serve duration when a built serious UI is launched.",
+        help="Optional finite serve duration when a built Frontend v2 workspace is launched.",
     )
 
     return parser
@@ -251,4 +251,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -1,6 +1,6 @@
 # Frontend Architecture Lock
 
-This note records the Step 41 frontend decision and is the repo-level reference for the serious UI direction entering Phase A.
+This note records the Step 41 frontend decision and is the repo-level reference for the Frontend v2 direction entering Phase A.
 
 ## Locked choices
 
@@ -8,7 +8,7 @@ This note records the Step 41 frontend decision and is the repo-level reference 
 - Primary renderer strategy: responsive `SVG` scene rendering for the serious operator shell baseline.
 - Fallback stack: the existing Python-generated standalone serious viewer HTML export path.
 - Simulator authority: Python remains authoritative for runtime state, commands, routing, trace, replay bundles, live-session bundles, and live-sync bundles.
-- Frontend authority: the serious UI consumes derived surfaces and submits explicit typed commands through backend/session boundaries; it does not directly mutate simulator internals.
+- Frontend authority: Frontend v2 consumes derived surfaces and submits explicit typed commands through backend/session boundaries; it does not directly mutate simulator internals.
 
 ## Why this stack
 
@@ -30,9 +30,9 @@ The frontend reads versioned Simulation API surfaces. Step 41 does not introduce
 
 ## Repo layout lock
 
-The serious frontend workspace lives at:
+The canonical Frontend v2 workspace lives at:
 
-- `frontend/serious_ui/`
+- `frontend/frontend_v2/`
 
 The locked layout inside that workspace is:
 
@@ -44,14 +44,16 @@ The locked layout inside that workspace is:
 - `src/App.tsx`: initial application shell
 - `src/app-shell.css`: shell tokens and layout styling
 
-This keeps the serious frontend isolated from the Python package while still living in the same repository.
+The existing `frontend/serious_ui/` workspace is now treated as a frozen legacy compatibility path, not the Frontend v2 home.
+
+This keeps Frontend v2 isolated from the Python package while still living in the same repository.
 
 ## Fallback path
 
 The fallback path remains the existing standalone serious viewer:
 
 - Python renders HTML from Simulation API bundles.
-- This path stays supported for export/showcase use and for environments where the serious frontend workspace is unavailable.
+- This path stays supported for export/showcase use and for environments where the Frontend v2 workspace is unavailable.
 
 That fallback is compatibility support, not the primary end-state UI.
 
@@ -71,5 +73,5 @@ Step 41 is complete when:
 
 - the primary stack and fallback stack are explicit
 - Python authority versus frontend rendering responsibility is unambiguous
-- `frontend/serious_ui/` exists as a dedicated app workspace
+- `frontend/frontend_v2/` exists as the canonical app workspace
 - the app shell is present and intended to compile/run cleanly once Node tooling is installed

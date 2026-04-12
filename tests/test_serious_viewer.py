@@ -109,7 +109,7 @@ def test_viewer_foundation_plan_commits_to_web_client_path() -> None:
     assert plan.rendering_strategy == "responsive_svg_scene"
     assert plan.transport_surface == "simulation_api_bundle_json"
     assert plan.backend_authority == "python_simulator"
-    assert plan.frontend_workspace == "frontend/serious_ui"
+    assert plan.frontend_workspace == "frontend/frontend_v2"
     assert len(plan.rationale) == 3
 
 

@@ -74,10 +74,10 @@ def test_export_live_app_artifacts_prefers_frontend_dist_when_available(tmp_path
     )
 
     assert artifacts.launch_mode == "frontend_dist"
-    assert artifacts.launch_path == tmp_path / "output" / "serious_ui" / "index.html"
+    assert artifacts.launch_path == tmp_path / "output" / "frontend_v2" / "index.html"
     assert artifacts.launch_path.exists()
-    assert (tmp_path / "output" / "serious_ui" / "assets" / "app.js").exists()
-    assert artifacts.launch_relative_url == "/serious_ui/index.html?bundle=/live_session_bundle.json"
+    assert (tmp_path / "output" / "frontend_v2" / "assets" / "app.js").exists()
+    assert artifacts.launch_relative_url == "/frontend_v2/index.html?bundle=/live_session_bundle.json"
 
 
 def test_build_live_app_url_uses_host_port_and_relative_url(tmp_path) -> None:

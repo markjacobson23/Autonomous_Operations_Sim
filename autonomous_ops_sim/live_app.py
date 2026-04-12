@@ -47,7 +47,7 @@ from autonomous_ops_sim.visualization.command_center import RoutePreviewRequest
 
 
 DEFAULT_LIVE_OUTPUT_DIRECTORY = Path("live_output")
-DEFAULT_LIVE_FRONTEND_DIST_DIRECTORY = Path("frontend/serious_ui/dist")
+DEFAULT_LIVE_FRONTEND_DIST_DIRECTORY = Path("frontend/frontend_v2/dist")
 DEFAULT_LIVE_HOST = "127.0.0.1"
 DEFAULT_LIVE_SESSION_STEP_SECONDS = 0.5
 
@@ -76,7 +76,7 @@ class LiveAppLaunchResult:
 
 @dataclass
 class LiveSessionRuntime:
-    """Mutable live session state backing the serious UI command transport."""
+    """Mutable live session state backing the Frontend v2 command transport."""
 
     artifacts: LiveAppArtifacts
     session: LiveSimulationSession
@@ -707,7 +707,7 @@ def export_live_app_artifacts(
     output_directory: str | Path = DEFAULT_LIVE_OUTPUT_DIRECTORY,
     frontend_dist_directory: str | Path = DEFAULT_LIVE_FRONTEND_DIST_DIRECTORY,
 ) -> LiveAppArtifacts:
-    """Prepare the live-session bundle and launch surface for the serious UI."""
+    """Prepare the live-session bundle and launch surface for Frontend v2."""
 
     scenario_file = Path(scenario_path)
     output_root = Path(output_directory)
@@ -745,7 +745,7 @@ def export_live_app_artifacts(
     frontend_dist_root = Path(frontend_dist_directory)
     frontend_index = frontend_dist_root / "index.html"
     if frontend_index.exists():
-        copied_frontend_root = output_root / "serious_ui"
+        copied_frontend_root = output_root / "frontend_v2"
         shutil.copytree(frontend_dist_root, copied_frontend_root, dirs_exist_ok=True)
         return LiveAppArtifacts(
             output_directory=output_root,
@@ -754,9 +754,7 @@ def export_live_app_artifacts(
             live_session_bundle_path=live_session_bundle_path,
             launch_path=copied_frontend_root / "index.html",
             launch_mode="frontend_dist",
-            launch_relative_url=(
-                f"/serious_ui/index.html?bundle={quote('/live_session_bundle.json')}"
-            ),
+            launch_relative_url=(f"/frontend_v2/index.html?bundle={quote('/live_session_bundle.json')}"),
         )
 
     launch_path = output_root / "live_session.viewer.html"

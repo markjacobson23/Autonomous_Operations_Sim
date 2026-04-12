@@ -35,7 +35,7 @@ def build_viewer_foundation_plan() -> ViewerFoundationPlan:
         rendering_strategy="responsive_svg_scene",
         transport_surface="simulation_api_bundle_json",
         backend_authority="python_simulator",
-        frontend_workspace="frontend/serious_ui",
+        frontend_workspace="frontend/frontend_v2",
         rationale=(
             "Higher rendering and interaction ceiling than the standalone HTML exporter.",
             "Consumes the versioned Simulation API boundary without simulator rewrites.",

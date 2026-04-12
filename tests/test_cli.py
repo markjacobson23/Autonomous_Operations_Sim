@@ -127,6 +127,30 @@ def test_cli_live_prepares_artifacts_without_opening_browser(tmp_path, capsys):
     assert (tmp_path / "live_session_bundle.json").exists()
 
 
+def test_cli_live_uses_frontend_v2_dist_when_available(tmp_path, capsys):
+    exit_code = main(
+        [
+            "live",
+            "--scenario",
+            "scenarios/showpiece_pack/01_mine_ore_shift.json",
+            "--output-dir",
+            str(tmp_path),
+            "--frontend-dist-dir",
+            str(Path("frontend/frontend_v2/dist")),
+            "--no-browser",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    launch_path = Path(captured.out.strip())
+
+    assert exit_code == 0
+    assert launch_path == tmp_path / "frontend_v2" / "index.html"
+    assert launch_path.exists()
+    assert (tmp_path / "frontend_v2" / "assets").exists()
+    assert (tmp_path / "live_session_bundle.json").exists()
+
+
 def test_cli_live_invalid_scenario_path_reports_error(capsys):
     exit_code = main(
         [
