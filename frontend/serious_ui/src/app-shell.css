@@ -449,12 +449,17 @@ h3 {
 
 .shell-tab-operate .operate-route-planning {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   border-color: rgba(10, 118, 108, 0.16);
   background:
     linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(246, 240, 231, 0.95)),
     linear-gradient(135deg, rgba(10, 118, 108, 0.06), rgba(36, 83, 199, 0.04));
-  box-shadow: 0 30px 72px rgba(24, 33, 44, 0.12);
+  box-shadow: 0 22px 52px rgba(24, 33, 44, 0.1);
+}
+
+.shell-tab-operate .operate-plan-stack,
+.shell-tab-operate .operate-advanced {
+  grid-column: 1 / -1;
 }
 
 .shell-tab-operate .operate-session-controls {
@@ -462,7 +467,188 @@ h3 {
   background:
     linear-gradient(180deg, rgba(255, 251, 246, 0.95), rgba(246, 240, 231, 0.9)),
     linear-gradient(135deg, rgba(187, 101, 30, 0.04), rgba(36, 83, 199, 0.03));
-  box-shadow: 0 22px 54px rgba(24, 33, 44, 0.1);
+  box-shadow: 0 18px 42px rgba(24, 33, 44, 0.08);
+}
+
+.operate-dock-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.operate-dock-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.operate-session-actions {
+  margin-top: 0;
+}
+
+.operate-status-strip,
+.operate-timeline-strip,
+.operate-command-strip {
+  margin-top: 0;
+}
+
+.operate-command-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.operate-plan-inspector-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.operate-plan-list {
+  display: grid;
+  gap: 10px;
+}
+
+.operate-plan-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 242, 235, 0.92)),
+    linear-gradient(135deg, rgba(10, 118, 108, 0.04), rgba(36, 83, 199, 0.02));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.operate-plan-card.selected {
+  border-color: rgba(10, 118, 108, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 14px 24px rgba(24, 33, 44, 0.08);
+}
+
+.operate-plan-card.committed {
+  border-color: rgba(36, 83, 199, 0.18);
+}
+
+.operate-plan-card-main {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.operate-plan-card-main strong {
+  font-size: 0.96rem;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+
+.operate-plan-card-main p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.operate-plan-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.operate-plan-card-index,
+.operate-plan-card-state {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: rgba(97, 112, 125, 0.08);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.operate-plan-card-state {
+  background: rgba(10, 118, 108, 0.08);
+  color: var(--accent);
+}
+
+.operate-plan-card-detail {
+  font-size: 0.88rem;
+}
+
+.operate-plan-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.operate-empty-plan-list {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px dashed rgba(97, 112, 125, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 241, 233, 0.82)),
+    rgba(255, 255, 255, 0.72);
+}
+
+.operate-empty-plan-list strong {
+  font-size: 0.94rem;
+}
+
+.operate-empty-plan-list p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.operate-advanced {
+  padding: 12px 14px;
+  border: 1px solid rgba(97, 112, 125, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.operate-advanced > summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.operate-advanced-body {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.operate-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.operate-context-card-compact {
+  gap: 6px;
+  padding: 12px;
+}
+
+.operate-card-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.9rem;
 }
 
 .shell-tab-operate .sidebar {
@@ -1355,8 +1541,8 @@ h3 {
 
 .stage-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.62fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.72fr) minmax(240px, 0.42fr);
+  gap: 14px;
 }
 
 .scene-toolbar,
@@ -1440,13 +1626,13 @@ h3 {
 
 .stage-canvas-frame {
   position: relative;
-  min-height: 490px;
+  min-height: 540px;
 }
 
 .stage-canvas {
   width: 100%;
   height: 100%;
-  min-height: 490px;
+  min-height: 540px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   background:
@@ -1541,10 +1727,9 @@ h3 {
   position: absolute;
   inset: 0;
   z-index: 2;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 16px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
   padding: 18px;
   pointer-events: none;
 }
@@ -1553,25 +1738,22 @@ h3 {
   pointer-events: none;
 }
 
-.scene-overlay-primary {
-  grid-column: 1;
-  grid-row: 2;
-  align-self: end;
-  justify-self: start;
+.scene-overlay-minimap {
+  width: min(320px, 42%);
+}
+
+.scene-minimap-frame {
   display: grid;
-  gap: 10px;
-  width: min(100%, 400px);
+  gap: 8px;
+  padding: 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(66, 78, 88, 0.12);
+  background: rgba(255, 251, 245, 0.8);
+  box-shadow: 0 16px 28px rgba(24, 33, 44, 0.12);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
 }
 
-.scene-overlay-secondary {
-  grid-column: 2;
-  grid-row: 1;
-  align-self: start;
-  justify-self: end;
-  width: min(100%, 290px);
-}
-
-.focus-card,
 .overview-card,
 .timeline-card,
 .inspection-card,
@@ -1583,90 +1765,22 @@ h3 {
   box-shadow: var(--shadow-strong);
 }
 
-.focus-card {
-  position: relative;
-  z-index: 1;
-  max-width: 380px;
-  padding: 18px 18px 18px 17px;
-  border-color: rgba(10, 118, 108, 0.16);
-  background:
-    linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(246, 240, 232, 0.95)),
-    linear-gradient(135deg, rgba(10, 118, 108, 0.08), rgba(36, 83, 199, 0.04));
-  box-shadow: 0 20px 48px rgba(24, 33, 44, 0.16);
-}
-
-.hover-card {
-  position: relative;
-  z-index: 1;
-  max-width: 290px;
-  padding: 14px 15px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(97, 112, 125, 0.12);
-  background:
-    linear-gradient(180deg, rgba(255, 252, 248, 0.94), rgba(246, 240, 233, 0.9)),
-    rgba(255, 255, 255, 0.76);
-  box-shadow: 0 14px 30px rgba(28, 36, 48, 0.14);
-  backdrop-filter: blur(12px);
-}
-
-.scene-legend {
-  position: relative;
-  z-index: 1;
+.scene-minimap-head {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  max-width: 100%;
-  padding: 10px 12px;
-  border-radius: 18px;
-  border: 1px solid rgba(66, 78, 88, 0.1);
-  background: rgba(255, 251, 245, 0.76);
-  box-shadow: 0 12px 24px rgba(24, 33, 44, 0.08);
-  backdrop-filter: blur(10px);
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
 }
 
-.legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(66, 78, 88, 0.1);
+.scene-minimap-label {
   color: var(--muted);
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.legend-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  display: inline-block;
-}
-
-.legend-swatch.road {
-  background: rgba(52, 64, 74, 0.82);
-}
-
-.legend-swatch.vehicle {
-  background: rgba(104, 112, 120, 0.95);
-}
-
-.legend-swatch.traffic {
-  background: linear-gradient(90deg, rgba(104, 112, 120, 0.95), rgba(128, 136, 144, 0.95), rgba(154, 160, 166, 0.95));
-}
-
-.legend-swatch.hazard {
-  background: rgba(96, 64, 64, 0.9);
-}
-
-.legend-swatch.handle {
-  background: rgba(96, 104, 112, 0.9);
-}
-
-.focus-card p,
 .overview-card p,
-.hover-card p,
 .status-copy,
 .empty-state {
   margin: 8px 0 0;
@@ -1745,14 +1859,14 @@ h3 {
 
 .overview-panel {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
 }
 
 .overview-card,
 .inspection-card,
 .empty-state {
-  padding: 16px;
+  padding: 15px;
 }
 
 .overview-card-minimap {
@@ -1765,34 +1879,12 @@ h3 {
   box-shadow: var(--shadow-strong);
 }
 
-.minimap-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  min-width: 0;
+.overview-panel .operate-route-planning {
+  padding: 14px;
 }
 
-.minimap-card-copy {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.minimap-card-label {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.minimap-card-summary {
-  margin: 0;
-  color: var(--ink);
-  font-size: 0.8rem;
-  font-weight: 700;
-  line-height: 1.4;
+.overview-panel .operate-route-planning p {
+  margin-top: 0;
 }
 
 .minimap-orientation-pill {
@@ -1808,7 +1900,7 @@ h3 {
   text-transform: uppercase;
 }
 
-.minimap-context-strip {
+.scene-minimap-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -1833,37 +1925,6 @@ h3 {
   padding-left: 18px;
   color: var(--muted);
   line-height: 1.55;
-}
-
-.timeline-body {
-  display: grid;
-  gap: 16px;
-}
-
-.timeline-track {
-  height: 18px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(97, 112, 125, 0.08);
-  overflow: hidden;
-}
-
-.timeline-fill {
-  width: 46%;
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 55%, var(--warm) 100%);
-}
-
-.timeline-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.timeline-card {
-  padding: 14px;
-  display: grid;
-  gap: 6px;
 }
 
 .subsection {
@@ -2646,6 +2707,126 @@ h3 {
   fill: rgba(239, 236, 230, 0.9);
 }
 
+.scene-environment {
+  isolation: isolate;
+}
+
+.scene-environment-form {
+  cursor: pointer;
+}
+
+.scene-environment-form-selectable {
+  pointer-events: all;
+}
+
+.scene-environment-shadow,
+.scene-environment-surface,
+.scene-environment-silhouette,
+.scene-environment-overlay {
+  vector-effect: non-scaling-stroke;
+  shape-rendering: geometricPrecision;
+  paint-order: stroke fill;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.scene-environment-shadow {
+  fill: rgba(68, 76, 84, 0.08);
+  stroke: none;
+  mix-blend-mode: multiply;
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.scene-environment-surface {
+  stroke: rgba(102, 112, 120, 0.16);
+  stroke-width: 0.06;
+}
+
+.scene-environment-silhouette {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.26);
+  stroke-width: 0.05;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.scene-environment-form-flat .scene-environment-shadow {
+  fill: rgba(68, 76, 84, 0.05);
+}
+
+.scene-environment-form-flat .scene-environment-surface {
+  fill: rgba(154, 161, 168, 0.12);
+}
+
+.scene-environment-form-flat .scene-environment-silhouette {
+  stroke: rgba(255, 255, 255, 0.18);
+}
+
+.scene-environment-form-raised .scene-environment-shadow {
+  fill: rgba(68, 76, 84, 0.16);
+}
+
+.scene-environment-form-raised .scene-environment-surface {
+  fill: rgba(138, 145, 152, 0.2);
+  stroke: rgba(92, 101, 110, 0.2);
+}
+
+.scene-environment-form-raised .scene-environment-silhouette {
+  stroke: rgba(255, 255, 255, 0.32);
+}
+
+.scene-environment-form-recessed .scene-environment-shadow {
+  fill: rgba(24, 33, 44, 0.15);
+}
+
+.scene-environment-form-recessed .scene-environment-surface {
+  fill: rgba(144, 150, 156, 0.11);
+  stroke: rgba(92, 101, 110, 0.18);
+}
+
+.scene-environment-form-recessed .scene-environment-silhouette {
+  stroke: rgba(68, 76, 84, 0.22);
+}
+
+.scene-environment-form.selected .scene-environment-surface {
+  stroke: rgba(10, 118, 108, 0.52);
+  stroke-width: 0.09;
+}
+
+.scene-environment-form.selected .scene-environment-silhouette {
+  stroke: rgba(10, 118, 108, 0.32);
+}
+
+.scene-environment-overlay {
+  fill: none;
+  stroke: rgba(97, 112, 125, 0.12);
+  stroke-width: 0.05;
+  stroke-dasharray: 0.28 0.18;
+  pointer-events: none;
+}
+
+.scene-environment-overlay-intersection {
+  stroke: rgba(10, 118, 108, 0.14);
+}
+
+.scene-environment-overlay-area.selected {
+  stroke: rgba(10, 118, 108, 0.36);
+  stroke-width: 0.07;
+  stroke-dasharray: 0.22 0.12;
+}
+
+.scene-road-shadow {
+  fill: none;
+  stroke: rgba(24, 33, 44, 0.16);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  shape-rendering: geometricPrecision;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
 .scene-area {
   fill: rgba(156, 162, 168, 0.16);
   stroke: rgba(110, 118, 125, 0.22);
@@ -2683,6 +2864,17 @@ h3 {
   filter: drop-shadow(0 0.06px 0.08px rgba(255, 255, 255, 0.2));
 }
 
+.scene-road-ribbon {
+  fill: none;
+  stroke: rgba(255, 251, 246, 0.18);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  shape-rendering: geometricPrecision;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
 .scene-road-heatmap {
   fill: none;
   pointer-events: none;
@@ -2712,9 +2904,9 @@ h3 {
 
 .scene-lane {
   fill: none;
-  stroke: rgba(255, 252, 247, 0.82);
-  stroke-width: 0.11;
-  stroke-dasharray: 0.6 0.45;
+  stroke: rgba(255, 252, 247, 0.66);
+  stroke-width: 0.09;
+  stroke-dasharray: 0.48 0.42;
   pointer-events: stroke;
 }
 
@@ -3040,6 +3232,49 @@ h3 {
 .scene-place-label-intersection .scene-place-label-bg {
   fill: rgba(247, 252, 249, 0.96);
   stroke: rgba(10, 118, 108, 0.18);
+}
+
+.scene-place-target {
+  cursor: pointer;
+  pointer-events: all;
+}
+
+.scene-place-target.selected .scene-place-label-bg {
+  stroke: rgba(10, 118, 108, 0.48);
+  stroke-width: 0.06;
+  filter: drop-shadow(0 0.14px 0.14px rgba(24, 33, 44, 0.18));
+}
+
+.scene-selection-popup {
+  pointer-events: none;
+}
+
+.scene-selection-popup-card {
+  fill: rgba(255, 252, 248, 0.94);
+  stroke: rgba(66, 78, 88, 0.18);
+  stroke-width: 0.05;
+  filter: drop-shadow(0 0.14px 0.16px rgba(24, 33, 44, 0.16));
+}
+
+.scene-selection-popup-title {
+  fill: var(--ink);
+  font-size: 0.3px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-anchor: start;
+  paint-order: stroke fill;
+  stroke: rgba(255, 255, 255, 0.84);
+  stroke-width: 0.05;
+}
+
+.scene-selection-popup-detail {
+  fill: var(--muted);
+  font-size: 0.22px;
+  font-weight: 700;
+  text-anchor: start;
+  paint-order: stroke fill;
+  stroke: rgba(255, 255, 255, 0.82);
+  stroke-width: 0.04;
 }
 
 .scene-vehicle text {
@@ -3680,9 +3915,9 @@ h3 {
 
 .minimap {
   width: 100%;
-  height: 160px;
-  margin-top: 2px;
-  border-radius: 20px;
+  height: 132px;
+  margin-top: 0;
+  border-radius: 14px;
   border: 1px solid rgba(36, 83, 199, 0.18);
   background:
     radial-gradient(circle at top left, rgba(10, 118, 108, 0.08), transparent 28%),

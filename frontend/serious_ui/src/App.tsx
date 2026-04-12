@@ -40,9 +40,10 @@ import type {
   MoveNodeEditOperation,
   NodePayload,
   Position3,
+  RoutePlanDestination,
+  RoutePlanEntry,
   SceneViewMode,
   RoadPayload,
-  RoutePreviewPayload,
   SelectedTarget,
   ViewportState,
   WorkspaceTab,
@@ -53,10 +54,14 @@ function App(): JSX.Element {
   const sceneRef = useRef<SVGSVGElement | null>(null);
   const liveSession = useLiveSession();
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
-  const [sceneViewMode, setSceneViewMode] = useState<SceneViewMode>("birdseye");
+  const [sceneViewMode, setSceneViewMode] = useState<SceneViewMode>("iso");
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("operate");
   const [selectedTarget, setSelectedTarget] = useState<SelectedTarget | null>(null);
   const [hoverTarget, setHoverTarget] = useState<HoverTarget | null>(null);
+  const [routePlans, setRoutePlans] = useState<RoutePlanEntry[]>([]);
+  const [activeRoutePlanId, setActiveRoutePlanId] = useState<string | null>(null);
+  const [selectedRouteDestination, setSelectedRouteDestination] = useState<RoutePlanDestination | null>(null);
+  const routePlanSequenceRef = useRef(0);
   const [liveCommandDraft, setLiveCommandDraft] = useState<LiveCommandDraft>({
     vehicleId: "",
     destinationNodeId: "",
@@ -93,12 +98,6 @@ function App(): JSX.Element {
     },
     [liveSession.applyLoadedBundle],
   );
-  const applyLoadedBundleWithoutViewport = useCallback(
-    (bundlePayload: BundlePayload, message: string) => {
-      liveSession.applyLoadedBundle(bundlePayload, message);
-    },
-    [liveSession.applyLoadedBundle],
-  );
 
   const authoringState = useAuthoring({
     bundle: liveSession.bundle,
@@ -106,7 +105,6 @@ function App(): JSX.Element {
   });
   const routePreview = useRoutePreview({
     bundle: liveSession.bundle,
-    applyLoadedBundle: applyLoadedBundleWithoutViewport,
     setLiveCommandMessage: liveSession.setLiveCommandMessage,
     selectedVehicleIds: selectedVehicleIds ?? [],
   });
@@ -125,6 +123,9 @@ function App(): JSX.Element {
   const minDisplayedSpacingM = computeMinDisplayedSpacing(displayedVehicles);
   const bounds = computeSceneBounds(bundle);
   const routePreviews = bundle?.command_center?.route_previews ?? [];
+  const activeRoutePlan =
+    routePlans.find((plan) => plan.id === activeRoutePlanId) ?? routePlans[0] ?? null;
+  const activeRoutePreview = activeRoutePlan?.preview ?? null;
   const inspections = bundle?.command_center?.vehicle_inspections ?? [];
   const recentCommands = bundle?.command_center?.recent_commands ?? [];
   const suggestions = bundle?.command_center?.ai_assist?.suggestions ?? [];
@@ -141,6 +142,7 @@ function App(): JSX.Element {
     ? inspections.find((inspection) => inspection.vehicle_id === selectedVehicleId) ?? null
     : null;
   const selectedRoutePreview =
+    activeRoutePreview ??
     routePreviews.find((preview) => preview.vehicle_id === selectedVehicleId) ??
     routePreviews[0] ??
     null;
@@ -404,6 +406,80 @@ function App(): JSX.Element {
     }
   }
 
+  function selectRouteDestination(destination: RoutePlanDestination): void {
+    setSelectedRouteDestination(destination);
+  }
+
+  function selectedPlanningVehicleId(): number | null {
+    if (selectedTarget?.kind === "vehicle") {
+      return selectedTarget.vehicleId;
+    }
+    return effectiveSelectedVehicleIds[0] ?? null;
+  }
+
+  async function createRoutePlanFromSelection(): Promise<void> {
+    const vehicleId = selectedPlanningVehicleId();
+    if (vehicleId === null) {
+      liveSession.setLiveCommandMessage("Select a vehicle on the map before creating a plan.");
+      return;
+    }
+    if (!selectedRouteDestination) {
+      liveSession.setLiveCommandMessage("Select a destination place on the map before creating a plan.");
+      return;
+    }
+
+    const previewResult = await routePreview.submitRoutePreview({
+      vehicle_id: vehicleId,
+      destination_node_id: selectedRouteDestination.nodeId,
+      vehicle_ids: [vehicleId],
+    });
+    const preview =
+      previewResult?.routePreviews.find((entry) => entry.vehicle_id === vehicleId) ??
+      previewResult?.routePreviews[0] ??
+      null;
+    const planId = `plan-${vehicleId}-${selectedRouteDestination.nodeId}-${routePlanSequenceRef.current + 1}`;
+    routePlanSequenceRef.current += 1;
+    const nextPlan: RoutePlanEntry = {
+      id: planId,
+      vehicleId,
+      destination: selectedRouteDestination,
+      preview,
+      committed: false,
+    };
+    setRoutePlans((current) => [...current, nextPlan]);
+    setActiveRoutePlanId(planId);
+    selectVehicle(vehicleId);
+  }
+
+  async function activateRoutePlan(planId: string): Promise<void> {
+    const plan = routePlans.find((entry) => entry.id === planId);
+    if (!plan) {
+      return;
+    }
+    setActiveRoutePlanId(planId);
+    selectVehicle(plan.vehicleId);
+    setSelectedRouteDestination(plan.destination);
+  }
+
+  async function commitRoutePlan(planId: string): Promise<void> {
+    const plan = routePlans.find((entry) => entry.id === planId);
+    if (!plan) {
+      return;
+    }
+    await submitLiveCommand({
+      command_type: "assign_vehicle_destination",
+      vehicle_id: plan.vehicleId,
+      destination_node_id: plan.destination.nodeId,
+      vehicle_ids: [plan.vehicleId],
+    });
+    setRoutePlans((current) =>
+      current.map((entry) => (entry.id === planId ? { ...entry, committed: true } : entry)),
+    );
+    setActiveRoutePlanId(planId);
+    selectVehicle(plan.vehicleId);
+    setSelectedRouteDestination(plan.destination);
+  }
+
   function parseDraftInteger(value: string): number | null {
     if (!value.trim()) {
       return null;
@@ -420,12 +496,12 @@ function App(): JSX.Element {
     return Number.isFinite(parsed) ? parsed : null;
   }
 
-  function submitLiveCommand(commandPayload: Record<string, unknown>): void {
+  async function submitLiveCommand(commandPayload: Record<string, unknown>): Promise<void> {
     const targetVehicleIds =
       commandPayload.vehicle_ids !== undefined
         ? commandPayload.vehicle_ids
         : effectiveSelectedVehicleIds;
-    void liveSession.submitLiveCommand({
+    await liveSession.submitLiveCommand({
       ...commandPayload,
       selected_vehicle_ids: targetVehicleIds,
     });
@@ -774,6 +850,11 @@ function App(): JSX.Element {
       layers={layers}
       selectedTarget={selectedTarget}
       selectedVehicleIds={effectiveSelectedVehicleIds}
+      selectedRouteDestination={selectedRouteDestination}
+      routePlans={routePlans}
+      activeRoutePlanId={activeRoutePlanId}
+      activeRoutePreview={activeRoutePreview}
+      isRoutePreviewing={routePreview.isPreviewing}
       liveCommandDraft={liveCommandDraft}
       setLiveCommandDraft={setLiveCommandDraft}
       liveCommandMessage={liveCommandMessage}
@@ -793,6 +874,7 @@ function App(): JSX.Element {
       onSelectArea={selectArea}
       onSelectQueue={selectQueue}
       onSelectHazard={selectHazard}
+      onSelectRouteDestination={selectRouteDestination}
       onMinimapClick={handleMinimapClick}
       onSceneMouseMove={handleSceneMouseMove}
       onSceneMouseUp={handleSceneMouseUp}
@@ -803,6 +885,9 @@ function App(): JSX.Element {
       sceneViewMode={sceneViewMode}
       onSceneViewModeChange={setSceneViewMode}
       onControlLiveSession={controlLiveSession}
+      onCreateRoutePlan={createRoutePlanFromSelection}
+      onActivateRoutePlan={activateRoutePlan}
+      onCommitRoutePlan={commitRoutePlan}
       onPreviewRouteFromDraft={previewRouteFromDraft}
       onAssignDestinationFromDraft={assignDestinationFromDraft}
       onRepositionVehicleFromDraft={repositionVehicleFromDraft}

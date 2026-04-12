@@ -13,6 +13,7 @@ import type {
   RecentCommandPayload,
   SceneLabelPayload,
   SceneViewMode,
+  RoutePlanDestination,
   RouteDestinationMarker,
   RoutePreviewPayload,
   SelectedTarget,
@@ -22,6 +23,8 @@ import type {
   VehicleSnapshotPayload,
   ViewportState,
   WorkspaceTab,
+  EnvironmentFormKind,
+  EnvironmentSurfacePayload,
 } from "./types";
 
 export const architecture = {
@@ -62,14 +65,47 @@ export const sceneViewModes: Array<{
 ];
 
 export const defaultLayers: LayerState = {
-  areas: true,
+  areas: false,
   roads: true,
-  intersections: true,
+  intersections: false,
   vehicles: true,
-  routes: true,
-  reservations: true,
-  hazards: true,
+  routes: false,
+  reservations: false,
+  hazards: false,
 };
+
+const raisedEnvironmentKeywords = [
+  "building",
+  "structure",
+  "tower",
+  "shed",
+  "warehouse",
+  "hangar",
+  "berm",
+  "mound",
+  "hill",
+  "mountain",
+  "embankment",
+  "ridge",
+  "stockpile",
+  "pile",
+  "wall",
+];
+
+const recessedEnvironmentKeywords = [
+  "pit",
+  "hole",
+  "quarry",
+  "sink",
+  "ditch",
+  "cut",
+  "basin",
+  "void",
+  "recess",
+  "depression",
+  "crater",
+  "excavation",
+];
 
 export type DisplayedVehicle = VehicleSnapshotPayload & {
   heading_rad?: number;
@@ -123,6 +159,23 @@ export function sceneProjectionTransform(viewMode: SceneViewMode, bounds: Bounds
     "skewX(-20)",
     `translate(${-centerX} ${-centerY})`,
   ].join(" ");
+}
+
+export function classifyEnvironmentFormKind(
+  ...sources: Array<string | undefined | null>
+): EnvironmentFormKind {
+  const normalizedSource = sources
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.toLowerCase())
+    .join(" ");
+
+  if (recessedEnvironmentKeywords.some((keyword) => normalizedSource.includes(keyword))) {
+    return "recessed";
+  }
+  if (raisedEnvironmentKeywords.some((keyword) => normalizedSource.includes(keyword))) {
+    return "raised";
+  }
+  return "flat";
 }
 
 export function computeSceneBounds(bundle: BundlePayload | null): Bounds {
@@ -745,6 +798,16 @@ export function describeSelectedTarget(
   return "no target selected";
 }
 
+function environmentFormRank(kind: EnvironmentFormKind): number {
+  if (kind === "recessed") {
+    return 0;
+  }
+  if (kind === "flat") {
+    return 1;
+  }
+  return 2;
+}
+
 export function describeSelectedBadge(selectedTarget: SelectedTarget): string {
   if (selectedTarget.kind === "vehicle") {
     return `vehicle ${selectedTarget.vehicleId}`;
@@ -960,6 +1023,124 @@ export function buildScenePlaceLabels(bundle: BundlePayload | null): SceneLabelP
     });
   }
   return labels;
+}
+
+export function buildEnvironmentSurfaces(
+  bundle: BundlePayload | null,
+  selectedTarget: SelectedTarget | null,
+): EnvironmentSurfacePayload[] {
+  const surfaces: EnvironmentSurfacePayload[] = [];
+
+  for (const area of bundle?.render_geometry?.areas ?? []) {
+    if (!area.polygon || area.polygon.length < 3) {
+      continue;
+    }
+    surfaces.push({
+      surfaceId: area.area_id ?? `area-${surfaces.length}`,
+      formKind: classifyEnvironmentFormKind(area.kind, area.label, area.area_id),
+      polygon: area.polygon,
+      label: area.label ?? humanizeIdentifier(area.area_id),
+      detail: area.kind ?? "area",
+      selected: selectedTarget?.kind === "area" && selectedTarget.areaId === area.area_id,
+      selectable: Boolean(area.area_id),
+      sourceKind: area.kind ?? null,
+    });
+  }
+
+  for (const intersection of bundle?.render_geometry?.intersections ?? []) {
+    if (!intersection.polygon || intersection.polygon.length < 3) {
+      continue;
+    }
+    surfaces.push({
+      surfaceId: intersection.intersection_id ?? `intersection-${surfaces.length}`,
+      formKind: classifyEnvironmentFormKind(
+        intersection.intersection_type,
+        intersection.intersection_id,
+      ),
+      polygon: intersection.polygon,
+      label: humanizeIdentifier(intersection.intersection_id),
+      detail: intersection.intersection_type ?? "intersection",
+      selected: false,
+      selectable: false,
+      sourceKind: intersection.intersection_type ?? null,
+    });
+  }
+
+  return [...surfaces].sort((left, right) => {
+    const formRank = environmentFormRank(left.formKind) - environmentFormRank(right.formKind);
+    if (formRank !== 0) {
+      return formRank;
+    }
+    if ((left.selected ?? false) !== (right.selected ?? false)) {
+      return left.selected ? 1 : -1;
+    }
+    return left.surfaceId.localeCompare(right.surfaceId);
+  });
+}
+
+export function resolveScenePlaceDestination(
+  bundle: BundlePayload | null,
+  place: SceneLabelPayload,
+): RoutePlanDestination | null {
+  const nodes = bundle?.map_surface?.nodes ?? [];
+  const road = place.kind === "road"
+    ? (bundle?.render_geometry?.roads ?? []).find((entry) => humanizeIdentifier(entry.road_id) === place.label)
+    : null;
+  const intersection = place.kind === "intersection"
+    ? (bundle?.render_geometry?.intersections ?? []).find(
+        (entry) => humanizeIdentifier(entry.intersection_id) === place.label,
+      )
+    : null;
+  const area = place.kind === "area"
+    ? (bundle?.render_geometry?.areas ?? []).find(
+        (entry) => (entry.label ?? humanizeIdentifier(entry.area_id)) === place.label,
+      )
+    : null;
+
+  if (place.kind === "intersection") {
+    const nodeId = intersection?.node_id ?? findNearestNodeId(nodes, place.position);
+    if (nodeId === null || nodeId === undefined) {
+      return null;
+    }
+    return {
+      kind: place.kind,
+      label: place.label,
+      detail: place.detail,
+      nodeId,
+      position: place.position,
+    };
+  }
+
+  if (place.kind === "area") {
+    const containingNodeIds = nodes
+      .filter((node) => node.position && area?.polygon && polygonContainsPoint(area.polygon, node.position))
+      .map((node) => node.node_id)
+      .filter((nodeId): nodeId is number => nodeId !== undefined)
+      .sort((left, right) => left - right);
+    const nodeId = containingNodeIds[0] ?? findNearestNodeId(nodes, place.position);
+    if (nodeId === null || nodeId === undefined) {
+      return null;
+    }
+    return {
+      kind: place.kind,
+      label: place.label,
+      detail: place.detail,
+      nodeId,
+      position: place.position,
+    };
+  }
+
+  const nodeId = findNearestNodeId(nodes, place.position);
+  if (nodeId === null || nodeId === undefined) {
+    return null;
+  }
+  return {
+    kind: place.kind,
+    label: place.label,
+    detail: road?.road_class ? humanizeIdentifier(road.road_class) : place.detail,
+    nodeId,
+    position: place.position,
+  };
 }
 
 export function describeEdgeTargetLabel(edgeId: number | undefined, roads: { edge_ids?: number[]; road_id?: string }[]): string | null {
@@ -1366,6 +1547,25 @@ function polygonArea(points: Position3[]): number {
     area += left[0] * right[1] - right[0] * left[1];
   }
   return Math.abs(area) * 0.5;
+}
+
+function findNearestNodeId(nodes: NodePayload[], point: Position3 | undefined): number | null {
+  if (!point) {
+    return null;
+  }
+  let nearestNodeId: number | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const node of nodes) {
+    if (!node.position || node.node_id === undefined) {
+      continue;
+    }
+    const distance = pointDistance(node.position, point);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestNodeId = node.node_id;
+    }
+  }
+  return nearestNodeId;
 }
 
 function polygonContainsPoint(points: Position3[], point: Position3): boolean {

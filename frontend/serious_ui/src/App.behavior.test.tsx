@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 
 import App from "./App";
+import { classifyEnvironmentFormKind } from "./viewModel";
 import type { BundlePayload } from "./types";
 
 const bundleUrl = "/api/live/bundle";
@@ -620,24 +621,8 @@ function buildCityStreetBundle(): BundlePayload {
   });
 }
 
-function makeFetchMock(routePreviewBundle?: BundlePayload, loadedBundleOverride?: BundlePayload) {
+function makeFetchMock(loadedBundleOverride?: BundlePayload) {
   const loadedBundle = loadedBundleOverride ?? buildBundle();
-  const previewBundle = routePreviewBundle ?? buildBundle({
-    command_center: {
-      route_previews: [
-        {
-          vehicle_id: 7,
-          destination_node_id: 2,
-          start_node_id: 1,
-          is_actionable: true,
-          reason: "Route is clear",
-          total_distance: 10,
-          node_ids: [1, 2],
-          edge_ids: [1],
-        },
-      ],
-    },
-  });
   const saveBundle = buildBundle();
   const reloadBundle = buildBundle();
   const validatePayload = {
@@ -660,6 +645,32 @@ function makeFetchMock(routePreviewBundle?: BundlePayload, loadedBundleOverride?
       return jsonResponse(loadedBundle);
     }
     if (url === "/api/live/preview" && method === "POST") {
+      const requestBody =
+        init?.body && typeof init.body === "string" ? JSON.parse(init.body) : {};
+      const vehicleId = Number(requestBody.vehicle_id ?? requestBody.selected_vehicle_ids?.[0] ?? 7);
+      const destinationNodeId = Number(requestBody.destination_node_id ?? 2);
+      const startNodeId =
+        loadedBundle.command_center?.vehicle_inspections?.find(
+          (inspection) => inspection.vehicle_id === vehicleId,
+        )?.current_node_id ??
+        loadedBundle.snapshot?.vehicles?.find((vehicle) => vehicle.vehicle_id === vehicleId)?.node_id ??
+        1;
+      const previewBundle = JSON.parse(JSON.stringify(loadedBundle)) as BundlePayload;
+      previewBundle.command_center = {
+        ...(previewBundle.command_center ?? {}),
+        route_previews: [
+          {
+            vehicle_id: vehicleId,
+            destination_node_id: destinationNodeId,
+            start_node_id: startNodeId ?? 1,
+            is_actionable: true,
+            reason: "Route is clear",
+            total_distance: 12,
+            node_ids: [startNodeId ?? 1, destinationNodeId],
+            edge_ids: [1],
+          },
+        ],
+      };
       return jsonResponse({
         ok: true,
         bundle: previewBundle,
@@ -725,29 +736,53 @@ afterEach(() => {
 });
 
 describe("serious ui behavior", () => {
-  it("renders a loaded bundle, drives route preview, and wires live session controls", async () => {
+  it("supports the map-first planning workflow and still wires live session controls", async () => {
+    vi.stubGlobal("fetch", makeFetchMock(buildCityStreetBundle()));
     const user = userEvent.setup();
     render(<App />);
 
-    await waitFor(() => expect(screen.getByText("serious-ui-fixture")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Proof-of-Life City Street")).toBeInTheDocument());
     expect(screen.getByText("Operate")).toBeInTheDocument();
     expect(screen.getByText("Traffic")).toBeInTheDocument();
     expect(screen.getByText("Fleet")).toBeInTheDocument();
     const routePlanningRegion = screen.getByRole("region", { name: "route-planning" });
     expect(routePlanningRegion).toBeVisible();
-    expect(within(routePlanningRegion).getByRole("heading", { name: "Primary Operator Workflow" })).toBeVisible();
-    expect(within(routePlanningRegion).getByLabelText("Vehicle ID")).toBeVisible();
-    expect(within(routePlanningRegion).getByLabelText("Destination Node")).toBeVisible();
-    expect(within(routePlanningRegion).getByRole("button", { name: "Preview Route" })).toBeVisible();
-    expect(within(routePlanningRegion).getByRole("button", { name: "Assign Destination" })).toBeVisible();
+    expect(within(routePlanningRegion).getByRole("heading", { name: "Plan Inspector" })).toBeVisible();
+    expect(within(routePlanningRegion).getByRole("button", { name: "Create Plan" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Session Controls" })).toBeVisible();
+    expect(screen.queryByText("Playback and Session Timeline")).not.toBeInTheDocument();
 
-    const destinationInput = screen.getByLabelText("Destination Node");
-    await user.clear(destinationInput);
-    await user.type(destinationInput, "2");
-    await user.click(screen.getByRole("button", { name: "Preview Route" }));
+    const vehicleNode = document.querySelector(".scene-vehicle");
+    expect(vehicleNode).not.toBeNull();
+    if (!vehicleNode) {
+      throw new Error("Expected a vehicle node");
+    }
+    fireEvent.click(vehicleNode);
 
-    await waitFor(() => expect(screen.getAllByText(/Route preview loaded\./i)).not.toHaveLength(0));
-    await waitFor(() => expect(screen.getAllByText(/V7 · Node 2 · actionable/i)).not.toHaveLength(0));
+    const roadPath = document.querySelectorAll(".scene-road")[0];
+    expect(roadPath).not.toBeNull();
+    if (!roadPath) {
+      throw new Error("Expected a road path");
+    }
+    fireEvent.click(roadPath);
+    await waitFor(() =>
+      expect(within(routePlanningRegion).getByText(/North Avenue · node/i)).toBeVisible(),
+    );
+
+    await user.click(within(routePlanningRegion).getByRole("button", { name: "Create Plan" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Commit/i })).toBeVisible());
+    await waitFor(() => expect(document.querySelector(".scene-route-preview")).not.toBeNull());
+
+    const planStack = screen.getByRole("region", { name: "plan-stack" });
+    expect(within(planStack).getByText(/Plan 1/i)).toBeVisible();
+    expect(within(planStack).getByText(/Previewing on map/i)).toBeVisible();
+
+    await user.click(within(planStack).getByRole("button", { name: /Plan 1/i }));
+    await waitFor(() => expect(document.querySelector(".scene-route-preview")).not.toBeNull());
+
+    const commitButton = within(planStack).getByRole("button", { name: "Commit" });
+    await user.click(commitButton);
+    await waitFor(() => expect(within(planStack).getByText(/Committed on live bundle/i)).toBeVisible());
 
     await user.click(screen.getByRole("button", { name: "Play" }));
     await waitFor(() =>
@@ -762,34 +797,44 @@ describe("serious ui behavior", () => {
   });
 
   it("renders the proof-of-life city street scenario as a readable multi-vehicle live scene", async () => {
-    vi.stubGlobal("fetch", makeFetchMock(undefined, buildCityStreetBundle()));
+    vi.stubGlobal("fetch", makeFetchMock(buildCityStreetBundle()));
     const user = userEvent.setup();
     render(<App />);
 
     await waitFor(() =>
       expect(screen.getByText("Proof-of-Life City Street")).toBeInTheDocument(),
     );
-    await waitFor(() =>
-      expect(screen.getByText(/Quiet projected map/i)).toBeInTheDocument(),
-    );
     const sceneSvg = screen.getByLabelText("Simulation scene graph");
     expect(document.querySelectorAll(".scene-place-label")).toHaveLength(0);
     expect(document.querySelectorAll(".vehicle-label")).toHaveLength(0);
     expect(document.querySelectorAll(".scene-destination-label")).toHaveLength(0);
-    expect(sceneSvg).toHaveClass("scene-canvas-birdseye");
+    expect(document.querySelectorAll(".scene-environment-form")).not.toHaveLength(0);
+    expect(document.querySelectorAll(".scene-area")).toHaveLength(0);
+    expect(sceneSvg).toHaveClass("scene-canvas-iso");
+    expect(document.querySelector(".scene-selection-popup")).toBeNull();
+    expect(screen.getByLabelText("Scene minimap")).toBeInTheDocument();
 
     const birdseyeButton = screen.getByRole("button", { name: "Birdseye" });
     const isoButton = screen.getByRole("button", { name: "Iso" });
-    expect(birdseyeButton).toHaveAttribute("aria-pressed", "true");
-    expect(isoButton).toHaveAttribute("aria-pressed", "false");
+    expect(isoButton).toHaveAttribute("aria-pressed", "true");
+    expect(birdseyeButton).toHaveAttribute("aria-pressed", "false");
 
     const roadPath = document.querySelector(".scene-road");
     expect(roadPath).not.toBeNull();
     if (!roadPath) {
       throw new Error("Expected a road path");
     }
-    fireEvent.mouseEnter(roadPath);
-    expect(screen.getByRole("status")).toHaveTextContent(/north avenue/i);
+    fireEvent.click(roadPath);
+    expect(document.querySelector(".scene-selection-popup")).not.toBeNull();
+    expect(document.querySelector(".scene-selection-popup-title")?.textContent).toMatch(/north avenue/i);
+
+    const environmentSurface = document.querySelector(".scene-environment-form-selectable");
+    expect(environmentSurface).not.toBeNull();
+    if (!environmentSurface) {
+      throw new Error("Expected an environment surface");
+    }
+    fireEvent.click(environmentSurface);
+    expect(document.querySelector(".scene-selection-popup")).not.toBeNull();
 
     await user.click(isoButton);
     expect(sceneSvg).toHaveClass("scene-canvas-iso");
@@ -800,9 +845,13 @@ describe("serious ui behavior", () => {
     expect(sceneSvg).toHaveClass("scene-canvas-birdseye");
 
     await user.click(screen.getByRole("button", { name: "Fit Scene" }));
-    await waitFor(() =>
-      expect(screen.getByText(/quiet projected map/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByLabelText("Scene minimap")).toBeInTheDocument());
+  });
+
+  it("classifies geometry-first environment forms without family-specific hacks", () => {
+    expect(classifyEnvironmentFormKind("yard", "loading bay")).toBe("flat");
+    expect(classifyEnvironmentFormKind("building", "warehouse")).toBe("raised");
+    expect(classifyEnvironmentFormKind("pit", "open cut")).toBe("recessed");
   });
 
   it("shows the bootstrap error state when the bundle cannot load", async () => {

@@ -10,6 +10,8 @@ export type ViewportState = {
 
 export type SceneViewMode = "birdseye" | "iso";
 
+export type EnvironmentFormKind = "flat" | "raised" | "recessed";
+
 export type LayerState = {
   areas: boolean;
   roads: boolean;
@@ -360,6 +362,22 @@ export type SelectedTarget =
   | { kind: "queue"; roadId: string }
   | { kind: "hazard"; edgeId: number };
 
+export type RoutePlanDestination = {
+  kind: "area" | "road" | "intersection";
+  label: string;
+  detail?: string;
+  nodeId: number;
+  position?: Position3;
+};
+
+export type RoutePlanEntry = {
+  id: string;
+  vehicleId: number;
+  destination: RoutePlanDestination;
+  preview: RoutePreviewPayload | null;
+  committed: boolean;
+};
+
 export type RouteDestinationMarker = {
   destinationNodeId: number;
   position: Position3;
@@ -375,6 +393,17 @@ export type SceneLabelPayload = {
   detail?: string;
   position: Position3;
   selected?: boolean;
+};
+
+export type EnvironmentSurfacePayload = {
+  surfaceId: string;
+  formKind: EnvironmentFormKind;
+  polygon?: Position3[];
+  label?: string | null;
+  detail?: string | null;
+  selected?: boolean;
+  selectable?: boolean;
+  sourceKind?: string | null;
 };
 
 export type HoverTarget = {

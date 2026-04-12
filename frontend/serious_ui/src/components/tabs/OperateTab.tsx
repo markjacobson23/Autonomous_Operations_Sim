@@ -4,18 +4,12 @@ import { SceneViewport } from "../SceneViewport";
 import { PanelHeader } from "../shared/PanelHeader";
 import { SectionCard } from "../shared/SectionCard";
 import {
-  describeSelectedTarget,
-  describeLocationLabel,
   describeRoutePreviewDestination,
-  describeVehicleOperationalSummary,
+  describeSelectedTarget,
+  describeVehicleName,
   findVehicleById,
-  formatMeters,
   formatMaybeNumber,
   formatSeconds,
-  sampleDisplayedVehicles,
-  sampleTrafficSnapshot,
-  trafficRoadPressureScore,
-  type DisplayedVehicle,
 } from "../../viewModel";
 import type {
   BootstrapSummary,
@@ -23,6 +17,9 @@ import type {
   HoverTarget,
   LayerState,
   LiveCommandDraft,
+  RoutePlanDestination,
+  RoutePlanEntry,
+  RoutePreviewPayload,
   SceneViewMode,
   SelectedTarget,
   ViewportState,
@@ -37,6 +34,11 @@ type OperateTabProps = {
   layers: LayerState;
   selectedTarget: SelectedTarget | null;
   selectedVehicleIds: number[];
+  selectedRouteDestination: RoutePlanDestination | null;
+  routePlans: RoutePlanEntry[];
+  activeRoutePlanId: string | null;
+  activeRoutePreview: RoutePreviewPayload | null;
+  isRoutePreviewing: boolean;
   liveCommandDraft: LiveCommandDraft;
   setLiveCommandDraft: Dispatch<SetStateAction<LiveCommandDraft>>;
   liveCommandMessage: string;
@@ -56,6 +58,7 @@ type OperateTabProps = {
   onSelectArea: (areaId: string | undefined) => void;
   onSelectQueue: (roadId: string | undefined) => void;
   onSelectHazard: (edgeId: number | undefined) => void;
+  onSelectRouteDestination: (destination: RoutePlanDestination) => void;
   onMinimapClick: (event: MouseEvent<SVGSVGElement>) => void;
   onSceneMouseMove: (event: MouseEvent<SVGSVGElement>) => void;
   onSceneMouseUp: () => void;
@@ -76,6 +79,9 @@ type OperateTabProps = {
   sceneViewMode: SceneViewMode;
   onSceneViewModeChange: (mode: SceneViewMode) => void;
   onControlLiveSession: (action: "play" | "pause" | "step") => void;
+  onCreateRoutePlan: () => void;
+  onActivateRoutePlan: (planId: string) => void;
+  onCommitRoutePlan: (planId: string) => void;
   onPreviewRouteFromDraft: () => void;
   onAssignDestinationFromDraft: () => void;
   onRepositionVehicleFromDraft: () => void;
@@ -90,6 +96,11 @@ export function OperateTab({
   layers,
   selectedTarget,
   selectedVehicleIds,
+  selectedRouteDestination,
+  routePlans,
+  activeRoutePlanId,
+  activeRoutePreview,
+  isRoutePreviewing,
   liveCommandDraft,
   setLiveCommandDraft,
   liveCommandMessage,
@@ -109,6 +120,7 @@ export function OperateTab({
   onSelectArea,
   onSelectQueue,
   onSelectHazard,
+  onSelectRouteDestination,
   onMinimapClick,
   onSceneMouseMove,
   onSceneMouseUp,
@@ -119,76 +131,67 @@ export function OperateTab({
   sceneViewMode,
   onSceneViewModeChange,
   onControlLiveSession,
+  onCreateRoutePlan,
+  onActivateRoutePlan,
+  onCommitRoutePlan,
   onPreviewRouteFromDraft,
   onAssignDestinationFromDraft,
   onRepositionVehicleFromDraft,
 }: OperateTabProps): JSX.Element {
-  const displayedVehicles = sampleDisplayedVehicles(bundle, motionClockS);
-  const trafficSnapshot = sampleTrafficSnapshot(bundle, motionClockS);
-  const trafficRoadStates = trafficSnapshot.road_states ?? [];
-  const queuedVehicleCount = trafficRoadStates.reduce(
-    (count, roadState) => count + (roadState.queued_vehicle_ids?.length ?? 0),
-    0,
-  );
-  const congestedRoadCount = trafficRoadStates.filter(
-    (roadState) => (roadState.congestion_intensity ?? 0) > 0.2,
-  ).length;
-  const minDisplayedSpacing = displayedVehicles.length > 1 ? "computed" : "pending";
+  const completedJobCount = formatMaybeNumber(bootstrap.summary?.completed_job_count ?? null);
+  const completedTaskCount = formatMaybeNumber(bootstrap.summary?.completed_task_count ?? null);
+  const traceEventCount = formatMaybeNumber(bootstrap.summary?.trace_event_count ?? null);
   const selectedVehicleId =
     selectedTarget?.kind === "vehicle"
       ? selectedTarget.vehicleId
       : selectedVehicleIds[0] ?? bundle?.command_center?.vehicle_inspections?.[0]?.vehicle_id ?? null;
-  const selectedVehicle = findVehicleById(bundle, selectedVehicleId);
+  const selectedPlanningVehicle = findVehicleById(bundle, selectedVehicleId);
   const selectedInspection = selectedVehicleId
     ? (bundle?.command_center?.vehicle_inspections ?? []).find(
         (inspection) => inspection.vehicle_id === selectedVehicleId,
       ) ?? null
     : null;
-  const routePreviews = bundle?.command_center?.route_previews ?? [];
+  const activeRoutePlan =
+    routePlans.find((entry) => entry.id === activeRoutePlanId) ?? routePlans[0] ?? null;
   const selectedRoutePreview =
-    routePreviews.find((preview) => preview.vehicle_id === selectedVehicleId) ??
-    routePreviews[0] ??
+    activeRoutePreview ??
+    activeRoutePlan?.preview ??
+    routePlans.find((entry) => entry.vehicleId === selectedVehicleId)?.preview ??
+    bundle?.command_center?.route_previews?.find((preview) => preview.vehicle_id === selectedVehicleId) ??
     null;
-  const operateSelectedTargetSummary = describeSelectedTarget(selectedTarget, selectedVehicleId);
-  const operateSelectedVehicleSummary =
-    selectedVehicle !== null
-      ? describeVehicleOperationalSummary(bundle, selectedVehicle, selectedInspection, selectedRoutePreview)
-      : selectedVehicleIds.length > 0
-        ? `Fleet selection active · ${selectedVehicleIds.length} vehicle(s)`
-        : "No vehicle selected yet";
-  const operateSelectedContextSummary =
-    selectedInspection !== null
-      ? `${describeLocationLabel(bundle, selectedInspection.current_node_id ?? null, {
-          includeNodeId: true,
-        })} · ETA ${formatSeconds(selectedInspection.eta_s ?? null)} · ${
-          selectedInspection.current_job_id ?? "no job"
-        }`
-      : "Select a vehicle on the map or from the roster to open inspection details.";
-  const operateRoutePreviewSummary =
+  const selectedVehicleTitle = selectedPlanningVehicle
+    ? describeVehicleName(selectedPlanningVehicle)
+    : selectedVehicleId !== null
+      ? `Vehicle ${selectedVehicleId}`
+      : "No vehicle selected";
+  const selectedVehicleSummary =
+    selectedVehicleId !== null
+      ? `${selectedVehicleTitle} · ${selectedInspection?.operational_state ?? "staged"}`
+      : "Select a vehicle on the map to start planning.";
+  const destinationSummary =
+    selectedRouteDestination !== null
+      ? `${selectedRouteDestination.label} · node ${selectedRouteDestination.nodeId}`
+      : "Select a road or area on the map to choose a destination.";
+  const routePreviewSummary =
     selectedRoutePreview !== null
-      ? `V${formatMaybeNumber(selectedRoutePreview.vehicle_id ?? null)} · ${describeLocationLabel(bundle, selectedRoutePreview.destination_node_id ?? null, {
-          includeNodeId: true,
-        })} · ${
-          selectedRoutePreview.is_actionable ? "actionable" : "pending"
-        }`
-      : "Waiting for route preview";
-  const operateRoutePreviewDetail =
+      ? describeRoutePreviewDestination(bundle, selectedRoutePreview, { includeNodeId: true })
+      : "Preview appears after a plan is created.";
+  const routePreviewDetail =
     selectedRoutePreview !== null
-      ? `${selectedRoutePreview.reason ?? "No reason provided"}${
-          selectedRoutePreview.total_distance !== undefined
-            ? ` · ${formatMeters(selectedRoutePreview.total_distance)}`
-            : ""
+      ? `${selectedRoutePreview.is_actionable ? "Actionable" : "Pending"}${
+          selectedRoutePreview.reason ? ` · ${selectedRoutePreview.reason}` : ""
         }`
-      : "Choose a vehicle and destination, then preview the route to populate node, edge, and distance details.";
-  const operatePrimaryActionLabel = selectedRoutePreview?.is_actionable ? "Assign Destination" : "Preview Route";
-  const operatePrimaryActionDetail = selectedRoutePreview
-    ? selectedRoutePreview.is_actionable
-      ? "The preview is actionable. Assign the destination to keep the route attached to the selected vehicle."
-      : "Preview the route first to verify the selected vehicle and destination before assigning it."
-    : "Pick a vehicle on the map or from the roster, then preview the route before assigning it.";
+      : "Create a plan to preview the route on the map.";
   const operateSessionStateSummary = `Mode ${sessionControl?.play_state ?? "paused"} · step ${formatSeconds(sessionControl?.step_seconds ?? null)} · ${
     sessionControl?.session_control_endpoint ?? "unbound"
   }`;
+  const operateSelectionSummary =
+    selectedTarget !== null
+      ? describeSelectedTarget(selectedTarget, selectedVehicleId)
+      : selectedVehicleIds.length > 0
+        ? `Fleet selection active · ${selectedVehicleIds.length} vehicle(s)`
+        : "No selection yet";
+  const canCreatePlan = selectedVehicleId !== null && selectedRouteDestination !== null;
 
   return (
     <section className="main-column operate-pane">
@@ -199,6 +202,9 @@ export function OperateTab({
         layers={layers}
         selectedTarget={selectedTarget}
         selectedVehicleIds={selectedVehicleIds}
+        selectedRouteDestination={selectedRouteDestination}
+        onSelectRouteDestination={onSelectRouteDestination}
+        activeRoutePreview={selectedRoutePreview}
         editorEnabled={editorEnabled}
         hoverTarget={hoverTarget}
         setHoverTarget={setHoverTarget}
@@ -225,17 +231,17 @@ export function OperateTab({
         onSceneViewModeChange={onSceneViewModeChange}
       />
 
-      <SectionCard
-        eyebrow="Operate Region"
-        title="Session Status"
-        titleId="session-control-title"
-        lede="Live session controls stay grouped so play-state changes remain easy to scan."
-        className="panel info-panel operate-session-controls"
-        meta={<span className="status-pill secondary">{operateSessionStateSummary}</span>}
-      >
-        <div className="section-stack">
-          <div className="subsection">
-            <div className="action-row">
+      <div className="operate-dock-grid">
+        <SectionCard
+          eyebrow="Operate Dock"
+          title="Session Controls"
+          titleId="session-control-title"
+          lede="Playback stays close at hand while the map remains the focus."
+          className="panel info-panel operate-session-controls"
+          meta={<span className="status-pill secondary">{operateSessionStateSummary}</span>}
+        >
+          <div className="operate-dock-actions">
+            <div className="action-row operate-session-actions">
               <button
                 className="scene-button scene-button-primary"
                 type="button"
@@ -261,7 +267,7 @@ export function OperateTab({
                 Single-Step
               </button>
             </div>
-            <div className="selection-strip operate-session-strip">
+            <div className="selection-strip operate-status-strip">
               <span className="selection-pill">Mode: {sessionControl?.play_state ?? "paused"}</span>
               <span className="selection-pill">
                 Step: {formatSeconds(sessionControl?.step_seconds ?? null)}
@@ -270,206 +276,237 @@ export function OperateTab({
                 Channel: {sessionControl?.session_control_endpoint ?? "unbound"}
               </span>
             </div>
+            <div className="selection-strip operate-timeline-strip">
+              <span className="selection-pill">Jobs: {completedJobCount}</span>
+              <span className="selection-pill">Tasks: {completedTaskCount}</span>
+              <span className="selection-pill">Trace: {traceEventCount}</span>
+              <span className="selection-pill">Routes: {formatMaybeNumber(bootstrap.routePreviewCount)}</span>
+            </div>
             <p className="status-copy">{liveCommandMessage}</p>
           </div>
-        </div>
-      </SectionCard>
+        </SectionCard>
 
-      <section className="timeline-region panel" aria-labelledby="timeline-title">
-        <PanelHeader
-          eyebrow="Timeline Region"
-          title="Playback and Session Timeline"
-          titleId="timeline-title"
-          lede="Playback, trace, and command surfaces stay visually docked even when the timeline is only a placeholder."
-          meta={<span className="status-pill secondary">Docked placeholder</span>}
-        />
-        <div className="timeline-body">
-          <div className="timeline-track">
-            <div className="timeline-fill" />
-          </div>
-          <div className="timeline-metrics">
-            <div className="timeline-card">
-              <span className="metric-label">Completed Jobs</span>
-              <strong>{formatMaybeNumber(bootstrap.summary?.completed_job_count ?? null)}</strong>
-            </div>
-            <div className="timeline-card">
-              <span className="metric-label">Completed Tasks</span>
-              <strong>{formatMaybeNumber(bootstrap.summary?.completed_task_count ?? null)}</strong>
-            </div>
-            <div className="timeline-card">
-              <span className="metric-label">Recent Commands</span>
-              <strong>{formatMaybeNumber(bootstrap.recentCommandCount)}</strong>
-            </div>
-            <div className="timeline-card">
-              <span className="metric-label">Preview Routes</span>
-              <strong>{formatMaybeNumber(bootstrap.routePreviewCount)}</strong>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="panel info-panel operate-route-planning" aria-label="route-planning">
-        <PanelHeader
-          eyebrow="Route Planning"
-          title="Primary Operator Workflow"
-          lede="Select a vehicle in the scene, confirm the route preview, then use the primary action to commit or refine the destination without leaving the map."
-          className="compact"
-          meta={
-            <div className="status-stack">
-              <span className="status-pill secondary">Fleet selection: {selectedVehicleIds.length} vehicle(s)</span>
-              <span className="status-pill secondary">
-                Route preview:{" "}
-                {selectedRoutePreview?.vehicle_id !== undefined
-                  ? describeLocationLabel(bundle, selectedRoutePreview.destination_node_id ?? null)
-                  : "waiting for preview"}
-              </span>
-            </div>
-          }
-        />
-        <div className="selection-strip">
-          <span className="selection-pill">
-            Destination:{" "}
-            {selectedRoutePreview
-              ? describeRoutePreviewDestination(bundle, selectedRoutePreview, {
-                  includeNodeId: true,
-                })
-              : "not set yet"}
-          </span>
-          <span className="selection-pill">Current target: {operateSelectedTargetSummary}</span>
-        </div>
-        <p className="operate-route-hint">
-          Select a vehicle in the scene, confirm the route preview, then use the primary action to
-          commit or refine the destination without leaving the map.
-        </p>
-        <div className="operate-context-grid">
-          <section className="operate-context-card">
-            <p className="operate-card-label">Selected Context</p>
-            <strong>{operateSelectedVehicleSummary}</strong>
-            <p>{operateSelectedContextSummary}</p>
-            <ul className="mini-list">
-              <li>Current target: {operateSelectedTargetSummary}</li>
-              <li>
-                Selection source:{" "}
-                {selectedVehicleIds.length > 1 ? `${selectedVehicleIds.length} vehicles` : "single vehicle focus"}
-              </li>
-            </ul>
-          </section>
-          <div className="route-preview-summary operate-context-card">
-            <div className="preview-badge">
-              <span className="preview-label">Route Preview</span>
-              <strong>{operateRoutePreviewSummary}</strong>
-            </div>
-            <p className="operate-route-preview-detail">{operateRoutePreviewDetail}</p>
-            <ul className="mini-list">
-              <li>Actionable: {selectedRoutePreview?.is_actionable ? "yes" : "no"}</li>
-              <li>Reason: {selectedRoutePreview?.reason ?? "none"}</li>
-              <li>Distance: {formatMeters(selectedRoutePreview?.total_distance ?? null)}</li>
-              <li>Edges: {(selectedRoutePreview?.edge_ids ?? []).join(", ") || "none"}</li>
-              <li>Nodes: {(selectedRoutePreview?.node_ids ?? []).join(" → ") || "none"}</li>
-            </ul>
-          </div>
-        </div>
-        <div className="operate-workflow-actions">
-          <div className="operate-next-action">
-            <span className="operate-card-label">Primary next action</span>
-            <strong>{operatePrimaryActionLabel}</strong>
-            <p>{operatePrimaryActionDetail}</p>
-          </div>
-          <div className="route-planning-grid">
-            <label className="form-field">
-              <span>Vehicle ID</span>
-              <input
-                type="number"
-                value={liveCommandDraft.vehicleId}
-                onChange={(event) =>
-                  setLiveCommandDraft((current) => ({
-                    ...current,
-                    vehicleId: event.target.value,
-                  }))
-                }
-                placeholder={selectedVehicleId !== null ? String(selectedVehicleId) : "77"}
-              />
-            </label>
-            <label className="form-field">
-              <span>Destination Node</span>
-              <input
-                type="number"
-                value={liveCommandDraft.destinationNodeId}
-                onChange={(event) =>
-                  setLiveCommandDraft((current) => ({
-                    ...current,
-                    destinationNodeId: event.target.value,
-                  }))
-                }
-                placeholder={
-                  routePreviews[0]?.destination_node_id !== undefined
-                    ? String(routePreviews[0].destination_node_id)
-                    : "3"
-                }
-              />
-            </label>
-            <label className="form-field">
-              <span>Reposition Node</span>
-              <input
-                type="number"
-                value={liveCommandDraft.nodeId}
-                onChange={(event) =>
-                  setLiveCommandDraft((current) => ({
-                    ...current,
-                    nodeId: event.target.value,
-                  }))
-                }
-                placeholder={
-                  selectedInspection?.current_node_id !== undefined
-                    ? String(selectedInspection.current_node_id)
-                    : "1"
-                }
-              />
-            </label>
-            <label className="form-field">
-              <span>Step Seconds</span>
-              <input
-                type="number"
-                step="0.1"
-                value={liveCommandDraft.stepSeconds}
-                onChange={(event) =>
-                  setLiveCommandDraft((current) => ({
-                    ...current,
-                    stepSeconds: event.target.value,
-                  }))
-                }
-                placeholder={String(sessionControl?.step_seconds ?? 0.5)}
-              />
-            </label>
+        <section className="panel info-panel operate-route-planning" aria-label="route-planning">
+          <PanelHeader
+            eyebrow="Operate Dock"
+            title="Plan Inspector"
+            lede="Select a vehicle on the map, choose a road or area destination, and turn that pairing into a plan entry."
+            className="compact"
+            meta={
+              <div className="status-stack">
+                <span className="status-pill secondary">Fleet: {selectedVehicleIds.length} vehicle(s)</span>
+                <span className="status-pill secondary">Plans: {routePlans.length}</span>
+                <span className="status-pill secondary">Map span: {boundsLabel}</span>
+              </div>
+            }
+          />
+          <div className="operate-context-grid operate-plan-inspector-grid">
+            <section className="operate-context-card operate-context-card-compact">
+              <p className="operate-card-label">Vehicle</p>
+              <strong>{selectedVehicleTitle}</strong>
+              <p>{selectedVehicleSummary}</p>
+              <p className="operate-card-note">
+                Primary target: {operateSelectionSummary}
+              </p>
+            </section>
+            <section className="operate-context-card operate-context-card-compact">
+              <p className="operate-card-label">Destination</p>
+              <strong>{selectedRouteDestination?.label ?? "No place selected"}</strong>
+              <p>{destinationSummary}</p>
+              <p className="operate-card-note">
+                Selecting a road or area on the map populates the plan draft destination.
+              </p>
+            </section>
+            <section className="operate-context-card operate-context-card-compact">
+              <p className="operate-card-label">Preview</p>
+              <strong>{routePreviewSummary}</strong>
+              <p>{routePreviewDetail}</p>
+              <p className="operate-card-note">
+                Preview source: {activeRoutePlan?.id ? `plan ${activeRoutePlan.id}` : "live bundle"}
+              </p>
+            </section>
           </div>
           <div className="route-primary-actions action-row">
             <button
               className="scene-button scene-button-primary"
               type="button"
-              onClick={onPreviewRouteFromDraft}
-              disabled={!sessionControl?.route_preview_endpoint}
+              onClick={onCreateRoutePlan}
+              disabled={!canCreatePlan || isRoutePreviewing}
             >
-              Preview Route
+              Create Plan
             </button>
-            <button
-              className="scene-button scene-button-primary"
-              type="button"
-              onClick={onAssignDestinationFromDraft}
-              disabled={!sessionControl?.command_endpoint}
-            >
-              Assign Destination
-            </button>
-            <button
-              className="scene-button"
-              type="button"
-              onClick={onRepositionVehicleFromDraft}
-              disabled={!sessionControl?.command_endpoint}
-            >
-              Reposition Vehicle
-            </button>
+            <span className="selection-pill">
+              {canCreatePlan
+                ? "Ready to add a plan entry"
+                : "Choose a vehicle and destination from the map"}
+            </span>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <section className="panel info-panel operate-plan-stack" aria-label="plan-stack">
+          <PanelHeader
+            eyebrow="Operate Dock"
+            title="Plan Stack"
+            lede="Each plan stays visible, can be previewed again by clicking it, and commits through the existing command path."
+            className="compact"
+            meta={
+              <div className="status-stack">
+                <span className="status-pill secondary">Preview: {routePreviewSummary}</span>
+                <span className="status-pill secondary">Entries: {routePlans.length}</span>
+              </div>
+            }
+          />
+          {routePlans.length > 0 ? (
+            <div className="operate-plan-list">
+              {routePlans.map((plan, index) => {
+                const isActive = plan.id === activeRoutePlanId;
+                const planPreviewSummary =
+                  plan.preview !== null
+                    ? describeRoutePreviewDestination(bundle, plan.preview, { includeNodeId: true })
+                    : `${plan.destination.label} · node ${plan.destination.nodeId}`;
+                const planStateLabel = plan.committed
+                  ? "Committed"
+                  : plan.preview?.is_actionable
+                    ? "Ready"
+                    : "Pending";
+                const planDetail = plan.preview?.reason ?? "Preview requested from the Python session.";
+                return (
+                  <article
+                    key={plan.id}
+                    className={`operate-plan-card ${isActive ? "selected" : ""} ${plan.committed ? "committed" : ""}`}
+                  >
+                    <button
+                      className="operate-plan-card-main"
+                      type="button"
+                      onClick={() => onActivateRoutePlan(plan.id)}
+                      aria-pressed={isActive}
+                    >
+                      <div className="operate-plan-card-head">
+                        <span className="operate-plan-card-index">Plan {index + 1}</span>
+                        <span className="operate-plan-card-state">{planStateLabel}</span>
+                      </div>
+                      <strong>
+                        {describeVehicleName(findVehicleById(bundle, plan.vehicleId))} → {plan.destination.label}
+                      </strong>
+                      <p>{planPreviewSummary}</p>
+                      <p className="operate-plan-card-detail">{planDetail}</p>
+                    </button>
+                    <div className="operate-plan-card-actions">
+                      <span className="selection-pill">
+                        {plan.committed ? "Committed on live bundle" : isActive ? "Previewing on map" : "Click to preview"}
+                      </span>
+                      <button
+                        className="scene-button scene-button-primary"
+                        type="button"
+                        onClick={() => onCommitRoutePlan(plan.id)}
+                        disabled={plan.preview === null || plan.committed || !sessionControl?.command_endpoint}
+                      >
+                        Commit
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="operate-empty-plan-list">
+              <strong>No plans yet.</strong>
+              <p>
+                Select a vehicle and a destination place on the map, then create the first plan
+                entry here.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <details className="operate-advanced">
+          <summary>Advanced / debug commands</summary>
+          <div className="operate-advanced-body">
+            <p className="operate-route-hint">
+              Raw numeric controls stay available here for debugging, but the primary workflow is
+              now map-first.
+            </p>
+            <div className="operate-command-grid">
+              <label className="form-field">
+                <span>Vehicle ID</span>
+                <input
+                  type="number"
+                  value={liveCommandDraft.vehicleId}
+                  onChange={(event) =>
+                    setLiveCommandDraft((current) => ({
+                      ...current,
+                      vehicleId: event.target.value,
+                    }))
+                  }
+                  placeholder={selectedVehicleId !== null ? String(selectedVehicleId) : "77"}
+                />
+              </label>
+              <label className="form-field">
+                <span>Destination Node</span>
+                <input
+                  type="number"
+                  value={liveCommandDraft.destinationNodeId}
+                  onChange={(event) =>
+                    setLiveCommandDraft((current) => ({
+                      ...current,
+                      destinationNodeId: event.target.value,
+                    }))
+                  }
+                  placeholder={
+                    selectedRoutePreview?.destination_node_id !== undefined
+                      ? String(selectedRoutePreview.destination_node_id)
+                      : "3"
+                  }
+                />
+              </label>
+              <label className="form-field">
+                <span>Reposition Node</span>
+                <input
+                  type="number"
+                  value={liveCommandDraft.nodeId}
+                  onChange={(event) =>
+                    setLiveCommandDraft((current) => ({
+                      ...current,
+                      nodeId: event.target.value,
+                    }))
+                  }
+                  placeholder={
+                    selectedInspection?.current_node_id !== undefined
+                      ? String(selectedInspection.current_node_id)
+                      : "1"
+                  }
+                />
+              </label>
+            </div>
+            <div className="route-primary-actions action-row">
+              <button
+                className="scene-button"
+                type="button"
+                onClick={onPreviewRouteFromDraft}
+                disabled={!sessionControl?.route_preview_endpoint}
+              >
+                Preview Route
+              </button>
+              <button
+                className="scene-button"
+                type="button"
+                onClick={onAssignDestinationFromDraft}
+                disabled={!sessionControl?.command_endpoint}
+              >
+                Assign Destination
+              </button>
+              <button
+                className="scene-button"
+                type="button"
+                onClick={onRepositionVehicleFromDraft}
+                disabled={!sessionControl?.command_endpoint}
+              >
+                Reposition Vehicle
+              </button>
+            </div>
+          </div>
+        </details>
+      </div>
     </section>
   );
 }

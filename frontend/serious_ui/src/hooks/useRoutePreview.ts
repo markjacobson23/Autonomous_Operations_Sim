@@ -1,22 +1,22 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 
 import { sendLiveRoutePreview } from "../api/liveClient";
-import type { BundlePayload, JsonRecord } from "../types";
+import type { BundlePayload, JsonRecord, RoutePreviewPayload } from "../types";
 
 export type UseRoutePreviewResult = {
   isPreviewing: boolean;
   previewError: string | null;
-  submitRoutePreview: (payload: JsonRecord) => Promise<void>;
+  submitRoutePreview: (
+    payload: JsonRecord,
+  ) => Promise<{ bundle: BundlePayload | null; routePreviews: RoutePreviewPayload[] } | null>;
 };
 
 export function useRoutePreview({
   bundle,
-  applyLoadedBundle,
   setLiveCommandMessage,
   selectedVehicleIds,
 }: {
   bundle: BundlePayload | null;
-  applyLoadedBundle: (bundlePayload: BundlePayload, message: string) => void;
   setLiveCommandMessage: Dispatch<SetStateAction<string>>;
   selectedVehicleIds: number[];
 }): UseRoutePreviewResult {
@@ -39,21 +39,26 @@ export function useRoutePreview({
       setLiveCommandMessage("Requesting a route preview from the Python session...");
       try {
         const response = await sendLiveRoutePreview(endpoint, requestPayload);
-        if (response.bundle) {
-          applyLoadedBundle(response.bundle, "Route preview refreshed.");
-        }
         setLiveCommandMessage(
           response.ok ? "Route preview loaded." : "Route preview response returned.",
         );
+        return {
+          bundle: response.bundle ?? null,
+          routePreviews:
+            response.route_previews ??
+            response.bundle?.command_center?.route_previews ??
+            [],
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Route preview request failed";
         setPreviewError(message);
         setLiveCommandMessage(`Route preview request failed. ${message}`);
+        return null;
       } finally {
         setIsPreviewing(false);
       }
     },
-    [applyLoadedBundle, bundle, selectedVehicleIds, setLiveCommandMessage],
+    [bundle, selectedVehicleIds, setLiveCommandMessage],
   );
 
   return {
