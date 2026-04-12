@@ -1,37 +1,54 @@
 # Autonomous Operations Sim — Execution Plan
-# Phase A Only: Frontend v2 Product Completion
+# Phase B Only: World Model v2 and Scene/Render Foundation
 
 ## Purpose
 
-This plan covers **only Phase A**.
+This plan covers **only Phase B**.
 
-Phase A is responsible for delivering a **good** Frontend v2 product foundation, not a partial cleanup of the old UI.
+Phase B is responsible for building a **good** world-model and scene/render foundation underneath the now-usable Frontend v2 product.
 
-At the end of this phase, the serious frontend must be:
+At the end of this phase, the system must have:
 
-- map-first
-- calm by default
-- operationally useful
-- selection-driven
-- previewable
-- trustworthy
-- presentation-worthy
+- a clearer environment/world representation
+- renderer-ready spatial semantics
+- environment-aware but product-shared scene modeling
+- believable world form for mine / yard / city style scenarios
+- a stable bridge between simulator truth and map rendering truth
 
-This phase must cover the full Frontend v2 scope:
-- app shell
+Phase B is **not** a frontend workflow redesign phase.
+It exists to make the world the frontend consumes feel spatially coherent, extensible, and ready for later realism work.
+
+This phase should improve:
+
+- world form readability
+- scene/render truth
+- environment semantics
+- geometry layering
+- object/surface meaning
+- future support for richer motion, traffic, hazards, and authoring
+
+without violating the rule that the frontend remains a consumer of simulator-derived truth.
+
+---
+
+## Relationship to Phase A
+
+Phase A established:
+
+- Frontend v2 shell
 - map shell
-- scene renderer
-- camera/minimap/layers
-- selection/popup/inspector
-- Operate mode
-- Traffic mode
-- Fleet mode
-- Editor mode baseline
-- Analyze mode baseline
-- command center
-- plan/preview workflow
-- visual system and polish
-- frontend ownership and data-contract discipline
+- selection / popup / inspector
+- route preview
+- command workflows
+- mode structure
+- visual system
+- live app control path
+
+Phase B must **build on** that work, not replace it.
+
+Carry-over note:
+- live playback during continuous play may still look visually jumpy because frontend sampling is coarser than ideal
+- treat that as a **small carry-over stabilization item**, not the center of Phase B
 
 ---
 
@@ -49,76 +66,90 @@ Use these docs as the design source of truth:
 ## Locked decisions
 
 ### 1. Python simulator remains authoritative
+Do not move world authority into the frontend.
+
 Frontend must not own:
+- authoritative topology truth
 - runtime vehicle truth
 - final route truth
-- conflict/reservation truth
-- topology truth
 - deterministic progression semantics
+- conflict/reservation truth
 
-### 2. Frontend remains derived
-Frontend state, panels, overlays, and workflows must remain derived from simulator truth and explicit preview/command surfaces.
+### 2. One shared product model across environments
+Phase B must improve support for:
+- mining
+- yard / depot
+- city / road-network environments
 
-### 3. Frontend v2 is map-first
-The map is the primary product surface.
-Panels support the map and must not dominate it.
+without creating environment-specific frontend architectures or scene-render forks.
 
-### 4. Mining is the primary acceptance environment
-Validate this phase against a live mining scenario.
-Keep the frontend architecture environment-agnostic.
+### 3. World semantics come before realism polish
+This phase is about:
+- what the world is
+- how it is structured
+- how it is exposed to rendering
+- how it is surfaced to inspection and editing
 
-### 5. This phase is product-first
-Do not spend this phase on deep simulator realism work unless a small backend seam is strictly required to complete Frontend v2 well.
+It is not the phase for advanced behavior realism.
+
+### 4. Scene/render foundation must support later phases
+Phase B should create a foundation that later supports:
+- richer motion
+- traffic realism
+- hazards
+- diagnostics
+- authoring
+- explanation surfaces
+
+without another world-model rewrite.
+
+### 5. Frontend remains map-first
+Phase B should improve the world **for the map**, not turn the product into a world debugger.
 
 ---
 
 ## Out of scope for this phase
 
-Do not use this phase for:
-- deep lane behavior realism
-- advanced kinematics
-- deep hazard/weather simulation
-- advanced AI suggestions
-- native performance work
-- broad import support
-- backend/read-model expansion that does not directly improve Frontend v2
+Do not use Phase B for:
+
+- deep vehicle behavior realism
+- advanced lane-level traffic policy
+- full hazard / weather systems
+- advanced AI explanation systems
+- batch fleet workflow depth
+- command-center redesign
+- renderer-stack replacement
+- native performance optimization
+- broad import pipeline work beyond small seams strictly needed for world-model structure
 
 ---
 
 ## Definition of done
 
-Phase A is done only when all of these are true:
+Phase B is done only when all of these are true:
 
-### Baseline map milestone
-- live bundle renders
-- map supports pan/zoom/fit/focus
-- minimap works
-- quiet-default contract is real
-- roads, vehicles, and environment form are readable
-- selection works reliably
+### World-model milestone
+- world/environment semantics are clearer and more structured
+- world features are represented in a way that supports mine / yard / city cases
+- renderer-facing geometry truth is cleaner and less ad hoc
+- scene-level semantics no longer depend on fragile one-off inference rules
 
-### Operational milestone
-- inspector is useful
-- route preview works
-- commands can be sent
-- session controls work
-- operator can use the UI without raw-ID-first flow
+### Scene foundation milestone
+- roads, areas, intersections, surfaces, and world-form features have a coherent render contract
+- world form reads spatially better in the map
+- scene bounds / framing reflect real environment geometry, not just a subset of operational geometry
+- geometry layering is stable enough for later realism work
 
-### Frontend-v2 coverage milestone
-- Operate mode is real
-- Traffic mode is real
-- Fleet mode is real
-- Editor mode baseline is real
-- Analyze mode baseline is real
+### Frontend contract milestone
+- Frontend v2 consumes the new world-model/render surfaces without gaining shadow truth
+- selection, inspection, and scene highlighting remain grounded in authoritative surfaces
+- Phase A flows still work after the new world/render foundation lands
 
-### Product milestone
-- layout feels intentional
-- map remains primary
-- panels do not fight the map
-- UI is screenshot-worthy
-- mining live walkthrough is externally presentable
+### Extensibility milestone
+- later motion / traffic / hazard / authoring work now has a clean world-model base
+- adding new environment archetypes no longer implies product-level hacks
 
-If any of those are false, the phase is not done.
+If any of those are false, Phase B is not done.
 
 ---
 
@@ -128,526 +159,302 @@ If any of those are false, the phase is not done.
 If prompted with `step-x`, do only that step.
 
 ### Rule 2
-Do not prebuild later simulator realism systems unless the current step needs a small compatible seam.
+Do not redesign frontend workflows unless a small compatible seam is strictly required by the new world-model contract.
 
 ### Rule 3
 Each step must produce:
 - code
 - tests where applicable
-- visible product gain
+- visible structural gain
 - a clear validation path
 
 ### Rule 4
-Do not accept “better than before” as success.
-Accept only “good enough to be the real frontend foundation.”
+Do not accept “slightly richer geometry” as success.
+Accept only “cleaner world-model and scene/render foundation.”
 
 ### Rule 5
-Do not create frontend shadow truth for convenience.
+Do not introduce frontend shadow truth to compensate for backend/world-model gaps.
+
+### Rule 6
+Prefer general world semantics over environment-specific hacks.
 
 ---
 
 # Step plan
 
-## Step 41 — Frontend v2 architecture and repo layout
-**Goal:** Lock the frontend-v2 path, boundaries, and structure.
+## Step 56 — Phase B architecture note and boundary lock
+**Goal:** lock what belongs to world model, render geometry, runtime state, and frontend consumption.
 
 ### Scope
-- define where Frontend v2 lives
-- define app-shell / map-shell / renderer / interaction / panels / adapters boundaries
-- define frontend-owned state vs simulator-owned truth
-- define replacement strategy for the old serious UI path
+- define world-model-v2 boundaries
+- define simulator-owned world semantics vs render-ready geometry vs frontend adapters
+- define how mine / yard / city fit one shared model
+- define allowed compatibility seams with existing Frontend v2
 
 ### Deliverables
-- frontend-v2 architecture note
-- repo layout decision
-- frontend-v2 scaffold
-- boundary notes
+- Phase B architecture note
+- ownership / boundary notes
+- explicit world-model-v2 terminology
 
 ### Must not do
-- no speculative feature-building
-- no heavy polish work
-- no half-old / half-new ambiguous structure
+- no feature building disguised as architecture
+- no environment-specific renderer branch
+- no frontend-only geometry truth
 
 ### Done when
-- there is one clear frontend-v2 home
-- there is one clear ownership model
-- there is no ambiguity about shadow truth
+- there is one clear source of truth for world semantics
+- there is one clear render-facing surface contract
+- there is no ambiguity about what later phases should build on
 
 ---
 
-## Step 42 — Live launch path and app shell
-**Goal:** Make Frontend v2 launchable and give it a real shell.
+## Step 57 — Environment archetypes and world-form taxonomy
+**Goal:** define a stable world-form vocabulary that works across environments.
 
 ### Scope
-- built-in live launch path
-- frontend bootstrap against a live session
-- app shell with:
-  - header
-  - environment/session identity
-  - connection state
-  - global alerts/status
-  - mode switching
-  - map-dominant layout
-
-### Deliverables
-- live launch command/path
-- app shell
-- connection/session status surfaces
-
-### Must not do
-- no stacked-card shell
-- no map-secondary layout
-- no throwaway placeholder look
-
-### Done when
-- one command opens a live mining scenario in Frontend v2
-- shell feels intentional
-- map is visually primary
-
----
-
-## Step 43 — Frontend data adapters and local state model
-**Goal:** Build the adapter layer and local state ownership model.
-
-### Scope
-- bundle-to-UI adapters
-- local state for:
-  - camera/viewport
-  - scene mode/layers
-  - selection/highlight
-  - popup state
-  - inspector state
-  - planning workflow state
-  - mode/panel state
-  - editor gesture state
-
-### Deliverables
-- adapter layer
-- typed local state model
-- tests around ownership boundaries where useful
-
-### Must not do
-- no frontend-owned runtime truth
-- no local route/conflict truth masquerading as authority
-
-### Done when
-- frontend state ownership is clean
-- data flow is predictable
-- no accidental shadow truth patterns remain
-
----
-
-## Step 44 — Map shell, camera, minimap, and layer controls
-**Goal:** Build the reusable map shell.
-
-### Scope
-- pan
-- zoom
-- fit scene
-- focus selected
-- minimap
-- scene modes (Iso/Birdseye)
-- map controls
-- layer controls
-
-### Deliverables
-- map shell
-- camera/navigation controls
-- minimap
-- layer control surface
-
-### Must not do
-- no fragile camera behavior
-- no minimap as separate analytics card
-- no layer system that is required just to make the map readable
-
-### Done when
-- large scenes are navigable comfortably
-- minimap is integrated and useful
-- controls feel stable and product-like
-
----
-
-## Step 45 — Scene renderer and quiet-default map
-**Goal:** Build the default visual contract of Frontend v2.
-
-### Scope
-- quiet-default map
-- roads readable
-- vehicles readable
-- environment/world form readable
-- restrained overlays
-- debug layers separated from the default experience
-
-### Deliverables
-- renderer baseline
-- default visibility contract
-- tests for quiet-default behavior
-
-### Must not do
-- no always-on node labels
-- no always-on place labels
-- no always-on vehicle labels
-- no clutter that requires turning things off to understand the scene
-
-### Done when
-- the map is calm by default
-- the map is readable at a glance
-- the default view feels product-grade, not debug-grade
-
----
-
-## Step 46 — Selection, popup, and inspector
-**Goal:** Make direct inspection reliable and useful.
-
-### Scope
-- click-to-select:
-  - vehicles
+- environment family / archetype structure
+- world-form feature categories such as:
   - roads
-  - lanes where applicable
-  - queues/conflict areas where applicable
-  - hazards where applicable
-  - environment surfaces/areas where applicable
-  - route previews
-- compact popup
-- inspector updates
-- selection highlighting
+  - lanes
+  - intersections / control nodes
+  - buildings / structures
+  - yards / work areas
+  - loading / unloading surfaces
+  - no-go / hazard-prone surfaces
+  - terrain / pit / embankment / boundary surfaces
+- semantic grouping rules shared across environments
 
 ### Deliverables
-- hit testing
-- popup
-- inspector baseline
-- tests for moving-object selection and inspector updates
+- world-form taxonomy
+- typed environment / archetype model
+- tests around taxonomy / serialization where applicable
 
 ### Must not do
-- no giant popup covering the map
-- no inspector data dump
-- no fragile selection that breaks on motion
+- no hardcoding to mining-only semantics
+- no purely visual categories without operational meaning
 
 ### Done when
-- moving vehicles remain selectable
-- selected state is obvious
-- popup stays compact
-- inspector answers operator questions quickly
+- mine / yard / city cases can all be described through one structured taxonomy
+- world features have clearer meaning than “misc area polygon”
 
 ---
 
-## Step 47 — Operate mode completion
-**Goal:** Complete Operate mode as the heart of the product.
+## Step 58 — World model surface v2
+**Goal:** build the authoritative world-model surface that later rendering and inspection consume.
 
 ### Scope
-- live scene watching
-- selected-object inspection
-- route preview
-- command execution entry point
-- compact live session controls
-- queue/hazard awareness
-- multi-vehicle awareness
+- world feature inventory
+- stable identifiers and feature categories
+- grouping / layering metadata
+- feature relationships where needed
+- environment metadata richer than the current thin display-name layer
 
 ### Deliverables
-- real Operate mode
-- operate-specific layout and panel behavior
+- world model v2 surface
+- serialization / export path
+- tests for shape and compatibility
 
 ### Must not do
-- no form-first console UX
-- no stacked panels dominating the map
-- no raw-ID-first main workflow
+- no frontend-owned reinterpretation of the world
+- no duplicate truth between map surface and world model without explicit relationship
 
 ### Done when
-- Operate mode is coherent and map-first
-- the map remains primary
-- panels support rather than compete with the map
+- the world has a coherent machine-readable structure
+- render and inspection layers can consume it predictably
 
 ---
 
-## Step 48 — Command center and typed command workflows
-**Goal:** Build the command center as a real operator surface.
+## Step 59 — Render geometry contract cleanup
+**Goal:** make render geometry a cleaner projection of world truth rather than a loose mixed bag.
 
 ### Scope
-- typed command entry
-- destination assignment
-- reposition
-- block/unblock road
-- pause/play/step
-- clear result/error feedback
+- clarify which surfaces are authoritative semantics vs render projections
+- improve geometry layering
+- improve feature-specific render geometry organization
+- remove or reduce fragile inference patterns where possible
+- ensure render geometry is renderer-ready but still derived
 
 ### Deliverables
-- command center surface
-- typed command plumbing
-- feedback surfaces
+- cleaned render geometry contract
+- compatibility mapping for Frontend v2
+- tests for render geometry construction
 
 ### Must not do
-- no separate-console feel
-- no command workflow detached from selection/map context
-- no fake success state before authoritative confirmation
+- no renderer-stack replacement
+- no geometry duplication without a reason
+- no hidden coupling between rendering and command semantics
 
 ### Done when
-- commands can be issued cleanly through Frontend v2
-- results are understandable
-- the command center composes naturally with the map and selection state
+- render geometry is easier to consume, reason about, and extend
+- scene rendering no longer depends on unclear mixed-purpose geometry blobs
 
 ---
 
-## Step 49 — Plan list and route preview workflow
-**Goal:** Complete the map-first planning model.
+## Step 60 — Scene bounds, framing, and spatial extents foundation
+**Goal:** make scene framing and overview reflect the real environment.
 
 ### Scope
-- select vehicle
-- select destination/target
-- create plan entry
-- preview route/consequence
-- select a plan entry to highlight route
-- commit command
+- better scene bounds from meaningful world geometry
+- environment-aware framing inputs
+- spatial extents that include real world-form context
+- clean support for minimap and fit/focus using better scene truth
 
 ### Deliverables
-- compact plan list/stack
-- route preview visualization
-- preview details:
-  - destination
-  - path
-  - distance
-  - actionability
-  - conflicts/reservations where available
-  - likely wait/congestion context where available
+- improved scene bounds logic
+- tests around bounds / framing inputs
+- compatibility with current frontend camera usage
 
 ### Must not do
-- no raw-ID-first primary planning flow
-- no frontend-owned fake route truth
-- no preview flow that is harder to understand than the old form
+- no camera UX redesign here
+- no frontend hacks to guess missing environment extents
 
 ### Done when
-- the golden operator loop works end-to-end
-- preview is understandable
-- commit is understandable
-- result is visible in the scene
+- fit / overview can rely on better environment geometry
+- world form is less likely to clip or disappear from framing decisions
 
 ---
 
-## Step 50 — Traffic mode baseline
-**Goal:** Build the dedicated Traffic mode surface.
+## Step 61 — World-aware scene rendering baseline
+**Goal:** make the scene renderer consume the better world/render foundation in a shared way.
 
 ### Scope
-- inspect queues
-- inspect congestion
-- inspect control points where available
-- inspect selected traffic context
-- surface traffic without polluting Operate default view
+- render consumption of new world-form / render layers
+- cleaner treatment of:
+  - structural massing
+  - terrain-like surfaces
+  - yards / zones
+  - roads / intersections
+- preserve quiet-default map rules while improving world readability
 
 ### Deliverables
-- Traffic mode
-- traffic panel/surfaces
-- traffic-specific selection/inspection behavior
+- renderer integration with Phase B surfaces
+- tests where practical
+- before / after validation on at least the mining scenario
 
 ### Must not do
-- no traffic clutter baked into default Operate view
-- no cosmetic heatmap with weak operational meaning
+- no mode redesign
+- no label clutter regression
+- no environment-specific component forks unless strictly necessary
 
 ### Done when
-- operators can understand flow issues without cluttering the default map
-- Traffic mode adds real value
+- the map reads more like a real environment
+- world-form improvements are visible without breaking Phase A workflows
 
 ---
 
-## Step 51 — Fleet mode baseline
-**Goal:** Build the dedicated Fleet mode surface.
+## Step 62 — Inspection and selection alignment with world model
+**Goal:** ensure the richer world model improves selection and inspection instead of just rendering.
 
 ### Scope
-- single-select and multi-select support
-- visible fleet selection state
-- fleet roster/summary
-- grouped vehicle context
-- early bounded batch-action affordance hooks
+- world feature selection compatibility
+- clearer inspection summaries for environment features
+- more coherent relationship between selected scene objects and their semantic role
+- support for future editor / analyze work through cleaner feature identity
 
 ### Deliverables
-- Fleet mode
-- fleet panel
-- selection management UI
+- aligned selection / inspection adapters
+- tests for feature identity / selection presentation where useful
 
 ### Must not do
-- no fake fleet mode that is just another inspector
-- no invisible or confusing multi-select state
+- no inspector bloat
+- no debug-dump surfaces as a substitute for semantic clarity
 
 ### Done when
-- fleet state is understandable
-- multi-select is real and visible
-- Fleet mode is useful before later deeper fleet operations work
+- selecting world objects reveals cleaner semantic meaning
+- the richer scene foundation improves usability, not just visuals
 
 ---
 
-## Step 52 — Editor mode baseline
-**Goal:** Build the Frontend v2 editor mode surface.
-
-### Scope
-- dedicated Editor mode
-- geometry edit affordance placeholders or baseline hooks
-- validation message surface
-- save/reload flow surface
-- clear visual distinction from Operate mode
-
-### Deliverables
-- Editor mode shell
-- validation UI
-- save/reload UI hooks
-
-### Must not do
-- no Operate-mode pollution
-- no fake edit mode with nowhere for authoring to live later
-
-### Done when
-- editor mode feels intentionally different
-- authoring has a real UI home
-- the frontend is ready for later authoring work
-
----
-
-## Step 53 — Analyze mode baseline
-**Goal:** Build the Analyze mode surface.
-
-### Scope
-- explanation-oriented panel
-- anomaly surfacing baseline
-- route comparison context where available
-- diagnostics aggregation baseline
-
-### Deliverables
-- Analyze mode
-- analysis panel
-- explanation/anomaly UI baseline
-
-### Must not do
-- no speculative AI magic
-- no Analyze mode that compensates for weak Operate/Inspector design
-
-### Done when
-- Analyze mode has a real role
-- it feels grounded in simulator truth
-- it gives later explanation/anomaly work a real product home
-
----
-
-## Step 54 — Visual system and product polish
-**Goal:** Make Frontend v2 presentation-worthy.
-
-### Scope
-- cohesive visual language
-- calm default palette
-- spatial clarity
-- compact readable panels
-- consistent hierarchy
-- reduced prototype feel
-- consistent interaction states and transitions
-
-### Deliverables
-- tokens/styles/polish pass
-- panel hierarchy cleanup
-- overlay cleanup
-- popup/minimap/control polish
-
-### Must not do
-- no “we’ll polish later”
-- no incoherent mix of old and new visual systems
-
-### Done when
-- UI is screenshot-worthy
-- layout feels intentional
-- visual language is cohesive
-
----
-
-## Step 55 — Phase A acceptance walkthroughs
-**Goal:** Prove Phase A is actually complete.
+## Step 63 — Phase B acceptance walkthroughs
+**Goal:** prove the new world/render foundation is real and safe to build on.
 
 ### Required walkthroughs
 
-#### A. Baseline map walkthrough
-1. launch live mining scenario
-2. orient quickly
-3. pan/zoom/fit/focus
-4. use minimap
-5. confirm quiet default map
+#### A. World-form walkthrough
+1. launch mining scenario
+2. fit scene
+3. inspect world-form readability
+4. verify roads / structures / areas / terrain-like context are clearer
+5. verify quiet-default map still holds
 
-#### B. Inspection walkthrough
-1. select moving vehicle
-2. inspect it
-3. select road/queue/hazard context
-4. inspect it
-5. keep map readable throughout
-
-#### C. Golden operator workflow
+#### B. Selection walkthrough
 1. select vehicle
-2. select destination
-3. create preview
-4. inspect preview
-5. commit command
-6. observe result
+2. select road
+3. select area / structure / world feature
+4. verify inspection reflects clearer semantic identity
 
-#### D. Mode walkthrough
-1. Operate mode
-2. Traffic mode
-3. Fleet mode
-4. Editor mode
-5. Analyze mode
+#### C. Renderer stability walkthrough
+1. switch view modes
+2. pan / zoom / focus / minimap
+3. verify framing is stable and world-aware
+4. verify no regression in preview / selection / commands
+
+#### D. Foundation walkthrough
+1. verify Phase A operator loop still works
+2. verify world / render contracts are cleaner
+3. verify later motion / traffic / hazard work now has a stronger base
 
 ### Deliverables
 - working walkthroughs
 - validation notes
-- any final polish fixes required to make the walkthroughs credible
+- any final small fixes required to make the phase credible
 
 ### Must not do
-- no “technically passes but embarrassing to show”
-- no moving on because later phases sound more fun
+- no moving on because “the docs are cleaner”
+- no shipping a prettier but still ad hoc world-model layer
 
 ### Done when
-- all walkthroughs feel coherent, grounded, readable, and product-grade
+- the world/render foundation is visibly stronger
+- Phase A functionality still works
+- the project is ready for richer realism work without another scene-model rewrite
 
 ---
 
 # Validation checklist
 
-## Architecture
-- Is frontend ownership clear?
-- Is there any shadow truth?
+## World model
+- Is the environment/world taxonomy clearer?
+- Is world truth structured enough to support multiple environment families?
+- Are stable identifiers and feature categories present where needed?
 
-## Shell
-- Is the shell intentional and map-first?
-- Are session/status/mode surfaces coherent?
+## Render geometry
+- Is render geometry clearly derived from world semantics?
+- Are geometry layers easier to consume and reason about?
+- Has fragile inference been reduced?
 
-## Map
-- Is the default map quiet?
-- Are roads, vehicles, and environment form readable?
-- Do minimap and controls feel integrated?
+## Scene framing
+- Do scene bounds reflect real environment geometry?
+- Do fit/focus/minimap have better world-aware inputs?
+
+## Scene readability
+- Does the map read more like a world and less like a thin overlay?
+- Are roads, structures, areas, and surfaces more coherent together?
+- Is the quiet-default rule preserved?
 
 ## Selection and inspection
-- Can moving vehicles be selected reliably?
-- Does popup stay compact?
-- Does inspector answer useful questions?
+- Do selected world features have clearer meaning?
+- Does inspection benefit from the richer model without becoming bloated?
 
-## Operate workflow
-- Does the golden operator loop work?
-- Is preview map-first?
-- Is command feedback understandable?
+## Compatibility
+- Do Phase A workflows still work?
+- Has Frontend v2 remained a consumer instead of becoming a competing authority?
 
-## Mode coverage
-- Does each Frontend v2 mode have a real UI home?
-- Are Traffic/Fleet/Editor/Analyze credible baselines rather than empty placeholders?
+## Product readiness
+- Does the project now have a world/render foundation strong enough for later realism work?
+- Would later phases be building on a clean base instead of another patch layer?
 
-## Product quality
-- Does the UI still feel prototype-grade anywhere in the main workflow?
-- Would you be comfortable showing the mining Phase A walkthrough externally?
-
-If any answer is “no,” Phase A is not done.
+If any answer is “no,” Phase B is not done.
 
 ---
 
-## What comes after Phase A
+## What comes after Phase B
 
-Only after Phase A is complete should the project move on to:
-- deeper world model work
-- richer environment-form semantics
-- lane geometry
-- motion realism
-- traffic realism
-- hazard and diagnostic depth
-- later AI/operator assistance depth
+Only after Phase B is complete should the project move on to:
+- deeper vehicle motion realism
+- richer traffic realism
+- hazard systems
+- operational diagnostics / explanation depth
+- stronger authoring flows
+- benchmark-guided polish
 
-Later phases should improve a good frontend, not rescue a bad one.
+Later phases should improve a **good world/render foundation**, not rescue a weak one.
