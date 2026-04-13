@@ -105,3 +105,4 @@ def test_render_geometry_surface_cleans_contract_for_mine_yard_city_and_flagship
         assert len(surface.roads) >= 1
         assert len(surface.intersections) >= 1
         assert len(surface.areas) >= 1
+        assert any(area.form_type in {"flat", "raised", "recessed", "structure_mass"} for area in surface.areas)

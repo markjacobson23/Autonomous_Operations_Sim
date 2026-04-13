@@ -137,6 +137,9 @@ function makeWorldAwareBundle(): JsonRecord {
           area_id: "mine-depot",
           category: "zone",
           kind: "depot",
+          form_type: "flat",
+          height_hint: 0.14,
+          depth_hint: 0.1,
           group_id: "zone:zones",
           polygon: [
             [-1.2, -1.2, 0],
@@ -150,6 +153,9 @@ function makeWorldAwareBundle(): JsonRecord {
           area_id: "haul-pad",
           category: "terrain",
           kind: "stockpile",
+          form_type: "raised",
+          height_hint: 1.05,
+          depth_hint: 0.82,
           group_id: "terrain:terrain_forms",
           polygon: [
             [6.8, -4.3, 0],
@@ -163,6 +169,9 @@ function makeWorldAwareBundle(): JsonRecord {
           area_id: "workshop",
           category: "structure",
           kind: "building",
+          form_type: "structure_mass",
+          height_hint: 1.75,
+          depth_hint: 1.0,
           group_id: "structure:buildings",
           polygon: [
             [1.0, -3.2, 0],
@@ -176,6 +185,9 @@ function makeWorldAwareBundle(): JsonRecord {
           area_id: "site-boundary",
           category: "boundary",
           kind: "site_boundary",
+          form_type: "flat",
+          height_hint: 0.22,
+          depth_hint: 0.14,
           group_id: "boundary:boundaries",
           polygon: [
             [-1.6, -5.2, 0],
@@ -189,6 +201,9 @@ function makeWorldAwareBundle(): JsonRecord {
           area_id: "blast-zone",
           category: "hazard",
           kind: "no_go_zone",
+          form_type: "flat",
+          height_hint: 0.12,
+          depth_hint: 0.08,
           group_id: "hazard:no_go_areas",
           polygon: [
             [8.5, -4.6, 0],
@@ -197,6 +212,22 @@ function makeWorldAwareBundle(): JsonRecord {
             [8.5, -2.7, 0],
           ],
           label: "Blast Zone",
+        },
+        {
+          area_id: "pit-cut",
+          category: "terrain",
+          kind: "pit",
+          form_type: "recessed",
+          height_hint: 1.3,
+          depth_hint: 1.1,
+          group_id: "terrain:terrain_forms",
+          polygon: [
+            [4.2, 1.8, 0],
+            [6.2, 1.8, 0],
+            [6.2, 3.6, 0],
+            [4.2, 3.6, 0],
+          ],
+          label: "Pit Cut",
         },
       ],
       lanes: [],
@@ -247,6 +278,9 @@ describe("LiveSceneCanvas", () => {
     );
 
     expect(markup).toContain("scene-world-form-backdrop");
+    expect(markup).toContain("world-form-structure-mass");
+    expect(markup).toContain("world-form-raised");
+    expect(markup).toContain("world-form-recessed");
     expect(markup).toContain("area-surface-structure");
     expect(markup).toContain("area-surface-terrain");
     expect(markup).toContain("area-surface-boundary");

@@ -173,6 +173,9 @@ function makeBaseBundle(): any {
         {
           area_id: "area-1",
           kind: "yard",
+          form_type: "raised",
+          height_hint: 0.72,
+          depth_hint: 0.48,
           polygon: [
             [-2, -2, 0],
             [12, -2, 0],
@@ -254,6 +257,9 @@ describe("live bundle adapter contracts", () => {
     expect(bundle.map.intersections).toHaveLength(1);
     expect(bundle.map.intersections[0]?.intersectionType).toBe("yard_junction");
     expect(bundle.map.areas[0]?.category).toBe("zone");
+    expect(bundle.map.areas[0]?.formType).toBe("raised");
+    expect(bundle.map.areas[0]?.heightHint).toBe(0.72);
+    expect(bundle.map.areas[0]?.depthHint).toBe(0.48);
     expect(bundle.map.sceneFrame.environmentFamily).toBe("industrial");
     expect(bundle.map.sceneFrame.sceneBounds).toEqual({
       minX: -2,

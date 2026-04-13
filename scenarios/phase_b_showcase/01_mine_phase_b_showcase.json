@@ -1,0 +1,306 @@
+{
+  "name": "mine_phase_b_showcase",
+  "seed": 4801,
+  "duration_s": 150.0,
+  "map": {
+    "kind": "graph",
+    "params": {
+      "nodes": [
+        {"id": 501, "position": [-10.0, -1.0, 0.0], "node_type": "DEPOT"},
+        {"id": 510, "position": [-4.0, -1.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 520, "position": [3.0, 1.0, 0.0], "node_type": "LOADING_ZONE"},
+        {"id": 530, "position": [9.0, 1.0, 0.0], "node_type": "INTERSECTION"},
+        {"id": 540, "position": [14.0, -1.0, 0.0], "node_type": "UNLOADING_ZONE"},
+        {"id": 550, "position": [2.0, -6.0, 0.0], "node_type": "JOB_SITE"},
+        {"id": 560, "position": [6.0, 5.5, 0.0], "node_type": "JOB_SITE"}
+      ],
+      "edges": [
+        {"id": 5101, "start_node_id": 501, "end_node_id": 510, "distance": 6.0, "speed_limit": 4.0},
+        {"id": 5102, "start_node_id": 510, "end_node_id": 501, "distance": 6.0, "speed_limit": 4.0},
+        {"id": 5103, "start_node_id": 510, "end_node_id": 520, "distance": 7.0, "speed_limit": 3.2},
+        {"id": 5104, "start_node_id": 520, "end_node_id": 510, "distance": 7.0, "speed_limit": 3.2},
+        {"id": 5105, "start_node_id": 520, "end_node_id": 530, "distance": 6.0, "speed_limit": 3.0},
+        {"id": 5106, "start_node_id": 530, "end_node_id": 520, "distance": 6.0, "speed_limit": 3.0},
+        {"id": 5107, "start_node_id": 530, "end_node_id": 540, "distance": 5.5, "speed_limit": 3.2},
+        {"id": 5108, "start_node_id": 540, "end_node_id": 530, "distance": 5.5, "speed_limit": 3.2},
+        {"id": 5109, "start_node_id": 510, "end_node_id": 550, "distance": 6.5, "speed_limit": 2.4},
+        {"id": 5110, "start_node_id": 550, "end_node_id": 510, "distance": 6.5, "speed_limit": 2.4},
+        {"id": 5111, "start_node_id": 520, "end_node_id": 560, "distance": 5.8, "speed_limit": 2.2},
+        {"id": 5112, "start_node_id": 560, "end_node_id": 520, "distance": 5.8, "speed_limit": 2.2}
+      ],
+      "render_geometry": {
+        "roads": [
+          {
+            "id": "haul-spine",
+            "edge_ids": [5101, 5102, 5103, 5104, 5105, 5106, 5107, 5108],
+            "centerline": [[-10.0, -1.0, 0.0], [-7.0, -1.0, 0.0], [-4.0, -1.0, 0.0], [0.0, 0.2, 0.0], [3.0, 1.0, 0.0], [6.2, 1.1, 0.0], [9.0, 1.0, 0.0], [12.0, 0.0, 0.0], [14.0, -1.0, 0.0]],
+            "road_class": "haul_road",
+            "directionality": "two_way",
+            "lane_count": 2,
+            "width_m": 2.4
+          },
+          {
+            "id": "staging-link",
+            "edge_ids": [5109, 5110],
+            "centerline": [[-4.0, -1.0, 0.0], [-2.0, -2.4, 0.0], [0.0, -4.0, 0.0], [2.0, -6.0, 0.0]],
+            "road_class": "service_road",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.3
+          },
+          {
+            "id": "pit-ramp",
+            "edge_ids": [5111, 5112],
+            "centerline": [[3.0, 1.0, 0.0], [3.4, 2.4, 0.0], [4.4, 3.8, 0.0], [6.0, 5.5, 0.0]],
+            "road_class": "ramp",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.1
+          },
+          {
+            "id": "crusher-approach",
+            "edge_ids": [5107, 5108],
+            "centerline": [[9.0, 1.0, 0.0], [10.6, 0.7, 0.0], [12.0, 0.0, 0.0], [14.0, -1.0, 0.0]],
+            "road_class": "service_road",
+            "directionality": "two_way",
+            "lane_count": 1,
+            "width_m": 1.4
+          }
+        ],
+        "intersections": [
+          {
+            "id": "gate-junction",
+            "node_id": 510,
+            "polygon": [[-4.8, -1.8, 0.0], [-3.2, -1.8, 0.0], [-3.2, -0.2, 0.0], [-4.8, -0.2, 0.0]],
+            "intersection_type": "yard_junction"
+          },
+          {
+            "id": "loading-apron",
+            "node_id": 520,
+            "polygon": [[2.0, 0.2, 0.0], [4.1, 0.2, 0.0], [4.1, 2.1, 0.0], [2.0, 2.1, 0.0]],
+            "intersection_type": "loading_apron"
+          },
+          {
+            "id": "crusher-apron",
+            "node_id": 530,
+            "polygon": [[8.0, -0.2, 0.0], [10.2, -0.2, 0.0], [10.2, 1.8, 0.0], [8.0, 1.8, 0.0]],
+            "intersection_type": "service_turnout"
+          },
+          {
+            "id": "staging-turn",
+            "node_id": 550,
+            "polygon": [[1.2, -6.9, 0.0], [2.8, -6.9, 0.0], [2.8, -5.1, 0.0], [1.2, -5.1, 0.0]],
+            "intersection_type": "staging_junction"
+          },
+          {
+            "id": "pit-switch",
+            "node_id": 560,
+            "polygon": [[5.0, 4.5, 0.0], [7.0, 4.5, 0.0], [7.0, 6.5, 0.0], [5.0, 6.5, 0.0]],
+            "intersection_type": "service_turnout"
+          }
+        ],
+        "areas": [
+          {
+            "id": "staging-pad",
+            "kind": "staging_zone",
+            "label": "Staging Pad",
+            "polygon": [[-6.0, -7.4, 0.0], [4.0, -7.4, 0.0], [4.0, -3.1, 0.0], [-6.0, -3.1, 0.0]]
+          },
+          {
+            "id": "loader-pocket",
+            "kind": "loading_bay",
+            "label": "Loading Pocket",
+            "polygon": [[1.2, -0.6, 0.0], [5.6, -0.6, 0.0], [5.6, 3.2, 0.0], [1.2, 3.2, 0.0]]
+          },
+          {
+            "id": "crusher-apron-area",
+            "kind": "crusher",
+            "label": "Crusher House",
+            "polygon": [[11.8, -2.8, 0.0], [16.4, -2.8, 0.0], [16.4, 1.8, 0.0], [11.8, 1.8, 0.0]]
+          },
+          {
+            "id": "unload-apron",
+            "kind": "unloading_zone",
+            "label": "Unloading Apron",
+            "polygon": [[12.8, -3.8, 0.0], [17.2, -3.8, 0.0], [17.2, -0.2, 0.0], [12.8, -0.2, 0.0]]
+          },
+          {
+            "id": "maintenance-shop",
+            "kind": "maintenance_building",
+            "label": "Maintenance Shop",
+            "polygon": [[-7.4, 1.4, 0.0], [-3.8, 1.4, 0.0], [-3.8, 4.2, 0.0], [-7.4, 4.2, 0.0]]
+          },
+          {
+            "id": "pit-cut",
+            "kind": "pit",
+            "label": "Pit Cut",
+            "polygon": [[2.6, 4.0, 0.0], [8.6, 4.0, 0.0], [8.6, 8.0, 0.0], [2.6, 8.0, 0.0]]
+          },
+          {
+            "id": "south-berm",
+            "kind": "berm",
+            "label": "South Berm",
+            "polygon": [[6.0, -7.8, 0.0], [11.4, -7.8, 0.0], [11.4, -5.8, 0.0], [6.0, -5.8, 0.0]]
+          },
+          {
+            "id": "site-boundary",
+            "kind": "site_boundary",
+            "label": "Mine Site Boundary",
+            "polygon": [[-11.6, -8.8, 0.0], [18.6, -8.8, 0.0], [18.6, 8.8, 0.0], [-11.6, 8.8, 0.0]]
+          },
+          {
+            "id": "blast-buffer",
+            "kind": "no_go_zone",
+            "label": "Blast Buffer",
+            "polygon": [[1.8, 3.5, 0.0], [9.4, 3.5, 0.0], [9.4, 8.4, 0.0], [1.8, 8.4, 0.0]]
+          }
+        ]
+      },
+      "world_model": {
+        "environment": {
+          "family": "mine",
+          "archetype": "phase_b_mine_showcase",
+          "display_name": "Phase B Mine Showcase"
+        },
+        "layers": {
+          "roads": [
+            {"id": "haul-spine", "kind": "haul_road", "reference_id": "haul-spine", "label": "Haul Spine"},
+            {"id": "staging-link", "kind": "service_road", "reference_id": "staging-link", "label": "Staging Link"},
+            {"id": "pit-ramp", "kind": "ramp", "reference_id": "pit-ramp", "label": "Pit Ramp"},
+            {"id": "crusher-approach", "kind": "service_road", "reference_id": "crusher-approach", "label": "Crusher Approach"}
+          ],
+          "intersections": [
+            {"id": "gate-junction", "kind": "yard_junction", "reference_id": "gate-junction", "label": "Gate Junction"},
+            {"id": "loading-apron", "kind": "loading_apron", "reference_id": "loading-apron", "label": "Loading Apron"},
+            {"id": "crusher-apron", "kind": "service_turnout", "reference_id": "crusher-apron", "label": "Crusher Apron"},
+            {"id": "staging-turn", "kind": "staging_junction", "reference_id": "staging-turn", "label": "Staging Turn"},
+            {"id": "pit-switch", "kind": "service_turnout", "reference_id": "pit-switch", "label": "Pit Switch"}
+          ],
+          "zones": [
+            {"id": "staging-zone", "kind": "staging_equipment", "reference_id": "staging-pad", "label": "Staging Zone"},
+            {"id": "loading-zone", "kind": "loading_bay", "reference_id": "loader-pocket", "label": "Loading Zone"},
+            {"id": "unloading-zone", "kind": "unloading_bay", "reference_id": "unload-apron", "label": "Unloading Zone"}
+          ],
+          "buildings": [
+            {"id": "crusher-house", "kind": "crusher", "reference_id": "crusher-apron-area", "label": "Crusher House"},
+            {"id": "maintenance-shop", "kind": "maintenance_building", "reference_id": "maintenance-shop", "label": "Maintenance Shop"}
+          ],
+          "terrain_forms": [
+            {"id": "pit-cut", "kind": "pit", "reference_id": "pit-cut", "label": "Pit Cut"},
+            {"id": "south-berm", "kind": "berm", "reference_id": "south-berm", "label": "South Berm"}
+          ],
+          "anchors": [
+            {"id": "depot-anchor", "kind": "depot", "reference_id": "501", "label": "Depot Anchor"},
+            {"id": "loading-anchor", "kind": "loading_zone", "reference_id": "520", "label": "Loading Anchor"},
+            {"id": "crusher-anchor", "kind": "unloading_zone", "reference_id": "540", "label": "Crusher Anchor"},
+            {"id": "pit-anchor", "kind": "job_site", "reference_id": "560", "label": "Pit Anchor"}
+          ],
+          "boundaries": [
+            {
+              "id": "site-perimeter",
+              "kind": "site_boundary",
+              "reference_id": "site-boundary",
+              "label": "Site Perimeter"
+            }
+          ],
+          "no_go_areas": [
+            {
+              "id": "blast-exclusion",
+              "kind": "blast_zone",
+              "reference_id": "blast-buffer",
+              "label": "Blast Buffer"
+            }
+          ]
+        },
+        "asset_layers": [
+          {
+            "id": "mine-gravel-base",
+            "kind": "terrain_fill",
+            "asset_key": "mine_gravel",
+            "z_index": 0,
+            "opacity": 1.0,
+            "coverage": [[-12.0, -9.0, 0.0], [19.0, -9.0, 0.0], [19.0, 9.0, 0.0], [-12.0, 9.0, 0.0]]
+          },
+          {
+            "id": "pit-shadow",
+            "kind": "ambient_overlay",
+            "asset_key": "pit_shadow",
+            "z_index": 2,
+            "opacity": 0.38,
+            "coverage": [[2.0, 3.2, 0.0], [9.4, 3.2, 0.0], [9.4, 8.2, 0.0], [2.0, 8.2, 0.0]]
+          },
+          {
+            "id": "crusher-glint",
+            "kind": "foreground_overlay",
+            "asset_key": "crusher_facility_glint",
+            "z_index": 3,
+            "opacity": 0.28,
+            "coverage": [[11.8, -3.0, 0.0], [16.6, -3.0, 0.0], [16.6, 2.0, 0.0], [11.8, 2.0, 0.0]]
+          }
+        ]
+      }
+    }
+  },
+  "vehicles": [
+    {
+      "id": 801,
+      "position": [-10.0, -1.0, 0.0],
+      "velocity": 0.0,
+      "payload": 0.0,
+      "max_payload": 28.0,
+      "max_speed": 8.0,
+      "vehicle_type": "GENERIC"
+    }
+  ],
+  "resources": [
+    {"id": "loader-shovel", "capacity": 1, "initial_available_times_s": [0.5]},
+    {"id": "crusher-hopper", "capacity": 1, "initial_available_times_s": [0.0]}
+  ],
+  "dispatcher": {
+    "kind": "first_feasible"
+  },
+  "execution": {
+    "kind": "dispatch_vehicle_job_queue",
+    "vehicle_id": 801,
+    "jobs": [
+      {
+        "id": "stage-in",
+        "tasks": [
+          {"kind": "move", "destination": [2.0, -6.0, 0.0]}
+        ]
+      },
+      {
+        "id": "load-cycle",
+        "tasks": [
+          {"kind": "move", "destination": [3.0, 1.0, 0.0]},
+          {
+            "kind": "load",
+            "position": [3.0, 1.0, 0.0],
+            "amount": 14.0,
+            "service_duration_s": 2.4,
+            "resource_id": "loader-shovel"
+          }
+        ]
+      },
+      {
+        "id": "haulpast-spine",
+        "tasks": [
+          {"kind": "move", "destination": [14.0, -1.0, 0.0]},
+          {
+            "kind": "unload",
+            "position": [14.0, -1.0, 0.0],
+            "amount": 14.0,
+            "service_duration_s": 1.8,
+            "resource_id": "crusher-hopper"
+          }
+        ]
+      },
+      {
+        "id": "return-stage",
+        "tasks": [
+          {"kind": "move", "destination": [-10.0, -1.0, 0.0]}
+        ]
+      }
+    ]
+  }
+}

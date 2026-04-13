@@ -209,6 +209,7 @@ describe("selection model world feature alignment", () => {
     expect(presentation?.badge).toBe("structure");
     expect(presentation?.summary).toContain("Built mass");
     expect(presentation?.context).toContain("structure surface");
+    expect(presentation?.details.map((detail) => detail.label)).toContain("Form");
     expect(presentation?.details.map((detail) => detail.label)).toContain("Group");
     expect(focusPointsForSelection(bundle, { kind: "area", areaId: "site-office" })).toHaveLength(4);
   });

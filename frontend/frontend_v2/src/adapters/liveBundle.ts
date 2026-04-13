@@ -51,6 +51,9 @@ export type LiveAreaViewModel = {
   areaId: string;
   category: string;
   kind: string;
+  formType: "flat" | "raised" | "recessed" | "structure_mass";
+  heightHint: number;
+  depthHint: number;
   polygon: Point2[];
   label: string | null;
   groupId: string | null;
@@ -347,12 +350,16 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
     if (areaRecord === null) {
       return [];
     }
+    const areaKind = readString(areaRecord, "kind", "context");
 
     return [
       {
         areaId: readString(areaRecord, "area_id", `area-${index}`),
-        category: readString(areaRecord, "category", classifyAreaCategory(readString(areaRecord, "kind", "context"))),
-        kind: readString(areaRecord, "kind", "context"),
+        category: readString(areaRecord, "category", classifyAreaCategory(areaKind)),
+        kind: areaKind,
+        formType: readAreaFormType(readStringOrNull(areaRecord, "form_type"), areaKind),
+        heightHint: readNumber(areaRecord, "height_hint", defaultAreaHeightHint(areaKind)),
+        depthHint: readNumber(areaRecord, "depth_hint", defaultAreaDepthHint(areaKind)),
         polygon: readPointList(readArray(areaRecord, "polygon")),
         label: areaRecord.label === null || areaRecord.label === undefined ? null : String(areaRecord.label),
         groupId: readStringOrNull(areaRecord, "group_id"),
@@ -889,6 +896,82 @@ function classifyAreaCategory(kind: string): string {
     return "hazard";
   }
   return "zone";
+}
+
+function readAreaFormType(
+  value: string | null,
+  kind: string,
+): "flat" | "raised" | "recessed" | "structure_mass" {
+  if (value === "raised" || value === "recessed" || value === "structure_mass") {
+    return value;
+  }
+  return defaultAreaFormType(kind);
+}
+
+function defaultAreaFormType(kind: string): "flat" | "raised" | "recessed" | "structure_mass" {
+  const normalized = kind.trim().toLowerCase();
+  if (["building", "maintenance_building", "office", "warehouse", "crusher", "gatehouse", "wall", "barrier"].includes(normalized)) {
+    return "structure_mass";
+  }
+  if (["berm", "stockpile", "hill", "mountain", "embankment", "retaining_wall"].includes(normalized)) {
+    return "raised";
+  }
+  if (["pit", "trench", "cut", "basin"].includes(normalized)) {
+    return "recessed";
+  }
+  return "flat";
+}
+
+function defaultAreaHeightHint(kind: string): number {
+  const normalized = kind.trim().toLowerCase();
+  if (
+    ["building", "maintenance_building", "office", "warehouse", "crusher", "gatehouse", "wall", "barrier"].includes(normalized)
+  ) {
+    return normalized === "crusher" || normalized === "warehouse" || normalized === "maintenance_building" || normalized === "office"
+      ? 1.8
+      : 1.55;
+  }
+  if (
+    ["berm", "stockpile", "hill", "mountain", "pit", "trench", "embankment", "cut", "basin", "retaining_wall"].includes(normalized)
+  ) {
+    return ["pit", "trench", "cut", "basin"].includes(normalized) ? 1.35 : 0.95;
+  }
+  if (["site_boundary", "boundary", "perimeter", "boundary_surface"].includes(normalized)) {
+    return 0.28;
+  }
+  if (["sidewalk", "walkway", "pedestrian_route", "sidewalk_zone"].includes(normalized)) {
+    return 0.12;
+  }
+  if (["no_go", "no_go_area", "no_go_zone", "hazard_zone", "blast_zone", "hazard_exclusion"].includes(normalized)) {
+    return 0.16;
+  }
+  return 0.18;
+}
+
+function defaultAreaDepthHint(kind: string): number {
+  const normalized = kind.trim().toLowerCase();
+  if (
+    ["building", "maintenance_building", "office", "warehouse", "crusher", "gatehouse", "wall", "barrier"].includes(normalized)
+  ) {
+    return normalized === "crusher" || normalized === "warehouse" || normalized === "maintenance_building" || normalized === "office"
+      ? 1.02
+      : 0.84;
+  }
+  if (
+    ["berm", "stockpile", "hill", "mountain", "pit", "trench", "embankment", "cut", "basin", "retaining_wall"].includes(normalized)
+  ) {
+    return ["pit", "trench", "cut", "basin"].includes(normalized) ? 1.08 : 0.82;
+  }
+  if (["site_boundary", "boundary", "perimeter", "boundary_surface"].includes(normalized)) {
+    return 0.18;
+  }
+  if (["sidewalk", "walkway", "pedestrian_route", "sidewalk_zone"].includes(normalized)) {
+    return 0.08;
+  }
+  if (["no_go", "no_go_area", "no_go_zone", "hazard_zone", "blast_zone", "hazard_exclusion"].includes(normalized)) {
+    return 0.12;
+  }
+  return 0.12;
 }
 
 function collectScenePoints(bundle: JsonRecord | null): Point2[] {

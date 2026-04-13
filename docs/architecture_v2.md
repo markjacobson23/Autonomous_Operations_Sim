@@ -209,6 +209,8 @@ It exists so consumers do not need to know internal engine details.
 
 This is also the boundary where render-ready geometry is derived from world-model-v2 semantics. The world model owns the static meaning of the scene; derived surfaces own the presentation-ready shape of that scene; frontend adapters only translate those derived surfaces into UI state.
 
+Render-ready world-form surfaces may carry small shared hints such as `form_type`, `height_hint`, and `depth_hint` so axonometric renderers can express raised, recessed, and structure-mass forms without inventing new frontend truth.
+
 The derived surface contract should preserve the shared taxonomy, not collapse it into generic miscellaneous geometry.
 
 The static world surface should expose a stable feature inventory and semantic feature groups so later rendering and inspection can consume the same world truth without reinterpretation.

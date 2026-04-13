@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import type { LiveBundleViewModel } from "../adapters/liveBundle";
+import type { LiveBundleViewModel, Point2 } from "../adapters/liveBundle";
 import type { FrontendModeId, LayerState } from "../state/frontendUiState";
 import type { ViewBox } from "../adapters/mapViewport";
 import type { SelectionTarget } from "../adapters/selectionModel";
@@ -57,7 +57,17 @@ export function LiveSceneCanvas({
   const previewDestinationPoint = layers.routes && activeRoutePreview !== null ? activeRoutePreview.destinationPoint : null;
   const previewDiagnostics = layers.routes && activeRoutePreview !== null ? activeRoutePreview.renderDiagnostics : [];
   const selectedVehicleIdSet = new Set(selectedVehicleIds);
-  const orderedAreas = [...areas].sort((left, right) => areaSortRank(left.category) - areaSortRank(right.category));
+  const orderedAreas = [...areas].sort((left, right) => {
+    const formRank = worldFormSortRank(left.formType) - worldFormSortRank(right.formType);
+    if (formRank !== 0) {
+      return formRank;
+    }
+    const categoryRank = areaSortRank(left.category) - areaSortRank(right.category);
+    if (categoryRank !== 0) {
+      return categoryRank;
+    }
+    return left.areaId.localeCompare(right.areaId);
+  });
   const hasWorldFormContext =
     sceneFrame.extents.some((extent) => extent.source === "world_model" && extent.category !== "operational") ||
     orderedAreas.some((area) => area.category !== "zone");
@@ -133,45 +143,39 @@ export function LiveSceneCanvas({
               return null;
             }
             const isSelected = selectionTarget?.kind === "area" && selectionTarget.areaId === area.areaId;
+            const worldFormGeometry = buildWorldFormGeometry(area.polygon, area.formType, area.heightHint, area.depthHint);
+            const formToken = worldFormToken(area.formType);
             return (
-              <path
+              <g
                 key={area.areaId}
-                d={pointsToClosedPath(area.polygon)}
-                className={[
-                  "area-surface",
-                  `area-surface-${area.category}`,
-                  `area-surface-kind-${areaKindToken(area.kind)}`,
-                  isSelected ? " area-surface-selected" : "",
-                ].join(" ")}
+                className={`world-form world-form-${formToken}${isSelected ? " world-form-selected" : ""}`}
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   onSelectArea(area.areaId);
                 }}
-              />
+              >
+                {worldFormGeometry.wallPath !== null ? (
+                  <path
+                    d={worldFormGeometry.wallPath}
+                    fillRule="evenodd"
+                    className={`world-form-wall world-form-wall-${formToken} world-form-wall-${area.category}`}
+                    pointerEvents="none"
+                  />
+                ) : null}
+                <path
+                  d={pointsToClosedPath(worldFormGeometry.topPolygon)}
+                  className={[
+                    "area-surface",
+                    `area-surface-${area.category}`,
+                    `area-surface-kind-${areaKindToken(area.kind)}`,
+                    "world-form-top",
+                    `world-form-top-${formToken}`,
+                    isSelected ? " area-surface-selected" : "",
+                  ].join(" ")}
+                />
+              </g>
             );
           })}
-        {intersections.length > 0 ? (
-          <g className="intersection-layer">
-            {intersections.map((intersection) => {
-              if (intersection.polygon.length < 3) {
-                return null;
-              }
-              const isSelected =
-                selectionTarget?.kind === "intersection" && selectionTarget.intersectionId === intersection.intersectionId;
-              return (
-                <path
-                  key={intersection.intersectionId}
-                  d={pointsToClosedPath(intersection.polygon)}
-                  className={`intersection-footprint intersection-footprint-${intersectionKindToken(intersection.intersectionType)}${isSelected ? " intersection-footprint-selected" : ""}`}
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                    onSelectIntersection(intersection.intersectionId);
-                  }}
-                />
-              );
-            })}
-          </g>
-        ) : null}
         {layers.routes && activeRoutePreview !== null && previewPathPoints.length > 0 ? (
           <g className="route-preview-layer">
             {previewPathPoints.length > 1 ? <path d={pointsToPath(previewPathPoints)} className="route-preview-path" /> : null}
@@ -227,6 +231,28 @@ export function LiveSceneCanvas({
               </g>
             );
           })}
+        {intersections.length > 0 ? (
+          <g className="intersection-layer">
+            {intersections.map((intersection) => {
+              if (intersection.polygon.length < 3) {
+                return null;
+              }
+              const isSelected =
+                selectionTarget?.kind === "intersection" && selectionTarget.intersectionId === intersection.intersectionId;
+              return (
+                <path
+                  key={intersection.intersectionId}
+                  d={pointsToClosedPath(intersection.polygon)}
+                  className={`intersection-footprint intersection-footprint-${intersectionKindToken(intersection.intersectionType)}${isSelected ? " intersection-footprint-selected" : ""}`}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    onSelectIntersection(intersection.intersectionId);
+                  }}
+                />
+              );
+            })}
+          </g>
+        ) : null}
         {showTrafficOverlay ? (
           <g className="traffic-overlay-layer">
             {trafficRoadStates.map((roadState) => {
@@ -357,6 +383,79 @@ function areaSortRank(category: string): number {
   }
 }
 
+function worldFormSortRank(formType: string): number {
+  switch (formType) {
+    case "recessed":
+      return 0;
+    case "flat":
+      return 1;
+    case "raised":
+      return 2;
+    case "structure_mass":
+      return 3;
+    default:
+      return 1;
+  }
+}
+
 function intersectionKindToken(kind: string): string {
   return kind.trim().toLowerCase().replace(/[^a-z0-9]+/gu, "-");
+}
+
+function worldFormToken(formType: string): string {
+  return formType.trim().toLowerCase().replace(/[^a-z0-9]+/gu, "-");
+}
+
+function buildWorldFormGeometry(
+  points: readonly (readonly [number, number])[],
+  formType: string,
+  heightHint: number,
+  depthHint: number,
+): {
+  topPolygon: Point2[];
+  wallPath: string | null;
+} {
+  const topPolygon = offsetWorldPolygon(points, formType, heightHint, depthHint);
+  return {
+    topPolygon,
+    wallPath: formType === "flat" ? null : buildWorldFormWallPath(points, topPolygon),
+  };
+}
+
+function offsetWorldPolygon(
+  points: readonly (readonly [number, number])[],
+  formType: string,
+  heightHint: number,
+  depthHint: number,
+): Point2[] {
+  if (points.length < 3) {
+    return points.map((point) => [point[0], point[1]] as Point2);
+  }
+
+  const offsetScale = worldFormOffsetScale(formType);
+  const direction = formType === "recessed" ? 1 : -1;
+  const offsetX = direction * depthHint * offsetScale.x;
+  const offsetY = direction * heightHint * offsetScale.y;
+  return points.map((point) => [point[0] + offsetX, point[1] + offsetY] as Point2);
+}
+
+function worldFormOffsetScale(formType: string): { x: number; y: number } {
+  switch (formType) {
+    case "structure_mass":
+      return { x: 0.34, y: 0.24 };
+    case "raised":
+      return { x: 0.24, y: 0.18 };
+    case "recessed":
+      return { x: 0.26, y: 0.2 };
+    case "flat":
+    default:
+      return { x: 0.08, y: 0.05 };
+  }
+}
+
+function buildWorldFormWallPath(
+  basePolygon: readonly (readonly [number, number])[],
+  topPolygon: readonly (readonly [number, number])[],
+): string {
+  return `${pointsToClosedPath(basePolygon)} ${pointsToClosedPath([...topPolygon].reverse())}`;
 }

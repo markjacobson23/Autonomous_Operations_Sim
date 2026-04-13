@@ -712,20 +712,68 @@ p {
   vector-effect: non-scaling-stroke;
 }
 
+.world-form {
+  isolation: isolate;
+}
+
+.world-form-wall {
+  fill-opacity: 0.94;
+  stroke: rgba(82, 74, 62, 0.12);
+  stroke-width: 0.08;
+  vector-effect: non-scaling-stroke;
+}
+
+.world-form-wall-flat {
+  opacity: 0;
+}
+
+.world-form-wall-raised {
+  fill: rgba(176, 164, 145, 0.48);
+}
+
+.world-form-wall-structure-mass {
+  fill: rgba(168, 154, 136, 0.82);
+}
+
+.world-form-wall-recessed {
+  fill: rgba(94, 80, 60, 0.56);
+}
+
+.world-form-top {
+  vector-effect: non-scaling-stroke;
+}
+
+.world-form-top-flat {
+  stroke-width: 0.08;
+}
+
+.world-form-top-raised {
+  stroke-width: 0.11;
+}
+
+.world-form-top-structure-mass {
+  stroke-width: 0.13;
+}
+
+.world-form-top-recessed {
+  stroke-width: 0.11;
+}
+
 .area-surface-zone {
   fill: rgba(214, 204, 186, 0.42);
 }
 
 .area-surface-structure {
-  fill: rgba(195, 182, 165, 0.54);
-  stroke: rgba(121, 108, 90, 0.28);
-  stroke-width: 0.13;
+  fill: rgba(220, 214, 202, 0.9);
+  stroke: rgba(126, 116, 102, 0.28);
+  stroke-width: 0.12;
+  filter: drop-shadow(0 0.28px 0.2px rgba(74, 68, 58, 0.1));
 }
 
 .area-surface-terrain {
-  fill: rgba(174, 152, 117, 0.34);
-  stroke: rgba(118, 98, 66, 0.22);
-  stroke-width: 0.12;
+  fill: rgba(186, 161, 122, 0.36);
+  stroke: rgba(118, 98, 66, 0.2);
+  stroke-width: 0.11;
 }
 
 .area-surface-boundary {

@@ -460,6 +460,7 @@ function buildAreaPresentation(bundle: LiveBundleViewModel, areaId: string): Sel
     details.push({ label: "Environment", value: bundle.map.environment.displayName });
   }
   if (area !== null) {
+    details.push({ label: "Form", value: humanize(area.formType) });
     details.push({ label: "Kind", value: humanize(area.kind) });
   }
   if (area !== null && area.groupId !== null) {

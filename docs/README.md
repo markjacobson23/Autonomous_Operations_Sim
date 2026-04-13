@@ -59,6 +59,9 @@ If you want the big picture first:
 8. `phase_b_acceptance_runbook.md`
    The concise operator-facing launch and walkthrough note for the Phase B mining acceptance pass.
 
+9. `phase_b_showcase_world.md`
+   The curated mining showcase world that makes the Phase B world/render foundation obvious.
+
 If you are doing implementation work, also keep `execution_plan.md` open.
 
 ## Document guide

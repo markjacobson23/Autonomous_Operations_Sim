@@ -48,6 +48,9 @@ class AreaGeometrySurface:
     polygon: tuple[Position, ...]
     label: str | None = None
     group_id: str | None = None
+    form_type: str = "flat"
+    height_hint: float = 0.18
+    depth_hint: float = 0.12
 
 
 @dataclass(frozen=True)
@@ -282,6 +285,9 @@ def render_geometry_surface_to_dict(
                 "category": area.category,
                 "kind": area.kind,
                 "group_id": area.group_id,
+                "form_type": area.form_type,
+                "height_hint": area.height_hint,
+                "depth_hint": area.depth_hint,
                 "polygon": [list(point) for point in area.polygon],
                 "label": area.label,
             }
@@ -423,6 +429,11 @@ def _build_areas_from_metadata(
 
 def _build_area_surface(area: dict[str, object]) -> AreaGeometrySurface:
     category, group_id = _classify_area_kind(str(area["kind"]))
+    form_type, height_hint, depth_hint = _build_area_form_spec(
+        category=category,
+        kind=str(area["kind"]),
+        area=area,
+    )
     return AreaGeometrySurface(
         area_id=str(area["id"]),
         category=category,
@@ -430,6 +441,9 @@ def _build_area_surface(area: dict[str, object]) -> AreaGeometrySurface:
         polygon=tuple(_position(point) for point in area["polygon"]),
         label=str(area["label"]) if area.get("label") is not None else None,
         group_id=group_id,
+        form_type=form_type,
+        height_hint=height_hint,
+        depth_hint=depth_hint,
     )
 
 
@@ -712,6 +726,11 @@ def _build_default_area_surface(
     x, y, z = position
     size = 0.55
     category, group_id = _classify_area_kind(kind)
+    form_type, height_hint, depth_hint = _build_area_form_spec(
+        category=category,
+        kind=kind,
+        area=None,
+    )
     return AreaGeometrySurface(
         area_id=f"{kind}-{node_id}",
         category=category,
@@ -724,6 +743,9 @@ def _build_default_area_surface(
         ),
         label=f"{kind.replace('_', ' ')} {node_id}",
         group_id=group_id,
+        form_type=form_type,
+        height_hint=height_hint,
+        depth_hint=depth_hint,
     )
 
 
@@ -1075,6 +1097,96 @@ def _classify_area_kind(kind: str) -> tuple[str, str]:
     if kind in {"no_go", "no_go_area", "no_go_zone", "hazard_zone", "blast_zone", "hazard_exclusion"}:
         return "hazard", "hazard:no_go_areas"
     return "zone", "zone:zones"
+
+
+def _build_area_form_spec(
+    *,
+    category: str,
+    kind: str,
+    area: dict[str, object] | None,
+) -> tuple[str, float, float]:
+    explicit_form_type = _read_optional_form_type(area)
+    explicit_height_hint = _read_optional_number(area, "height_hint")
+    explicit_depth_hint = _read_optional_number(area, "depth_hint")
+    if explicit_form_type is not None or explicit_height_hint is not None or explicit_depth_hint is not None:
+        return (
+            explicit_form_type or _default_form_type_for_area(category, kind),
+            explicit_height_hint if explicit_height_hint is not None else _default_height_hint_for_area(category, kind),
+            explicit_depth_hint if explicit_depth_hint is not None else _default_depth_hint_for_area(category, kind),
+        )
+
+    return (
+        _default_form_type_for_area(category, kind),
+        _default_height_hint_for_area(category, kind),
+        _default_depth_hint_for_area(category, kind),
+    )
+
+
+def _read_optional_form_type(area: dict[str, object] | None) -> str | None:
+    if area is None:
+        return None
+    value = area.get("form_type")
+    if isinstance(value, str) and value.strip():
+        normalized = value.strip().lower()
+        if normalized in {"flat", "raised", "recessed", "structure_mass"}:
+            return normalized
+    return None
+
+
+def _read_optional_number(area: dict[str, object] | None, key: str) -> float | None:
+    if area is None:
+        return None
+    value = area.get(key)
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def _default_form_type_for_area(category: str, kind: str) -> str:
+    normalized = kind.lower()
+    if category == "structure":
+        return "structure_mass"
+    if category == "terrain":
+        if normalized in {"pit", "trench", "cut", "basin"}:
+            return "recessed"
+        return "raised"
+    if category in {"zone", "surface", "hazard", "boundary"}:
+        return "flat"
+    return "flat"
+
+
+def _default_height_hint_for_area(category: str, kind: str) -> float:
+    normalized = kind.lower()
+    if category == "structure":
+        return 1.8 if normalized in {"crusher", "warehouse", "maintenance_building", "office"} else 1.55
+    if category == "terrain":
+        if normalized in {"pit", "trench", "cut", "basin"}:
+            return 1.35
+        return 0.95
+    if category == "boundary":
+        return 0.28
+    if category == "hazard":
+        return 0.16
+    if category == "surface":
+        return 0.12
+    return 0.18
+
+
+def _default_depth_hint_for_area(category: str, kind: str) -> float:
+    normalized = kind.lower()
+    if category == "structure":
+        return 1.02 if normalized in {"crusher", "warehouse", "maintenance_building", "office"} else 0.84
+    if category == "terrain":
+        if normalized in {"pit", "trench", "cut", "basin"}:
+            return 1.08
+        return 0.82
+    if category == "boundary":
+        return 0.18
+    if category == "hazard":
+        return 0.12
+    if category == "surface":
+        return 0.08
+    return 0.12
 
 
 def _default_centerline_for_road(

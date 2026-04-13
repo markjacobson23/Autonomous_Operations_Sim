@@ -53,6 +53,7 @@ The render-facing contract is separate:
 
 * world model v2 describes what the world is
 * render-ready geometry describes how the world is presented
+* world-form rendering hints such as `form_type`, `height_hint`, and `depth_hint` remain simulator-derived and shared across environment families
 * scene framing and spatial extents are derived from the shared world/render surfaces, not guessed locally by frontend consumers
 * frontend adapters translate derived bundle surfaces into UI state
 

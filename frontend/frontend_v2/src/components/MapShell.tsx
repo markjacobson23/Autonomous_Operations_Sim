@@ -14,10 +14,22 @@ import {
   resolveSelectionVehicleIds,
 } from "../adapters/selectionModel";
 import type { FrontendUiActions, FrontendUiState } from "../state/frontendUiState";
+import type { LiveRoutePreviewViewModel } from "../adapters/liveBundle";
 import { LiveSceneCanvas } from "./LiveSceneCanvas";
+import { LiveSceneCanvas3D } from "./LiveSceneCanvas3D";
 import { MapMinimap } from "./MapMinimap";
 import { SelectionPopup } from "./SelectionPopup";
-import type { LiveRoutePreviewViewModel } from "../adapters/liveBundle";
+
+type SceneRendererMode = "svg" | "three";
+
+function readInitialRendererMode(): SceneRendererMode {
+  if (typeof window === "undefined") {
+    return "svg";
+  }
+
+  const rendererMode = new URLSearchParams(window.location.search).get("sceneRenderer");
+  return rendererMode === "three" ? "three" : "svg";
+}
 
 type MapShellProps = {
   bundle: LiveBundleViewModel;
@@ -29,11 +41,13 @@ type MapShellProps = {
 export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapShellProps): JSX.Element {
   const initialFitDoneRef = useRef(false);
   const lastSessionKeyRef = useRef<string | null>(null);
+  const [rendererMode, setRendererMode] = useState<SceneRendererMode>(() => readInitialRendererMode());
   const [dragState, setDragState] = useState<{
     pointerId: number;
     lastClientX: number;
     lastClientY: number;
   } | null>(null);
+  const sceneBounds = bundle.map.sceneFrame.sceneBounds;
 
   useEffect(() => {
     if (bundle.sessionIdentity.key !== lastSessionKeyRef.current) {
@@ -42,10 +56,10 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
     }
 
     if (bundle.loadState === "ready" && !initialFitDoneRef.current) {
-      actions.fitScene(bundle.map.bounds);
+      actions.fitScene(sceneBounds);
       initialFitDoneRef.current = true;
     }
-  }, [actions, bundle.loadState, bundle.map.bounds, bundle.sessionIdentity.key]);
+  }, [actions, bundle.loadState, bundle.sessionIdentity.key, sceneBounds]);
 
   const hasRenderableScene =
     bundle.map.nodes.length > 0 ||
@@ -56,9 +70,9 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
     bundle.commandCenter.routePreviews.length > 0;
   const camera = initialFitDoneRef.current && bundle.loadState !== "loading"
     ? uiState.camera
-    : createInitialCamera(bundle.map.bounds, uiState.camera.sceneViewMode);
-  const viewBox = cameraToViewBox(camera, bundle.map.bounds);
-  const viewport = minimapViewport(bundle.map.bounds, viewBox);
+    : createInitialCamera(sceneBounds, uiState.camera.sceneViewMode);
+  const viewBox = cameraToViewBox(camera, sceneBounds);
+  const viewport = minimapViewport(sceneBounds, viewBox);
   const activeSelectionTarget = resolveActiveSelectionTarget(bundle, uiState);
   const selectedVehicleIds = resolveSelectionVehicleIds(bundle, uiState);
   const selectionPresentation = buildSelectionPresentation(bundle, uiState);
@@ -176,22 +190,36 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
   }
 
   function handleFit() {
-    actions.fitScene(bundle.map.bounds);
+    actions.fitScene(sceneBounds);
   }
 
   function handleFocusSelected() {
-    actions.focusPoints(selectedPoints, bundle.map.bounds);
+    actions.focusPoints(selectedPoints, sceneBounds);
+  }
+
+  function handleResetView() {
+    actions.setSceneViewMode("iso");
+    actions.fitScene(sceneBounds);
   }
 
   function handleSceneModeChange(sceneViewMode: FrontendUiState["camera"]["sceneViewMode"]) {
     actions.setSceneViewMode(sceneViewMode);
   }
 
+  function handleRendererModeChange(nextMode: SceneRendererMode) {
+    setRendererMode(nextMode);
+  }
+
   function handleToggleLayer(layer: keyof FrontendUiState["layers"]) {
     actions.toggleLayer(layer);
   }
 
-  const shellCursorClass = dragState === null ? "map-shell-cursor-grab" : "map-shell-cursor-grabbing";
+  const shellCursorClass =
+    rendererMode === "three"
+      ? "map-shell-cursor-grab"
+      : dragState === null
+        ? "map-shell-cursor-grab"
+        : "map-shell-cursor-grabbing";
 
   return (
     <section className={`map-shell panel ${shellCursorClass}`}>
@@ -224,6 +252,9 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
           <button type="button" className="scene-button-primary" onClick={handleFocusSelected} disabled={!canFocusSelected}>
             Focus Selected
           </button>
+          <button type="button" className="scene-button-primary" onClick={handleResetView}>
+            Reset View
+          </button>
         </div>
 
         <div className="map-shell-toolbar-group">
@@ -242,29 +273,63 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
             Birdseye
           </button>
         </div>
+
+        <div className="map-shell-toolbar-group">
+          <button
+            type="button"
+            className={`scene-button-primary ${rendererMode === "svg" ? "scene-button-active" : ""}`}
+            onClick={() => handleRendererModeChange("svg")}
+          >
+            SVG
+          </button>
+          <button
+            type="button"
+            className={`scene-button-primary ${rendererMode === "three" ? "scene-button-active" : ""}`}
+            onClick={() => handleRendererModeChange("three")}
+          >
+            3D
+          </button>
+        </div>
       </div>
 
       <div className="map-shell-stage">
         {hasRenderableScene ? (
-          <LiveSceneCanvas
-            model={bundle}
-            viewBox={viewBox}
-            sceneTransform={sceneTransform(camera, viewBox)}
-            layers={uiState.layers}
-            selectionTarget={activeSelectionTarget}
-            selectedVehicleIds={selectedVehicleIds}
-            activeRoutePreview={activeRoutePreview}
-            activeMode={uiState.modePanel.activeMode}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={clearDragState}
-            onPointerLeave={clearDragState}
-            onWheelZoom={handleWheel}
-            onSelectVehicle={handleSelectVehicle}
-            onSelectRoad={handleSelectRoad}
-            onSelectIntersection={handleSelectIntersection}
-            onSelectArea={handleSelectArea}
-          />
+          rendererMode === "three" ? (
+            <LiveSceneCanvas3D
+              model={bundle}
+              camera={camera}
+              layers={uiState.layers}
+              selectionTarget={activeSelectionTarget}
+              selectedVehicleIds={selectedVehicleIds}
+              activeRoutePreview={activeRoutePreview}
+              activeMode={uiState.modePanel.activeMode}
+              onCameraChange={actions.setCamera}
+              onSelectVehicle={handleSelectVehicle}
+              onSelectRoad={handleSelectRoad}
+              onSelectIntersection={handleSelectIntersection}
+              onSelectArea={handleSelectArea}
+            />
+          ) : (
+            <LiveSceneCanvas
+              model={bundle}
+              viewBox={viewBox}
+              sceneTransform={sceneTransform(camera, viewBox)}
+              layers={uiState.layers}
+              selectionTarget={activeSelectionTarget}
+              selectedVehicleIds={selectedVehicleIds}
+              activeRoutePreview={activeRoutePreview}
+              activeMode={uiState.modePanel.activeMode}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={clearDragState}
+              onPointerLeave={clearDragState}
+              onWheelZoom={handleWheel}
+              onSelectVehicle={handleSelectVehicle}
+              onSelectRoad={handleSelectRoad}
+              onSelectIntersection={handleSelectIntersection}
+              onSelectArea={handleSelectArea}
+            />
+          )
         ) : (
           <div className="map-loading">
             <strong>{bundle.loadState === "error" ? "Map unavailable" : "Loading live map..."}</strong>
