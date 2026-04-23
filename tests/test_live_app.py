@@ -414,6 +414,8 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
         assert bootstrap_payload["bootstrap"]["metadata"]["bootstrap_schema_version"] == 2
         assert bootstrap_payload["bootstrap"]["metadata"]["bridge_schema_version"] == 1
         assert bootstrap_payload["bootstrap"]["authority"]["motion_authority"] == "python"
+        assert bootstrap_payload["bootstrap"]["session"]["motion_authority"] == "python"
+        assert server._runtime.motion_authority == "python"
         assert bootstrap_payload["bootstrap"]["session"]["source_scenario_path"].endswith(
             "scenarios/showpiece_pack/01_mine_ore_shift.json"
         )
@@ -463,6 +465,15 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
         telemetry_payload = json.loads(telemetry_response.read().decode("utf-8"))
         assert telemetry_payload["ok"] is True
         assert telemetry_payload["telemetry"]["telemetry_count"] == 1
+        assert telemetry_payload["telemetry"]["motion_authority"] == "python"
+        assert telemetry_payload["telemetry"]["guardrails"]["motion_authority"] == "python"
+        assert (
+            telemetry_payload["telemetry"]["guardrails"]["telemetry_role"]
+            == "observational_motion_signal"
+        )
+        assert "task_identity" in telemetry_payload["telemetry"]["guardrails"][
+            "telemetry_must_not_overwrite"
+        ]
         assert telemetry_payload["telemetry"]["received_samples"][0]["vehicle_id"] == vehicle_id
         assert telemetry_payload["telemetry"]["received_samples"][0]["position"] == [
             1.0,
@@ -480,6 +491,67 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
         assert refreshed_bootstrap_payload["bootstrap"][
             "latest_unity_telemetry_by_vehicle_id"
         ][0]["vehicle_id"] == vehicle_id
+    finally:
+        server.stop()
+
+
+def test_live_app_frontend_server_exposes_unity_motion_authority_explicitly(tmp_path) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
+    vehicle_id = bundle["snapshot"]["vehicles"][0]["vehicle_id"]
+    server = LiveAppServer(
+        artifacts.output_directory,
+        artifacts=artifacts,
+        motion_authority="unity",
+        port=0,
+    )
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
+        bootstrap_payload = json.loads(bootstrap_response.read().decode("utf-8"))
+        assert bootstrap_payload["ok"] is True
+        assert bootstrap_payload["bootstrap"]["authority"]["motion_authority"] == "unity"
+        assert bootstrap_payload["bootstrap"]["session"]["motion_authority"] == "unity"
+        assert server._runtime.motion_authority == "unity"
+
+        telemetry_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/unity/telemetry",
+                data=json.dumps(
+                    {
+                        "telemetry": {
+                            "vehicle_id": vehicle_id,
+                            "timestamp_s": 2.0,
+                            "position": [0.0, 0.0, 0.0],
+                            "speed": 0.0,
+                        }
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        telemetry_payload = json.loads(telemetry_response.read().decode("utf-8"))
+        assert telemetry_payload["ok"] is True
+        assert telemetry_payload["telemetry"]["motion_authority"] == "unity"
+        assert telemetry_payload["telemetry"]["guardrails"]["motion_authority"] == "unity"
+        assert (
+            telemetry_payload["telemetry"]["guardrails"]["telemetry_role"]
+            == "unity_embodied_motion_signal"
+        )
+        assert server._runtime.latest_unity_telemetry_by_vehicle_id[vehicle_id][
+            "vehicle_id"
+        ] == vehicle_id
     finally:
         server.stop()
 

@@ -55,8 +55,10 @@ DEFAULT_LIVE_OUTPUT_DIRECTORY = Path("live_output")
 DEFAULT_LIVE_FRONTEND_DIST_DIRECTORY = Path("frontend/frontend_v2/dist")
 DEFAULT_LIVE_HOST = "127.0.0.1"
 DEFAULT_LIVE_SESSION_STEP_SECONDS = 0.5
+DEFAULT_SESSION_MOTION_AUTHORITY = "python"
 UNITY_BRIDGE_SCHEMA_VERSION = 1
 UNITY_BOOTSTRAP_SCHEMA_VERSION = 2
+VALID_SESSION_MOTION_AUTHORITIES = {"python", "unity"}
 
 
 @dataclass(frozen=True)
@@ -87,6 +89,7 @@ class LiveSessionRuntime:
 
     artifacts: LiveAppArtifacts
     session: LiveSimulationSession
+    motion_authority: str = DEFAULT_SESSION_MOTION_AUTHORITY
     play_state: str = "paused"
     pending_route_commands: list[AssignVehicleDestinationCommand] = field(default_factory=list)
     latest_unity_telemetry_by_vehicle_id: dict[int, dict[str, object]] = field(
@@ -98,10 +101,24 @@ class LiveSessionRuntime:
     lock: threading.RLock = field(default_factory=threading.RLock)
 
     @classmethod
-    def from_artifacts(cls, artifacts: LiveAppArtifacts) -> "LiveSessionRuntime":
+    def from_artifacts(
+        cls,
+        artifacts: LiveAppArtifacts,
+        *,
+        motion_authority: str = DEFAULT_SESSION_MOTION_AUTHORITY,
+    ) -> "LiveSessionRuntime":
         scenario = load_scenario(artifacts.working_scenario_path)
         session = LiveSimulationSession(build_scenario_engine(scenario))
-        return cls(artifacts=artifacts, session=session)
+        return cls(
+            artifacts=artifacts,
+            session=session,
+            motion_authority=motion_authority,
+        )
+
+    def __post_init__(self) -> None:
+        self.motion_authority = _normalize_session_motion_authority(
+            self.motion_authority
+        )
 
     def refresh_bundle(
         self,
@@ -119,6 +136,7 @@ class LiveSessionRuntime:
                 route_preview_requests=route_preview_requests,
                 play_state=self.play_state,
                 pending_route_commands=self.pending_route_commands,
+                motion_authority=self.motion_authority,
             )
             self._write_bundle(bundle)
             return bundle
@@ -133,6 +151,7 @@ class LiveSessionRuntime:
                 working_scenario_path=self.artifacts.working_scenario_path,
                 pending_route_commands=self.pending_route_commands,
                 latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
+                motion_authority=self.motion_authority,
             )
 
     def record_unity_telemetry(
@@ -158,6 +177,10 @@ class LiveSessionRuntime:
                     self.latest_unity_telemetry_by_vehicle_id[vehicle_id]
                     for vehicle_id in sorted(self.latest_unity_telemetry_by_vehicle_id)
                 ],
+                "motion_authority": self.motion_authority,
+                "guardrails": _telemetry_guardrails_for_motion_authority(
+                    self.motion_authority
+                ),
             }
 
     def apply_command(
@@ -308,6 +331,7 @@ class LiveSessionRuntime:
             route_preview_requests=route_preview_requests,
             play_state=self.play_state,
             pending_route_commands=self.pending_route_commands,
+            motion_authority=self.motion_authority,
         )
         self._write_bundle(bundle)
         return bundle
@@ -362,10 +386,14 @@ class LiveAppServer:
         *,
         artifacts: LiveAppArtifacts,
         runtime: LiveSessionRuntime | None = None,
+        motion_authority: str = DEFAULT_SESSION_MOTION_AUTHORITY,
         host: str = DEFAULT_LIVE_HOST,
         port: int = 0,
     ) -> None:
-        session_runtime = runtime or LiveSessionRuntime.from_artifacts(artifacts)
+        session_runtime = runtime or LiveSessionRuntime.from_artifacts(
+            artifacts,
+            motion_authority=motion_authority,
+        )
         self._runtime = session_runtime
         handler = partial(
             LiveAppRequestHandler,
@@ -873,6 +901,7 @@ def export_live_app_artifacts(
                 session=initial_session.session,
                 source_scenario_path=scenario_file,
                 working_scenario_path=working_scenario_path,
+                motion_authority=initial_session.motion_authority,
             ),
             indent=2,
             sort_keys=True,
@@ -901,6 +930,7 @@ def export_live_app_artifacts(
             session=initial_session.session,
             source_scenario_path=scenario_file,
             working_scenario_path=working_scenario_path,
+            motion_authority=initial_session.motion_authority,
         ),
         launch_path,
         title=f"Autonomous Ops Live Session ({load_scenario(scenario_file).name})",
@@ -983,7 +1013,9 @@ def _build_live_bundle_record(
     play_state: str = "paused",
     pending_route_commands: tuple[AssignVehicleDestinationCommand, ...]
     | list[AssignVehicleDestinationCommand] = (),
+    motion_authority: str = DEFAULT_SESSION_MOTION_AUTHORITY,
 ) -> dict[str, object]:
+    normalized_motion_authority = _normalize_session_motion_authority(motion_authority)
     bundle = live_session_bundle_to_dict(
         build_live_session_bundle(
             session,
@@ -1011,6 +1043,7 @@ def _build_live_bundle_record(
     bundle["session_control"] = {
         "play_state": play_state,
         "step_seconds": DEFAULT_LIVE_SESSION_STEP_SECONDS,
+        "motion_authority": normalized_motion_authority,
         "route_preview_endpoint": "/api/live/preview",
         "command_endpoint": "/api/live/command",
         "session_control_endpoint": "/api/live/session/control",
@@ -1029,13 +1062,16 @@ def _build_unity_bootstrap_record(
     pending_route_commands: tuple[AssignVehicleDestinationCommand, ...]
     | list[AssignVehicleDestinationCommand] = (),
     latest_unity_telemetry_by_vehicle_id: dict[int, dict[str, object]] | None = None,
+    motion_authority: str = DEFAULT_SESSION_MOTION_AUTHORITY,
 ) -> dict[str, object]:
     live_bundle = _build_live_bundle_record(
         session=session,
         source_scenario_path=source_scenario_path,
         working_scenario_path=working_scenario_path,
         pending_route_commands=pending_route_commands,
+        motion_authority=motion_authority,
     )
+    session_motion_authority = str(live_bundle["session_control"]["motion_authority"])
     world_model = world_model_surface_to_dict(build_world_model_surface(session.engine.map))
     vehicle_identity_map = _unity_vehicle_identity_map(session)
     pending_route_intents = [
@@ -1056,12 +1092,13 @@ def _build_unity_bootstrap_record(
         },
         "authority": {
             "runtime_owner": "python",
-            "motion_authority": "python",
+            "motion_authority": session_motion_authority,
         },
         "session": {
             "seed": live_bundle["seed"],
             "simulated_time_s": live_bundle["simulated_time_s"],
             "play_state": live_bundle["session_control"]["play_state"],
+            "motion_authority": session_motion_authority,
             "source_scenario_path": str(source_scenario_path),
             "working_scenario_path": str(working_scenario_path),
         },
@@ -1185,6 +1222,53 @@ def _normalize_unity_telemetry_sample(sample: dict[str, object]) -> dict[str, ob
     if "sample_index" in normalized_sample:
         normalized_sample["sample_index"] = int(normalized_sample["sample_index"])
     return normalized_sample
+
+
+def _normalize_session_motion_authority(motion_authority: object) -> str:
+    normalized_motion_authority = str(motion_authority).strip().lower()
+    if normalized_motion_authority in VALID_SESSION_MOTION_AUTHORITIES:
+        return normalized_motion_authority
+    return DEFAULT_SESSION_MOTION_AUTHORITY
+
+
+def _telemetry_guardrails_for_motion_authority(
+    motion_authority: str,
+) -> dict[str, object]:
+    normalized_motion_authority = _normalize_session_motion_authority(motion_authority)
+    return {
+        "motion_authority": normalized_motion_authority,
+        "telemetry_role": (
+            "observational_motion_signal"
+            if normalized_motion_authority == "python"
+            else "unity_embodied_motion_signal"
+        ),
+        "accepted_fields": [
+            "vehicle_id",
+            "timestamp_s",
+            "position",
+            "speed",
+            "heading_rad",
+            "rotation",
+            "current_node_id",
+            "current_edge_id",
+        ],
+        "backend_state_updates": [
+            "latest_unity_telemetry_by_vehicle_id",
+            "unity_telemetry_history",
+        ],
+        "protected_truth": [
+            "task_identity",
+            "routing_legality",
+            "command_truth",
+            "scenario_world_truth",
+        ],
+        "telemetry_must_not_overwrite": [
+            "task_identity",
+            "routing_legality",
+            "command_truth",
+            "scenario_world_truth",
+        ],
+    }
 
 
 def _payload_optional_int(payload: dict[str, object], key: str) -> int | None:
