@@ -385,6 +385,8 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
     current_node_id = bundle["snapshot"]["vehicles"][0]["node_id"]
     destination_node_id = bundle["map_surface"]["edges"][0]["end_node_id"]
     current_edge_id = bundle["map_surface"]["edges"][0]["edge_id"]
+    map_node_count = len(bundle["map_surface"]["nodes"])
+    map_road_count = len(bundle["render_geometry"]["roads"])
     server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
     server.start()
     base_url = f"http://{server.host}:{server.port}"
@@ -409,16 +411,35 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
         bootstrap_payload = json.loads(bootstrap_response.read().decode("utf-8"))
         assert bootstrap_payload["ok"] is True
         assert bootstrap_payload["bootstrap"]["metadata"]["surface_name"] == "unity_bootstrap"
+        assert bootstrap_payload["bootstrap"]["metadata"]["bootstrap_schema_version"] == 2
         assert bootstrap_payload["bootstrap"]["metadata"]["bridge_schema_version"] == 1
         assert bootstrap_payload["bootstrap"]["authority"]["motion_authority"] == "python"
-        assert bootstrap_payload["bootstrap"]["vehicle_identity_map"][0]["vehicle_id"] == vehicle_id
-        assert bootstrap_payload["bootstrap"]["pending_route_intents"] == [
+        assert bootstrap_payload["bootstrap"]["session"]["source_scenario_path"].endswith(
+            "scenarios/showpiece_pack/01_mine_ore_shift.json"
+        )
+        assert len(bootstrap_payload["bootstrap"]["world"]["topology"]["nodes"]) == map_node_count
+        assert len(bootstrap_payload["bootstrap"]["world"]["render_geometry"]["roads"]) == map_road_count
+        assert bootstrap_payload["bootstrap"]["world"]["topology"]["nodes"][0]["node_id"] == bundle["map_surface"]["nodes"][0]["node_id"]
+        assert bootstrap_payload["bootstrap"]["runtime"]["vehicle_snapshot"][0][
+            "vehicle_id"
+        ] == vehicle_id
+        assert bootstrap_payload["bootstrap"]["runtime"]["vehicle_identity_map"][0][
+            "vehicle_id"
+        ] == vehicle_id
+        assert bootstrap_payload["bootstrap"]["runtime"]["pending_route_intents"] == [
             {
                 "command_type": "assign_vehicle_destination",
                 "destination_node_id": destination_node_id,
                 "vehicle_id": vehicle_id,
             }
         ]
+        assert bootstrap_payload["bootstrap"]["runtime_vehicle_snapshot"][0][
+            "vehicle_id"
+        ] == vehicle_id
+        assert bootstrap_payload["bootstrap"]["bridge"]["schema_version"] == 1
+        assert bootstrap_payload["bootstrap"]["bridge"]["bootstrap_endpoint"] == "/api/unity/bootstrap"
+        assert bootstrap_payload["bootstrap"]["bridge"]["telemetry_endpoint"] == "/api/unity/telemetry"
+        assert bootstrap_payload["bootstrap"]["provenance"]["source_surface_name"] == "live_session_bundle"
 
         telemetry_request_payload = {
             "telemetry": {

@@ -56,6 +56,7 @@ DEFAULT_LIVE_FRONTEND_DIST_DIRECTORY = Path("frontend/frontend_v2/dist")
 DEFAULT_LIVE_HOST = "127.0.0.1"
 DEFAULT_LIVE_SESSION_STEP_SECONDS = 0.5
 UNITY_BRIDGE_SCHEMA_VERSION = 1
+UNITY_BOOTSTRAP_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -312,9 +313,9 @@ class LiveSessionRuntime:
         return bundle
 
     def _write_bundle(self, bundle: dict[str, object]) -> None:
-        self.artifacts.live_session_bundle_path.write_text(
+        _write_text_atomic(
+            self.artifacts.live_session_bundle_path,
             json.dumps(bundle, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
         )
 
     def _queue_route_command(
@@ -865,7 +866,8 @@ def export_live_app_artifacts(
             launch_relative_url="/",
         )
     )
-    live_session_bundle_path.write_text(
+    _write_text_atomic(
+        live_session_bundle_path,
         json.dumps(
             _build_live_bundle_record(
                 session=initial_session.session,
@@ -876,7 +878,6 @@ def export_live_app_artifacts(
             sort_keys=True,
         )
         + "\n",
-        encoding="utf-8",
     )
 
     frontend_dist_root = Path(frontend_dist_directory)
@@ -1035,10 +1036,21 @@ def _build_unity_bootstrap_record(
         working_scenario_path=working_scenario_path,
         pending_route_commands=pending_route_commands,
     )
+    world_model = world_model_surface_to_dict(build_world_model_surface(session.engine.map))
+    vehicle_identity_map = _unity_vehicle_identity_map(session)
+    pending_route_intents = [
+        command_to_dict(command) for command in pending_route_commands
+    ]
+    bridge_endpoints = {
+        "bootstrap_endpoint": "/api/unity/bootstrap",
+        "telemetry_endpoint": "/api/unity/telemetry",
+    }
+    runtime_vehicle_snapshot = live_bundle["snapshot"]["vehicles"]
     bootstrap = {
         "metadata": {
             "api_version": live_bundle["metadata"]["api_version"],
             "surface_name": "unity_bootstrap",
+            "bootstrap_schema_version": UNITY_BOOTSTRAP_SCHEMA_VERSION,
             "bridge_schema_version": UNITY_BRIDGE_SCHEMA_VERSION,
             "transport": "http_json",
         },
@@ -1050,24 +1062,35 @@ def _build_unity_bootstrap_record(
             "seed": live_bundle["seed"],
             "simulated_time_s": live_bundle["simulated_time_s"],
             "play_state": live_bundle["session_control"]["play_state"],
+            "source_scenario_path": str(source_scenario_path),
+            "working_scenario_path": str(working_scenario_path),
         },
         "world": {
+            "topology": live_bundle["map_surface"],
             "map_surface": live_bundle["map_surface"],
             "render_geometry": live_bundle["render_geometry"],
-            "world_model": world_model_surface_to_dict(
-                build_world_model_surface(session.engine.map)
-            ),
+            "world_model": world_model,
         },
-        "runtime_vehicle_snapshot": live_bundle["snapshot"]["vehicles"],
-        "vehicle_identity_map": _unity_vehicle_identity_map(session),
-        "pending_route_intents": [
-            command_to_dict(command) for command in pending_route_commands
-        ],
-        "bridge_endpoints": {
-            "bootstrap_endpoint": "/api/unity/bootstrap",
-            "telemetry_endpoint": "/api/unity/telemetry",
+        "runtime": {
+            "vehicle_snapshot": runtime_vehicle_snapshot,
+            "vehicle_identity_map": vehicle_identity_map,
+            "pending_route_intents": pending_route_intents,
+        },
+        "bridge": {
+            "transport": "http_json",
+            "schema_version": UNITY_BRIDGE_SCHEMA_VERSION,
+            **bridge_endpoints,
+        },
+        "provenance": {
+            "source_surface_name": live_bundle["metadata"]["surface_name"],
+            "source_scenario_path": str(source_scenario_path),
+            "working_scenario_path": str(working_scenario_path),
         },
     }
+    bootstrap["runtime_vehicle_snapshot"] = runtime_vehicle_snapshot
+    bootstrap["vehicle_identity_map"] = vehicle_identity_map
+    bootstrap["pending_route_intents"] = pending_route_intents
+    bootstrap["bridge_endpoints"] = bridge_endpoints
     if latest_unity_telemetry_by_vehicle_id:
         bootstrap["latest_unity_telemetry_by_vehicle_id"] = [
             latest_unity_telemetry_by_vehicle_id[vehicle_id]
@@ -1186,6 +1209,12 @@ def _payload_position(
             raise ValueError(f"{key}[{index}] must be numeric")
         coordinates.append(float(component))
     return (coordinates[0], coordinates[1], coordinates[2])
+
+
+def _write_text_atomic(path: Path, text: str) -> None:
+    temporary_path = path.with_name(path.name + ".tmp")
+    temporary_path.write_text(text, encoding="utf-8")
+    temporary_path.replace(path)
 
 
 def _build_live_command_result(
