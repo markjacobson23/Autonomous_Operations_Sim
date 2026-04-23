@@ -24,6 +24,7 @@ Deliverables:
 - telemetry payload
 - stable vehicle identity mapping
 - initial Unity runtime client
+- initial HTTP/JSON bridge proving the contract end to end
 
 Done when:
 - Python can send target/route intent
@@ -52,10 +53,15 @@ Deliverables:
 - Python-motion mode
 - Unity-motion mode
 - safe runtime ingestion of Unity telemetry
-- per-session or per-vehicle authority selection
+- per-session authority selection
+- later per-vehicle authority selection
 
 Done when:
 - the same scenario can run in either motion mode
+
+Guardrail:
+- do not remove or break Python motion before Unity motion mode is stable
+- Python motion remains the fallback path during transition
 
 ## Phase 4 — Route execution in Unity
 
@@ -66,10 +72,12 @@ Deliverables:
 - waypoint/route following
 - progress reporting
 - arrival/completion signals
+- failure/blockage reporting
 - runtime command feedback
 
 Done when:
 - Unity-controlled vehicles can complete backend-issued routes
+- Python can track route progress without surrendering operational truth
 
 ## Phase 5 — Terrain and physics embodiment
 
@@ -81,9 +89,10 @@ Deliverables:
 - collision handling
 - richer vehicle representation
 - exception/blockage feedback to Python
+- operational consequences that flow back into backend state
 
 Done when:
-- Unity execution affects real operational outcomes
+- Unity execution affects real operational outcomes, not just visuals
 
 ## Phase 6 — Operator integration
 
@@ -110,13 +119,16 @@ Possible later phases:
 ## Practical rule
 
 At each step, prefer:
+
 - additive seams
 - explicit ownership
 - reversible changes
 - fallback-safe behavior
 
 Reject:
+
 - giant rewrites
 - Unity-owned operational truth
 - client-side shadow truth
 - environment-specific hacks
+- premature transport complexity before contract clarity

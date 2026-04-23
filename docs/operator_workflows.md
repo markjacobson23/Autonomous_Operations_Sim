@@ -54,6 +54,7 @@ The operator should be able to inspect:
 - a planned route preview
 
 A good outcome is being able to answer:
+
 - what is this?
 - what is it doing?
 - why is it doing that?

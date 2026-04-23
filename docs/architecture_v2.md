@@ -109,6 +109,15 @@ Unity owns:
 
 Unity may be motion-authoritative for selected vehicles, but only inside a contract where Python still owns operational truth.
 
+Unity must not own:
+
+- topology truth
+- dispatch/job logic
+- reservation/conflict truth
+- final command legality
+- stable scenario truth
+- task identity
+
 ### 5.2 Browser / Operator Surfaces
 
 Operator-facing clients own:
@@ -132,13 +141,38 @@ They must not own:
 The architecture must support two modes:
 
 ### Python motion authority
+
 Python computes and advances motion.
 Clients render the resulting state.
 
+Use this mode for:
+
+- deterministic fallback
+- debugging
+- sessions where full physics is unnecessary
+- compatibility while Unity motion matures
+
 ### Unity motion authority
+
 Python issues route/goal intent.
 Unity executes embodied motion and reports telemetry back.
 Python remains authoritative for task, routing legality, command truth, and session truth.
+
+Use this mode for:
+
+- embodied vehicle motion
+- terrain interaction
+- collision-aware execution
+- future autonomy/runtime experiments
+
+### Requirement
+
+Motion authority must be explicit.
+
+The architecture should support:
+
+- per-session authority selection first
+- per-vehicle authority selection later
 
 ## Python ↔ Unity contract
 
@@ -155,6 +189,70 @@ Unity sends:
 - progress/completion events
 - collision/blockage events
 - future sensor summaries where needed
+
+## Transport principles
+
+The initial Unity bridge should follow these rules:
+
+1. Start simple.
+2. Reuse existing HTTP/JSON patterns first.
+3. Keep payloads versioned and explicit.
+4. Avoid inventing a separate truth model just for Unity.
+
+The first transport should prove the contract before the project moves to more complex options such as WebSockets or gRPC.
+
+## Telemetry contract
+
+Minimum telemetry should include:
+
+- vehicle id
+- x/y/z position
+- speed
+- timestamp
+
+Soon after, telemetry should expand to include:
+
+- heading/rotation
+- nearest node id or current edge id when known
+- active target or route-progress state
+- collision/blockage flags
+
+Python should ingest Unity telemetry through a dedicated bridge/update path rather than scattering it into unrelated UI code.
+
+## Route and command execution contract
+
+Python remains the source of route and task intent.
+
+Python issues:
+
+- destination assignments
+- route node sequences
+- future route-segment permissions
+- pause/stop/reposition commands
+
+Unity executes:
+
+- movement toward the current target point or waypoint
+- local path embodiment over terrain/scene
+- physical stopping and arrival detection
+
+Unity reports:
+
+- current telemetry
+- target reached
+- route progress
+- blocked/collision/failure events
+
+## Environment/runtime assumptions
+
+Unity must remain compatible with the shared world-model direction.
+It must not hardcode a mine-only world.
+
+Unity runtime assumptions should be:
+
+- topology-driven, not environment-hardcoded
+- world-form aware, not only waypoint-only
+- capable of consuming scene/render/world surfaces derived from Python
 
 ## Truth matrix
 
@@ -174,6 +272,7 @@ Reject changes that create:
 - environment-specific architecture forks
 - visual realism that contradicts runtime truth
 - speculative multi-runtime sprawl without clear ownership
+- a separate long-lived Unity-only data model
 
 ## Final statement
 

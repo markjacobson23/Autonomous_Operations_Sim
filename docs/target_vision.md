@@ -12,7 +12,7 @@ The system should combine:
 
 - a Python simulator that owns authoritative world and runtime truth
 - a Unity runtime that embodies that truth in 3D motion, physics, rendering, and future sensor simulation
-- operator-facing surfaces that allow inspection, planning, command, replay, and analysis without becoming competing sources of truth
+- operator-facing clients that allow inspection, planning, command, replay, and analysis without becoming competing sources of truth
 
 ## What the project should become
 
