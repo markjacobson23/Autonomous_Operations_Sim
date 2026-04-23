@@ -1,7 +1,14 @@
 import { useMemo, useReducer } from "react";
 
 import type { SceneBounds } from "../adapters/mapViewport";
-import { fitCameraToBounds, focusPoints, panCamera, setSceneViewMode, zoomCamera } from "../adapters/mapViewport";
+import {
+  fitCameraToBounds,
+  focusPoints,
+  panCamera,
+  sceneViewPreset,
+  setSceneViewMode,
+  zoomCamera,
+} from "../adapters/mapViewport";
 import type { SelectionTarget } from "../adapters/selectionModel";
 
 export type FrontendModeId = "operate" | "traffic" | "fleet" | "editor" | "analyze";
@@ -25,6 +32,8 @@ export type FrontendUiState = {
     y: number;
     zoom: number;
     sceneViewMode: SceneViewMode;
+    azimuth: number;
+    polar: number;
   };
   layers: LayerState;
   selection: {
@@ -86,6 +95,7 @@ export function createDefaultFrontendUiState(): FrontendUiState {
       y: 0,
       zoom: 1,
       sceneViewMode: "iso",
+      ...sceneViewPreset("iso"),
     },
     layers: defaultLayers,
     selection: {
@@ -145,12 +155,12 @@ function frontendUiStateReducer(
     case "fit_scene":
       return {
         ...state,
-        camera: fitCameraToBounds(action.bounds, state.camera.sceneViewMode),
+        camera: fitCameraToBounds(action.bounds, state.camera),
       };
     case "focus_points":
       return {
         ...state,
-        camera: focusPoints(action.points, action.fallbackBounds, state.camera.sceneViewMode),
+        camera: focusPoints(action.points, action.fallbackBounds, state.camera),
       };
     case "set_scene_view_mode":
       return {

@@ -14,7 +14,7 @@ from autonomous_ops_sim.io.scenario_pack_runner import (
     discover_scenario_pack_paths,
     run_scenario_pack,
 )
-from autonomous_ops_sim.research.wrapper import (
+from archive.research.wrapper import (
     InteractionExperimentRun,
     InteractionExperimentSpec,
     ScenarioExperimentRunner,

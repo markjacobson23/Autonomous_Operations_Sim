@@ -56,10 +56,10 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
     }
 
     if (bundle.loadState === "ready" && !initialFitDoneRef.current) {
-      actions.fitScene(sceneBounds);
+      actions.setCamera(createInitialCamera(sceneBounds, uiState.camera.sceneViewMode));
       initialFitDoneRef.current = true;
     }
-  }, [actions, bundle.loadState, bundle.sessionIdentity.key, sceneBounds]);
+  }, [actions, bundle.loadState, bundle.sessionIdentity.key, sceneBounds, uiState.camera.sceneViewMode]);
 
   const hasRenderableScene =
     bundle.map.nodes.length > 0 ||
@@ -198,8 +198,7 @@ export function MapShell({ bundle, uiState, actions, activeRoutePreview }: MapSh
   }
 
   function handleResetView() {
-    actions.setSceneViewMode("iso");
-    actions.fitScene(sceneBounds);
+    actions.setCamera(createInitialCamera(sceneBounds, uiState.camera.sceneViewMode));
   }
 
   function handleSceneModeChange(sceneViewMode: FrontendUiState["camera"]["sceneViewMode"]) {

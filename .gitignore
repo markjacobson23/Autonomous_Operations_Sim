@@ -15,5 +15,5 @@ __pycache__/
 build/
 dist/
 node_modules/
-frontend/serious_ui/dist/
-frontend/serious_ui/node_modules/
+archive/serious_ui/dist/
+archive/serious_ui/node_modules/

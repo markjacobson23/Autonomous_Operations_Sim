@@ -14,6 +14,8 @@ export type CameraState = {
   y: number;
   zoom: number;
   sceneViewMode: SceneViewMode;
+  azimuth: number;
+  polar: number;
 };
 
 export type ViewBox = {
@@ -32,23 +34,59 @@ export type MinimapViewport = {
 
 const minZoom = 0.65;
 const maxZoom = 4;
+const defaultIsoAzimuth = Math.PI / 4;
+const defaultIsoPolar = 0.96;
+const defaultBirdseyeAzimuth = Math.PI / 4;
+const defaultBirdseyePolar = 0.34;
 
-export function createInitialCamera(bounds: SceneBounds, sceneViewMode: SceneViewMode = "iso"): CameraState {
-  return fitCameraToBounds(bounds, sceneViewMode);
+export function sceneViewPreset(sceneViewMode: SceneViewMode): Pick<CameraState, "azimuth" | "polar"> {
+  if (sceneViewMode === "birdseye") {
+    return {
+      azimuth: defaultBirdseyeAzimuth,
+      polar: defaultBirdseyePolar,
+    };
+  }
+
+  return {
+    azimuth: defaultIsoAzimuth,
+    polar: defaultIsoPolar,
+  };
 }
 
-export function fitCameraToBounds(bounds: SceneBounds, sceneViewMode: SceneViewMode = "iso"): CameraState {
+export function createInitialCamera(bounds: SceneBounds, sceneViewMode: SceneViewMode = "iso"): CameraState {
+  return fitCameraToBounds(bounds, {
+    sceneViewMode,
+    ...sceneViewPreset(sceneViewMode),
+  });
+}
+
+export function fitCameraToBounds(
+  bounds: SceneBounds,
+  cameraSeed: Pick<CameraState, "sceneViewMode" | "azimuth" | "polar"> = {
+    sceneViewMode: "iso",
+    ...sceneViewPreset("iso"),
+  },
+): CameraState {
   return {
     x: bounds.minX + bounds.width / 2,
     y: bounds.minY + bounds.height / 2,
     zoom: 1,
-    sceneViewMode,
+    sceneViewMode: cameraSeed.sceneViewMode,
+    azimuth: cameraSeed.azimuth,
+    polar: cameraSeed.polar,
   };
 }
 
-export function focusPoints(points: Point2[], fallbackBounds: SceneBounds, sceneViewMode: SceneViewMode): CameraState {
+export function focusPoints(
+  points: Point2[],
+  fallbackBounds: SceneBounds,
+  cameraSeed: Pick<CameraState, "sceneViewMode" | "azimuth" | "polar"> = {
+    sceneViewMode: "iso",
+    ...sceneViewPreset("iso"),
+  },
+): CameraState {
   if (points.length === 0) {
-    return fitCameraToBounds(fallbackBounds, sceneViewMode);
+    return fitCameraToBounds(fallbackBounds, cameraSeed);
   }
 
   const bounds = boundsFromPoints(points);
@@ -62,7 +100,9 @@ export function focusPoints(points: Point2[], fallbackBounds: SceneBounds, scene
     x: paddedBounds.minX + paddedBounds.width / 2,
     y: paddedBounds.minY + paddedBounds.height / 2,
     zoom,
-    sceneViewMode,
+    sceneViewMode: cameraSeed.sceneViewMode,
+    azimuth: cameraSeed.azimuth,
+    polar: cameraSeed.polar,
   };
 }
 
@@ -85,6 +125,7 @@ export function setSceneViewMode(camera: CameraState, sceneViewMode: SceneViewMo
   return {
     ...camera,
     sceneViewMode,
+    ...sceneViewPreset(sceneViewMode),
   };
 }
 

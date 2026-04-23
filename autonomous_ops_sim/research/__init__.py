@@ -6,7 +6,7 @@ from autonomous_ops_sim.research.comparison import (
     compare_interaction_experiments_on_scenario_pack,
     export_scenario_pack_comparison_json,
 )
-from autonomous_ops_sim.research.wrapper import (
+from archive.research.wrapper import (
     InteractionExperimentRun,
     InteractionExperimentSpec,
     ScenarioExperimentRunner,

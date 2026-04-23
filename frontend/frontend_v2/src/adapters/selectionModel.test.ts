@@ -163,7 +163,7 @@ function makeBundle(): JsonRecord {
 }
 
 const baseUiState: FrontendUiState = {
-  camera: { x: 0, y: 0, zoom: 1, sceneViewMode: "iso" },
+  camera: { x: 0, y: 0, zoom: 1, sceneViewMode: "iso", azimuth: Math.PI / 4, polar: 0.96 },
   layers: {
     roads: true,
     vehicles: true,

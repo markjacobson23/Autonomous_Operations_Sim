@@ -30,29 +30,12 @@ type SelectableMeta = {
   id: string | number;
 };
 
-type CameraPreset = {
-  azimuth: number;
-  polar: number;
-  radiusMultiplier: number;
-};
-
-const CAMERA_PRESETS: Record<"iso" | "birdseye", CameraPreset> = {
-  iso: {
-    azimuth: Math.PI / 4,
-    polar: 0.96,
-    radiusMultiplier: 1.85,
-  },
-  birdseye: {
-    azimuth: Math.PI / 4,
-    polar: 0.34,
-    radiusMultiplier: 1.45,
-  },
-};
-
 const BASE_ORTHO_HEIGHT = 100;
 const FIT_PADDING_FACTOR = 1.16;
 const MIN_CAMERA_ZOOM_FACTOR = 0.36;
 const MAX_CAMERA_ZOOM_FACTOR = 8.5;
+const ISO_ORBIT_RADIUS_SCALE = 1.85;
+const BIRDSEYE_ORBIT_RADIUS_SCALE = 1.45;
 
 export function LiveSceneCanvas3D({
   model,
@@ -77,6 +60,7 @@ export function LiveSceneCanvas3D({
   const sceneBoundsRef = useRef<SceneBounds>(model.map.sceneFrame.sceneBounds);
   const fitZoomRef = useRef<number>(1);
   const syncSignatureRef = useRef<string>("");
+  const cameraStateRef = useRef<CameraState>(camera);
   const pointerDownRef = useRef<{
     pointerId: number;
     clientX: number;
@@ -142,6 +126,12 @@ export function LiveSceneCanvas3D({
     controls.minZoom = 0.2;
     controls.maxZoom = 12;
     controls.addEventListener("change", () => {
+      cameraStateRef.current = readCameraStateFromControls(
+        controls,
+        orthoCamera,
+        fitZoomRef.current,
+        cameraStateRef.current.sceneViewMode,
+      );
       renderFrame();
       emitCameraState();
     });
@@ -230,19 +220,18 @@ export function LiveSceneCanvas3D({
       fitZoomRef.current = computeFitZoom(sceneBoundsRef.current, aspect);
       controls.minZoom = fitZoomRef.current * MIN_CAMERA_ZOOM_FACTOR;
       controls.maxZoom = fitZoomRef.current * MAX_CAMERA_ZOOM_FACTOR;
-      applyCameraState(camera, false);
+      applyCameraState(cameraStateRef.current, false);
       renderFrame();
     }
 
     function applyCameraState(nextCamera: CameraState, emit = true) {
       const sceneBounds = sceneBoundsRef.current;
       const aspect = Math.max(containerElement.clientWidth, 1) / Math.max(containerElement.clientHeight, 1);
-      const preset = CAMERA_PRESETS[nextCamera.sceneViewMode];
       const fitZoom = computeFitZoom(sceneBounds, aspect);
       fitZoomRef.current = fitZoom;
-      const orbitRadius = computeOrbitRadius(sceneBounds, preset.radiusMultiplier);
+      const orbitRadius = computeOrbitRadius(sceneBounds, orbitRadiusScaleFor(nextCamera.sceneViewMode));
       const target = new THREE.Vector3(nextCamera.x, nextCamera.y, 0);
-      const position = positionFromPreset(target, orbitRadius, preset.azimuth, preset.polar);
+      const position = positionFromAngles(target, orbitRadius, nextCamera.azimuth, nextCamera.polar);
       orthoCamera.position.copy(position);
       orthoCamera.zoom = clamp(fitZoom * nextCamera.zoom, fitZoom * MIN_CAMERA_ZOOM_FACTOR, fitZoom * MAX_CAMERA_ZOOM_FACTOR);
       orthoCamera.updateProjectionMatrix();
@@ -250,7 +239,8 @@ export function LiveSceneCanvas3D({
       controls.minZoom = fitZoom * MIN_CAMERA_ZOOM_FACTOR;
       controls.maxZoom = fitZoom * MAX_CAMERA_ZOOM_FACTOR;
       controls.update();
-      syncSignatureRef.current = cameraSignature(nextCamera);
+      cameraStateRef.current = readCameraStateFromControls(controls, orthoCamera, fitZoom, nextCamera.sceneViewMode);
+      syncSignatureRef.current = cameraSignature(cameraStateRef.current);
       if (emit) {
         emitCameraState();
       }
@@ -263,19 +253,19 @@ export function LiveSceneCanvas3D({
         return;
       }
 
-      const sceneViewMode = camera.sceneViewMode;
-      const nextCamera: CameraState = {
-        x: currentControls.target.x,
-        y: currentControls.target.y,
-        zoom: clamp(currentCamera.zoom / Math.max(fitZoomRef.current, 0.0001), MIN_CAMERA_ZOOM_FACTOR, MAX_CAMERA_ZOOM_FACTOR),
-        sceneViewMode,
-      };
+      const nextCamera = readCameraStateFromControls(
+        currentControls,
+        currentCamera,
+        fitZoomRef.current,
+        cameraStateRef.current.sceneViewMode,
+      );
       const nextSignature = cameraSignature(nextCamera);
       if (nextSignature === syncSignatureRef.current) {
         return;
       }
 
       syncSignatureRef.current = nextSignature;
+      cameraStateRef.current = nextCamera;
       onCameraChange(nextCamera);
     }
 
@@ -340,11 +330,13 @@ export function LiveSceneCanvas3D({
 
     sceneBoundsRef.current = model.map.sceneFrame.sceneBounds;
     buildScene(root, model, layers, selectionTarget, selectedVehicleIds, activeRoutePreview, activeMode);
+    cameraStateRef.current = camera;
     syncCameraToProps(camera);
     renderCurrentFrame();
   }, [activeMode, activeRoutePreview, layers, model, selectedVehicleIds, selectionTarget]);
 
   useEffect(() => {
+    cameraStateRef.current = camera;
     syncCameraToProps(camera);
     renderCurrentFrame();
   }, [camera]);
@@ -362,16 +354,21 @@ export function LiveSceneCanvas3D({
     const aspect = Math.max(containerRef.current?.clientWidth ?? 1, 1) / Math.max(containerRef.current?.clientHeight ?? 1, 1);
     const fitZoom = computeFitZoom(sceneBounds, aspect);
     fitZoomRef.current = fitZoom;
-    const preset = CAMERA_PRESETS[nextCamera.sceneViewMode];
-    const orbitRadius = computeOrbitRadius(sceneBounds, preset.radiusMultiplier);
+    const nextSignature = cameraSignature(nextCamera);
+    if (nextSignature === syncSignatureRef.current) {
+      return;
+    }
+    const orbitRadius = computeOrbitRadius(sceneBounds, orbitRadiusScaleFor(nextCamera.sceneViewMode));
     const target = new THREE.Vector3(nextCamera.x, nextCamera.y, 0);
     controls.target.copy(target);
-    cameraObject.position.copy(positionFromPreset(target, orbitRadius, preset.azimuth, preset.polar));
+    cameraObject.position.copy(positionFromAngles(target, orbitRadius, nextCamera.azimuth, nextCamera.polar));
     cameraObject.zoom = clamp(fitZoom * nextCamera.zoom, fitZoom * MIN_CAMERA_ZOOM_FACTOR, fitZoom * MAX_CAMERA_ZOOM_FACTOR);
     cameraObject.updateProjectionMatrix();
     controls.minZoom = fitZoom * MIN_CAMERA_ZOOM_FACTOR;
     controls.maxZoom = fitZoom * MAX_CAMERA_ZOOM_FACTOR;
-    syncSignatureRef.current = cameraSignature(nextCamera);
+    controls.update();
+    cameraStateRef.current = readCameraStateFromControls(controls, cameraObject, fitZoom, nextCamera.sceneViewMode);
+    syncSignatureRef.current = cameraSignature(cameraStateRef.current);
   }
 
   function renderCurrentFrame() {
@@ -783,7 +780,11 @@ function computeOrbitRadius(bounds: SceneBounds, radiusMultiplier: number): numb
   return Math.max(bounds.width, bounds.height, 1) * radiusMultiplier;
 }
 
-function positionFromPreset(
+function orbitRadiusScaleFor(sceneViewMode: CameraState["sceneViewMode"]): number {
+  return sceneViewMode === "birdseye" ? BIRDSEYE_ORBIT_RADIUS_SCALE : ISO_ORBIT_RADIUS_SCALE;
+}
+
+function positionFromAngles(
   target: THREE.Vector3,
   radius: number,
   azimuth: number,
@@ -804,7 +805,31 @@ function boundsCenter(bounds: SceneBounds): { x: number; y: number } {
 }
 
 function cameraSignature(camera: CameraState): string {
-  return `${camera.x.toFixed(3)}:${camera.y.toFixed(3)}:${camera.zoom.toFixed(3)}:${camera.sceneViewMode}`;
+  return [
+    camera.x.toFixed(3),
+    camera.y.toFixed(3),
+    camera.zoom.toFixed(3),
+    camera.azimuth.toFixed(3),
+    camera.polar.toFixed(3),
+    camera.sceneViewMode,
+  ].join(":");
+}
+
+function readCameraStateFromControls(
+  controls: OrbitControls,
+  camera: THREE.OrthographicCamera,
+  fitZoom: number,
+  sceneViewMode: CameraState["sceneViewMode"],
+): CameraState {
+  const target = controls.target;
+  return {
+    x: target.x,
+    y: target.y,
+    zoom: clamp(camera.zoom / fitZoom, MIN_CAMERA_ZOOM_FACTOR, MAX_CAMERA_ZOOM_FACTOR),
+    sceneViewMode,
+    azimuth: controls.getAzimuthalAngle(),
+    polar: controls.getPolarAngle(),
+  };
 }
 
 function worldFormSortRank(formType: LiveBundleViewModel["map"]["areas"][number]["formType"]): number {
