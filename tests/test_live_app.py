@@ -368,6 +368,101 @@ def test_live_app_frontend_server_supports_live_commands_and_session_control(
         server.stop()
 
 
+def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
+    tmp_path,
+) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
+    vehicle_id = bundle["snapshot"]["vehicles"][0]["vehicle_id"]
+    current_node_id = bundle["snapshot"]["vehicles"][0]["node_id"]
+    destination_node_id = bundle["map_surface"]["edges"][0]["end_node_id"]
+    current_edge_id = bundle["map_surface"]["edges"][0]["edge_id"]
+    server = LiveAppServer(artifacts.output_directory, artifacts=artifacts, port=0)
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/command",
+                data=json.dumps(
+                    {
+                        "command_type": "assign_vehicle_destination",
+                        "vehicle_id": vehicle_id,
+                        "destination_node_id": destination_node_id,
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+
+        bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
+        bootstrap_payload = json.loads(bootstrap_response.read().decode("utf-8"))
+        assert bootstrap_payload["ok"] is True
+        assert bootstrap_payload["bootstrap"]["metadata"]["surface_name"] == "unity_bootstrap"
+        assert bootstrap_payload["bootstrap"]["metadata"]["bridge_schema_version"] == 1
+        assert bootstrap_payload["bootstrap"]["authority"]["motion_authority"] == "python"
+        assert bootstrap_payload["bootstrap"]["vehicle_identity_map"][0]["vehicle_id"] == vehicle_id
+        assert bootstrap_payload["bootstrap"]["pending_route_intents"] == [
+            {
+                "command_type": "assign_vehicle_destination",
+                "destination_node_id": destination_node_id,
+                "vehicle_id": vehicle_id,
+            }
+        ]
+
+        telemetry_request_payload = {
+            "telemetry": {
+                "vehicle_id": vehicle_id,
+                "timestamp_s": 12.5,
+                "position": [1.0, 2.0, 3.0],
+                "speed": 4.25,
+                "heading_rad": 1.57,
+                "current_node_id": current_node_id,
+                "current_edge_id": current_edge_id,
+            }
+        }
+        telemetry_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/unity/telemetry",
+                data=json.dumps(telemetry_request_payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        telemetry_payload = json.loads(telemetry_response.read().decode("utf-8"))
+        assert telemetry_payload["ok"] is True
+        assert telemetry_payload["telemetry"]["telemetry_count"] == 1
+        assert telemetry_payload["telemetry"]["received_samples"][0]["vehicle_id"] == vehicle_id
+        assert telemetry_payload["telemetry"]["received_samples"][0]["position"] == [
+            1.0,
+            2.0,
+            3.0,
+        ]
+        assert server._runtime.latest_unity_telemetry_by_vehicle_id[vehicle_id][
+            "speed"
+        ] == 4.25
+
+        refreshed_bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
+        refreshed_bootstrap_payload = json.loads(
+            refreshed_bootstrap_response.read().decode("utf-8")
+        )
+        assert refreshed_bootstrap_payload["bootstrap"][
+            "latest_unity_telemetry_by_vehicle_id"
+        ][0]["vehicle_id"] == vehicle_id
+    finally:
+        server.stop()
+
+
 def test_live_app_defers_assign_destination_until_session_advances(tmp_path) -> None:
     frontend_dist = tmp_path / "dist"
     frontend_dist.mkdir()

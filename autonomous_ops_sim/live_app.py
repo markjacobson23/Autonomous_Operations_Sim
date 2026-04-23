@@ -45,6 +45,7 @@ from autonomous_ops_sim.simulation.commands import job_from_dict
 from autonomous_ops_sim.simulation.commands import command_to_dict
 from autonomous_ops_sim.simulation.scenario_executor import build_scenario_engine
 from autonomous_ops_sim.simulation.live_session import session_advance_to_dict
+from autonomous_ops_sim.world import build_world_model_surface, world_model_surface_to_dict
 from autonomous_ops_sim.visualization import export_serious_viewer_html
 from autonomous_ops_sim.visualization.command_center import RoutePreviewRequest
 from autonomous_ops_sim.visualization.state import VehicleSurfaceState
@@ -54,6 +55,7 @@ DEFAULT_LIVE_OUTPUT_DIRECTORY = Path("live_output")
 DEFAULT_LIVE_FRONTEND_DIST_DIRECTORY = Path("frontend/frontend_v2/dist")
 DEFAULT_LIVE_HOST = "127.0.0.1"
 DEFAULT_LIVE_SESSION_STEP_SECONDS = 0.5
+UNITY_BRIDGE_SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -86,6 +88,10 @@ class LiveSessionRuntime:
     session: LiveSimulationSession
     play_state: str = "paused"
     pending_route_commands: list[AssignVehicleDestinationCommand] = field(default_factory=list)
+    latest_unity_telemetry_by_vehicle_id: dict[int, dict[str, object]] = field(
+        default_factory=dict
+    )
+    unity_telemetry_history: list[dict[str, object]] = field(default_factory=list)
     playback_thread: threading.Thread | None = None
     playback_stop_event: threading.Event = field(default_factory=threading.Event)
     lock: threading.RLock = field(default_factory=threading.RLock)
@@ -115,6 +121,43 @@ class LiveSessionRuntime:
             )
             self._write_bundle(bundle)
             return bundle
+
+    def build_unity_bootstrap(self) -> dict[str, object]:
+        """Build the Unity-facing bootstrap projection without mutating runtime truth."""
+
+        with self.lock:
+            return _build_unity_bootstrap_record(
+                session=self.session,
+                source_scenario_path=self.artifacts.scenario_path,
+                working_scenario_path=self.artifacts.working_scenario_path,
+                pending_route_commands=self.pending_route_commands,
+                latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
+            )
+
+    def record_unity_telemetry(
+        self,
+        telemetry_samples: tuple[dict[str, object], ...],
+    ) -> dict[str, object]:
+        """Ingest Unity telemetry through one dedicated bridge update path."""
+
+        with self.lock:
+            normalized_samples = [
+                _normalize_unity_telemetry_sample(sample)
+                for sample in telemetry_samples
+            ]
+            for sample in normalized_samples:
+                vehicle_id = int(sample["vehicle_id"])
+                self.latest_unity_telemetry_by_vehicle_id[vehicle_id] = sample
+            self.unity_telemetry_history.extend(normalized_samples)
+            return {
+                "ok": True,
+                "telemetry_count": len(self.unity_telemetry_history),
+                "received_samples": normalized_samples,
+                "latest_telemetry_by_vehicle_id": [
+                    self.latest_unity_telemetry_by_vehicle_id[vehicle_id]
+                    for vehicle_id in sorted(self.latest_unity_telemetry_by_vehicle_id)
+                ],
+            }
 
     def apply_command(
         self,
@@ -381,6 +424,16 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
                 },
             )
             return
+        if parsed.path == "/api/unity/bootstrap":
+            self._write_json_response(
+                200,
+                {
+                    "ok": True,
+                    "bootstrap": self._runtime.build_unity_bootstrap(),
+                    "working_scenario_path": str(self._artifacts.working_scenario_path),
+                },
+            )
+            return
         super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802
@@ -391,6 +444,7 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
             "/api/live/preview",
             "/api/live/command",
             "/api/live/session/control",
+            "/api/unity/telemetry",
         }:
             self.send_error(404, "Unknown live authoring endpoint.")
             return
@@ -428,6 +482,9 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/live/session/control":
             self._handle_live_session_control(payload)
+            return
+        if parsed.path == "/api/unity/telemetry":
+            self._handle_unity_telemetry(payload)
             return
 
     def _read_json_payload(self) -> dict[str, object]:
@@ -743,6 +800,43 @@ class LiveAppRequestHandler(SimpleHTTPRequestHandler):
             },
         )
 
+    def _handle_unity_telemetry(self, payload: dict[str, object]) -> None:
+        try:
+            telemetry_samples = _unity_telemetry_samples_from_payload(payload)
+        except (KeyError, TypeError, ValueError) as exc:
+            self._write_json_response(
+                400,
+                {
+                    "ok": False,
+                    "message": str(exc),
+                    "validation_messages": [
+                        {
+                            "severity": "error",
+                            "code": "invalid_request",
+                            "message": str(exc),
+                        }
+                    ],
+                },
+            )
+            return
+
+        response = self._runtime.record_unity_telemetry(telemetry_samples)
+        self._write_json_response(
+            200,
+            {
+                "ok": True,
+                "bridge": {
+                    "schema_version": UNITY_BRIDGE_SCHEMA_VERSION,
+                    "transport": "http_json",
+                    "authority": "python",
+                    "telemetry_endpoint": "/api/unity/telemetry",
+                    "bootstrap_endpoint": "/api/unity/bootstrap",
+                },
+                "telemetry": response,
+                "working_scenario_path": str(self._artifacts.working_scenario_path),
+            },
+        )
+
 
 def export_live_app_artifacts(
     *,
@@ -924,6 +1018,174 @@ def _build_live_bundle_record(
         ],
     }
     return bundle
+
+
+def _build_unity_bootstrap_record(
+    *,
+    session: LiveSimulationSession,
+    source_scenario_path: Path,
+    working_scenario_path: Path,
+    pending_route_commands: tuple[AssignVehicleDestinationCommand, ...]
+    | list[AssignVehicleDestinationCommand] = (),
+    latest_unity_telemetry_by_vehicle_id: dict[int, dict[str, object]] | None = None,
+) -> dict[str, object]:
+    live_bundle = _build_live_bundle_record(
+        session=session,
+        source_scenario_path=source_scenario_path,
+        working_scenario_path=working_scenario_path,
+        pending_route_commands=pending_route_commands,
+    )
+    bootstrap = {
+        "metadata": {
+            "api_version": live_bundle["metadata"]["api_version"],
+            "surface_name": "unity_bootstrap",
+            "bridge_schema_version": UNITY_BRIDGE_SCHEMA_VERSION,
+            "transport": "http_json",
+        },
+        "authority": {
+            "runtime_owner": "python",
+            "motion_authority": "python",
+        },
+        "session": {
+            "seed": live_bundle["seed"],
+            "simulated_time_s": live_bundle["simulated_time_s"],
+            "play_state": live_bundle["session_control"]["play_state"],
+        },
+        "world": {
+            "map_surface": live_bundle["map_surface"],
+            "render_geometry": live_bundle["render_geometry"],
+            "world_model": world_model_surface_to_dict(
+                build_world_model_surface(session.engine.map)
+            ),
+        },
+        "runtime_vehicle_snapshot": live_bundle["snapshot"]["vehicles"],
+        "vehicle_identity_map": _unity_vehicle_identity_map(session),
+        "pending_route_intents": [
+            command_to_dict(command) for command in pending_route_commands
+        ],
+        "bridge_endpoints": {
+            "bootstrap_endpoint": "/api/unity/bootstrap",
+            "telemetry_endpoint": "/api/unity/telemetry",
+        },
+    }
+    if latest_unity_telemetry_by_vehicle_id:
+        bootstrap["latest_unity_telemetry_by_vehicle_id"] = [
+            latest_unity_telemetry_by_vehicle_id[vehicle_id]
+            for vehicle_id in sorted(latest_unity_telemetry_by_vehicle_id)
+        ]
+    return bootstrap
+
+
+def _unity_vehicle_identity_map(session: LiveSimulationSession) -> list[dict[str, object]]:
+    return [
+        {
+            "vehicle_id": vehicle.id,
+            "vehicle_type": getattr(vehicle.vehicle_type, "name", str(vehicle.vehicle_type)),
+            "current_node_id": vehicle.current_node_id,
+            "operational_state": vehicle.operational_state,
+            "is_active": getattr(vehicle, "is_active", True),
+        }
+        for vehicle in sorted(session.engine.vehicles, key=lambda vehicle: vehicle.id)
+    ]
+
+
+def _unity_telemetry_samples_from_payload(
+    payload: dict[str, object],
+) -> tuple[dict[str, object], ...]:
+    if "telemetry_samples" in payload:
+        telemetry_samples_payload = payload.get("telemetry_samples", ())
+        if not isinstance(telemetry_samples_payload, list):
+            raise ValueError("telemetry_samples must be a list of objects")
+        return tuple(
+            _unity_telemetry_sample_from_payload(sample, index=index)
+            for index, sample in enumerate(telemetry_samples_payload)
+        )
+    if "telemetry" in payload:
+        telemetry_payload = payload.get("telemetry")
+        if not isinstance(telemetry_payload, dict):
+            raise ValueError("telemetry must be an object")
+        return (_unity_telemetry_sample_from_payload(telemetry_payload),)
+    raise ValueError("Expected telemetry or telemetry_samples")
+
+
+def _unity_telemetry_sample_from_payload(
+    payload: dict[str, object],
+    *,
+    index: int | None = None,
+) -> dict[str, object]:
+    position = _payload_position(payload, "position")
+    sample: dict[str, object] = {
+        "vehicle_id": _payload_int(payload, "vehicle_id"),
+        "timestamp_s": _payload_float(payload, "timestamp_s"),
+        "position": list(position),
+        "speed": _payload_float(payload, "speed"),
+    }
+    heading_rad = payload.get("heading_rad")
+    if isinstance(heading_rad, (int, float)) and not isinstance(heading_rad, bool):
+        sample["heading_rad"] = float(heading_rad)
+    rotation = payload.get("rotation")
+    if isinstance(rotation, list):
+        sample["rotation"] = [
+            float(component)
+            for component in rotation
+            if isinstance(component, (int, float)) and not isinstance(component, bool)
+        ]
+    current_node_id = _payload_optional_int(payload, "current_node_id")
+    if current_node_id is not None:
+        sample["current_node_id"] = current_node_id
+    current_edge_id = _payload_optional_int(payload, "current_edge_id")
+    if current_edge_id is not None:
+        sample["current_edge_id"] = current_edge_id
+    if index is not None:
+        sample["sample_index"] = index
+    return sample
+
+
+def _normalize_unity_telemetry_sample(sample: dict[str, object]) -> dict[str, object]:
+    normalized_sample = dict(sample)
+    normalized_sample["vehicle_id"] = int(normalized_sample["vehicle_id"])
+    normalized_sample["timestamp_s"] = float(normalized_sample["timestamp_s"])
+    normalized_sample["position"] = [
+        float(component) for component in normalized_sample["position"]  # type: ignore[arg-type]
+    ]
+    normalized_sample["speed"] = float(normalized_sample["speed"])
+    if "heading_rad" in normalized_sample:
+        normalized_sample["heading_rad"] = float(normalized_sample["heading_rad"])
+    if "rotation" in normalized_sample:
+        normalized_sample["rotation"] = [
+            float(component) for component in normalized_sample["rotation"]  # type: ignore[arg-type]
+        ]
+    if "current_node_id" in normalized_sample:
+        normalized_sample["current_node_id"] = int(normalized_sample["current_node_id"])
+    if "current_edge_id" in normalized_sample:
+        normalized_sample["current_edge_id"] = int(normalized_sample["current_edge_id"])
+    if "sample_index" in normalized_sample:
+        normalized_sample["sample_index"] = int(normalized_sample["sample_index"])
+    return normalized_sample
+
+
+def _payload_optional_int(payload: dict[str, object], key: str) -> int | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise ValueError(f"{key} must be numeric")
+    return int(value)
+
+
+def _payload_position(
+    payload: dict[str, object],
+    key: str,
+) -> tuple[float, float, float]:
+    value = payload.get(key)
+    if not isinstance(value, list) or len(value) != 3:
+        raise ValueError(f"{key} must be a list of three numeric values")
+    coordinates: list[float] = []
+    for index, component in enumerate(value):
+        if isinstance(component, bool) or not isinstance(component, (int, float, str)):
+            raise ValueError(f"{key}[{index}] must be numeric")
+        coordinates.append(float(component))
+    return (coordinates[0], coordinates[1], coordinates[2])
 
 
 def _build_live_command_result(
