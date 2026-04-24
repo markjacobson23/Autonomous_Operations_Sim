@@ -13,54 +13,53 @@ If this file conflicts with those docs, the canonical docs win.
 
 ## Active roadmap item
 
-Phase 4 — Route execution in Unity
+Phase 5 — Terrain and physics embodiment
 
 ## Objective
 
-Implement the first end-to-end route execution slice where Unity can follow backend-issued route intent instead of only consuming a bootstrap snapshot.
+Make Unity route execution physically meaningful enough to surface operationally relevant outcomes back to Python.
 
-This task is about route-following over backend truth, not about advanced physics, terrain realism, collision handling, or ML/AI behavior.
+This task is about introducing the first terrain/physics embodiment seam, not about full realism.
 
 ## Why this task exists
 
-Phases 1–3 established:
+Phases 1–4 established:
 
 - a canonical Python ↔ Unity bridge
-- a real-simulator Unity bootstrap
+- real simulator bootstrap
 - explicit motion authority
-- a dedicated Unity bridge module
+- Unity-side route execution over backend-issued routes
+- backend-visible route progress and completion
 
-The next required step is to make Unity execute backend-issued route intent in a minimal but real way.
+The next required step is to make Unity execution produce physically meaningful outcomes rather than pure placeholder kinematic movement.
 
 The system must now support:
 
-- Python computing and owning route intent
-- Unity consuming that route intent as waypoints or ordered route nodes
-- Unity reporting route progress back through the canonical bridge
-- Python tracking progress without surrendering operational truth
+- terrain-aware or scene-aware movement constraints
+- basic collision or blockage detection
+- backend-visible exception/blockage signals
+- operational consequences that remain Python-owned
 
 ## In scope
 
-- expose backend-issued route-following data in the canonical Unity bridge
-- provide enough ordered route/waypoint information for Unity to follow a route
-- implement minimal Unity-side route following for placeholder vehicles
-- report route progress and arrival/completion back to Python through the canonical bridge
-- keep progress and completion semantics explicit and backend-visible
-- preserve stable vehicle identity mapping
+- add a minimal terrain/physics embodiment layer to the Unity route-following path
+- introduce basic collision or blockage detection for Unity-controlled vehicles
+- report blockage/exception state back through the canonical telemetry bridge
+- expose backend-visible embodiment status through the canonical Unity bridge state
+- keep Unity movement simple but no longer purely abstract waypoint motion
+- preserve route-following behavior from Phase 4
 - preserve Python-motion mode unchanged
-- make Unity-route execution apply only where motion authority and current bridge semantics allow it
 
 ## Out of scope
 
-- do not remove or break Python motion
-- do not redesign routing or dispatch logic
+- do not redesign routing or dispatch
 - do not move route legality into Unity
+- do not implement advanced vehicle dynamics
+- do not implement realistic tire/suspension/traction simulation
+- do not add ML-Agents, sensors, or advanced autonomy logic
+- do not introduce a second reporting channel
 - do not redesign the world model
-- do not add terrain-aware driving yet
-- do not add collision/blockage physics yet unless a tiny placeholder status is strictly needed
-- do not add WebSockets or gRPC yet
-- do not add ML-Agents, sensors, or advanced vehicle controllers yet
-- do not implement per-vehicle authority switching unless a tiny seam is required for future support
+- do not remove Python fallback behavior
 
 ## Architectural constraints
 
@@ -72,66 +71,42 @@ The system must now support:
   - command truth
   - session truth
 
-- Unity may execute route motion only as an embodied client/runtime layer
+- Unity may surface physically meaningful execution outcomes, but must not become the source of operational truth
 
-- Unity route-following data must be derived from backend route truth, not invented locally
+- Terrain/physics effects must feed back into Python through the canonical bridge
 
-- The canonical bridge must remain the only Python ↔ Unity bridge path
+- Unity must not invent new operational states that bypass backend visibility
 
 ## Required backend behavior
 
-### Route intent for Unity
+### Embodiment feedback
 
-The canonical Unity bootstrap or related canonical bridge payload should expose enough backend-derived route information for Unity to follow a route for a vehicle under Unity motion authority.
+The backend telemetry/bridge path must support the first meaningful embodiment signals, such as:
 
-At minimum, Unity should be able to determine:
+- blocked or obstructed movement
+- collision or contact event
+- inability to reach the next waypoint under current local conditions
+- route execution exception state if needed
 
-- which vehicle has an active backend-issued route
-- the ordered route nodes and/or waypoint positions
-- the current destination / target node
-- when the backend considers the route pending vs active vs complete if such state is already available
+These signals must be stored in Python-owned runtime state and be visible through the canonical bridge.
 
-### Progress feedback
+### Operational consequences
 
-Unity must report route-following progress back to Python through the canonical telemetry/bridge path.
+The backend should be able to observe that Unity route execution is no longer proceeding normally.
 
-At minimum, the bridge should support reporting:
-
-- vehicle id
-- current position/speed/timestamp
-- current route progress signal
-- current target waypoint/node if known
-- arrival/completion signal when the route is finished
-
-This task may extend the telemetry contract if needed, but must do so through the existing canonical bridge path rather than inventing a second reporting channel.
-
-### Python-motion mode
-
-In Python-motion mode:
-
-- existing behavior must remain unchanged
-- Unity route-following logic must not become authoritative
-
-### Unity-motion mode
-
-In Unity-motion mode:
-
-- Unity may follow backend-issued route data
-- Python still owns operational/task/command truth
-- progress and completion must remain backend-visible and must not bypass Python session truth
+This task does not need to fully solve backend replanning or policy response, but it must make those conditions visible and structurally usable later.
 
 ## Unity-side expectations
 
 If the Unity project is present in the workspace, Unity should:
 
-- consume the route-following data from the canonical bootstrap/bridge payload
-- move placeholder vehicles along the ordered route in a minimal, deterministic way
-- preserve stable `vehicle_id` identity
-- avoid taking over backend concepts like command legality or task truth
-- report progress back to Python through the existing bridge
+- move route-following vehicles in a slightly more embodied way than pure abstract waypoint snapping
+- use minimal built-in physics or collision-aware movement where appropriate
+- detect when movement is blocked or colliding
+- report that state back through the existing telemetry bridge
+- keep placeholder visuals acceptable
 
-Minimal placeholder movement is acceptable.
-This phase is about route execution semantics, not realism.
+This phase is about meaningful execution signals, not polished realism.
 
 ## Allowed files to change
 
@@ -140,8 +115,8 @@ Only the minimum files needed for this slice.
 Expected categories:
 - `autonomous_ops_sim/unity_bridge.py`
 - `autonomous_ops_sim/live_app.py`
-- tests covering route-following bridge behavior
-- Unity bootstrap/runtime consumer code for minimal route execution
+- tests covering embodiment/blockage feedback
+- Unity route-following/runtime code for minimal terrain/physics embodiment
 - tiny glue changes required by the canonical bridge
 
 ## Files that must not be broadly rewritten
@@ -150,25 +125,24 @@ Expected categories:
 - routing/dispatch architecture
 - unrelated frontend/operator files
 - unrelated simulation subsystems
-- full terrain/physics systems
-- unrelated Unity scene systems
+- large Unity scene systems unrelated to route execution
 
 ## Deliverables
 
-1. Backend-derived route-following data exposed through the canonical bridge
-2. Minimal Unity-side route execution over backend-issued route intent
-3. Progress/completion reporting back to Python through the canonical bridge
-4. Tests validating backend-side route/progress contract behavior
+1. Minimal terrain/physics-aware Unity route execution
+2. Canonical bridge support for blockage/exception feedback
+3. Backend-visible embodiment status stored in Python-owned runtime state
+4. Tests validating backend-side embodiment feedback behavior
 5. Existing Python-only and Python-motion paths still working
 
 ## Acceptance criteria
 
 This task is complete when:
 
-- Unity can follow backend-issued routes in a minimal way
-- route data is clearly derived from backend truth
-- route progress and arrival/completion are reported back to Python
-- Python can track route progress without surrendering operational truth
+- Unity execution can surface physically meaningful blockage/exception outcomes
+- those outcomes are reported back to Python through the canonical bridge
+- Python can observe embodiment failures without surrendering operational truth
+- route execution still works in the non-blocked case
 - the existing bridge remains canonical
 - Python-motion mode still works unchanged
 
@@ -176,15 +150,14 @@ This task is complete when:
 
 Prefer:
 
-- explicit route/progress contracts
-- additive seams over redesign
-- minimal placeholder movement over ambitious realism
-- behavioral clarity over visual polish
+- meaningful embodiment signals over ambitious realism
+- explicit backend-visible status over local Unity-only behavior
+- small, testable seams
+- reversible changes
 
 Reject:
 
-- Unity-owned route legality
-- local route invention in Unity
-- second bridge/reporting channels
-- premature terrain/physics complexity
+- Unity-owned operational truth
+- second reporting channels
+- advanced realism before operational usefulness
 - giant rewrites

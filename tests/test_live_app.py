@@ -447,6 +447,10 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
         assert bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
             "waypoints"
         ][0]["node_id"] == current_node_id
+        assert bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
+            "embodiment_state"
+        ] == "inactive"
+        assert bootstrap_payload["bootstrap"]["world"]["blocked_edge_ids"] == []
         assert bootstrap_payload["bootstrap"]["runtime_vehicle_snapshot"][0][
             "vehicle_id"
         ] == vehicle_id
@@ -468,6 +472,7 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
                 "route_progress": 0.4,
                 "current_target_node_id": destination_node_id,
                 "current_waypoint_index": 1,
+                "embodiment_state": "moving",
             }
         }
         telemetry_response = request.urlopen(
@@ -488,6 +493,10 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
             == "observational_motion_signal"
         )
         assert "route_status" in telemetry_payload["telemetry"]["guardrails"]["accepted_fields"]
+        assert "embodiment_state" in telemetry_payload["telemetry"]["guardrails"]["accepted_fields"]
+        assert "latest_unity_embodiment_status_by_vehicle_id" in telemetry_payload["telemetry"][
+            "guardrails"
+        ]["backend_state_updates"]
         assert "task_identity" in telemetry_payload["telemetry"]["guardrails"][
             "telemetry_must_not_overwrite"
         ]
@@ -506,6 +515,9 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
         assert server._runtime.latest_unity_route_progress_by_vehicle_id[vehicle_id][
             "current_target_node_id"
         ] == destination_node_id
+        assert server._runtime.latest_unity_embodiment_status_by_vehicle_id[vehicle_id][
+            "embodiment_state"
+        ] == "moving"
 
         refreshed_bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
         refreshed_bootstrap_payload = json.loads(
@@ -517,6 +529,9 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
         assert refreshed_bootstrap_payload["bootstrap"][
             "latest_unity_route_progress_by_vehicle_id"
         ][0]["route_status"] == "active"
+        assert refreshed_bootstrap_payload["bootstrap"][
+            "latest_unity_embodiment_status_by_vehicle_id"
+        ][0]["embodiment_state"] == "moving"
     finally:
         server.stop()
 
@@ -548,6 +563,7 @@ def test_live_app_frontend_server_exposes_unity_motion_authority_explicitly(tmp_
         assert bootstrap_payload["ok"] is True
         assert bootstrap_payload["bootstrap"]["authority"]["motion_authority"] == "unity"
         assert bootstrap_payload["bootstrap"]["session"]["motion_authority"] == "unity"
+        assert bootstrap_payload["bootstrap"]["runtime"]["route_following"] == []
         assert server._runtime.motion_authority == "unity"
 
         telemetry_response = request.urlopen(
@@ -660,8 +676,14 @@ def test_live_app_frontend_server_projects_unity_route_completion_back_to_backen
         assert telemetry_payload["telemetry"]["latest_route_progress_by_vehicle_id"][0][
             "route_completed"
         ] is True
+        assert telemetry_payload["telemetry"]["latest_embodiment_status_by_vehicle_id"][0][
+            "embodiment_state"
+        ] == "complete"
         assert server._runtime.latest_unity_route_progress_by_vehicle_id[vehicle_id][
             "route_status"
+        ] == "complete"
+        assert server._runtime.latest_unity_embodiment_status_by_vehicle_id[vehicle_id][
+            "embodiment_state"
         ] == "complete"
 
         refreshed_bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
@@ -671,6 +693,112 @@ def test_live_app_frontend_server_projects_unity_route_completion_back_to_backen
         assert refreshed_bootstrap_payload["bootstrap"]["latest_unity_route_progress_by_vehicle_id"][0][
             "route_status"
         ] == "complete"
+        assert refreshed_bootstrap_payload["bootstrap"]["latest_unity_embodiment_status_by_vehicle_id"][0][
+            "embodiment_state"
+        ] == "complete"
+    finally:
+        server.stop()
+
+
+def test_live_app_frontend_server_projects_blocked_embodiment_state(
+    tmp_path,
+) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
+    vehicle_id = bundle["snapshot"]["vehicles"][0]["vehicle_id"]
+    destination_node_id = bundle["map_surface"]["edges"][0]["end_node_id"]
+    blocker_edge_id = bundle["map_surface"]["edges"][1]["edge_id"]
+    server = LiveAppServer(
+        artifacts.output_directory,
+        artifacts=artifacts,
+        motion_authority="unity",
+        port=0,
+    )
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/command",
+                data=json.dumps(
+                    {
+                        "command_type": "assign_vehicle_destination",
+                        "vehicle_id": vehicle_id,
+                        "destination_node_id": destination_node_id,
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+
+        blocked_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/unity/telemetry",
+                data=json.dumps(
+                    {
+                        "telemetry": {
+                            "vehicle_id": vehicle_id,
+                            "timestamp_s": 4.2,
+                            "position": [0.2, 0.0, 0.1],
+                            "speed": 0.0,
+                            "route_status": "blocked",
+                            "route_progress": 0.1,
+                            "blockage_reason": "blocked_edge",
+                            "blockage_edge_id": blocker_edge_id,
+                            "blockage_node_id": destination_node_id,
+                            "exception_code": "movement_blocked",
+                            "embodiment_state": "blocked",
+                        }
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        blocked_payload = json.loads(blocked_response.read().decode("utf-8"))
+        assert blocked_payload["telemetry"]["latest_route_progress_by_vehicle_id"][0][
+            "route_status"
+        ] == "blocked"
+        assert blocked_payload["telemetry"]["latest_route_progress_by_vehicle_id"][0][
+            "blockage_edge_id"
+        ] == blocker_edge_id
+        assert blocked_payload["telemetry"]["latest_route_progress_by_vehicle_id"][0][
+            "exception_code"
+        ] == "movement_blocked"
+        assert blocked_payload["telemetry"]["latest_embodiment_status_by_vehicle_id"][0][
+            "blockage_reason"
+        ] == "blocked_edge"
+        assert blocked_payload["telemetry"]["latest_embodiment_status_by_vehicle_id"][0][
+            "embodiment_state"
+        ] == "blocked"
+        assert server._runtime.latest_unity_route_progress_by_vehicle_id[vehicle_id][
+            "blockage_edge_id"
+        ] == blocker_edge_id
+        assert server._runtime.latest_unity_embodiment_status_by_vehicle_id[vehicle_id][
+            "blockage_edge_id"
+        ] == blocker_edge_id
+        assert server._runtime.unity_embodiment_history[-1]["embodiment_state"] == "blocked"
+
+        refreshed_bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
+        refreshed_bootstrap_payload = json.loads(
+            refreshed_bootstrap_response.read().decode("utf-8")
+        )
+        assert refreshed_bootstrap_payload["bootstrap"][
+            "latest_unity_embodiment_status_by_vehicle_id"
+        ][0]["embodiment_state"] == "blocked"
+        assert refreshed_bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
+            "embodiment_state"
+        ] == "blocked"
     finally:
         server.stop()
 

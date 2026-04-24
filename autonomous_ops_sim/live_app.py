@@ -55,6 +55,7 @@ from autonomous_ops_sim.unity_bridge import (
     normalize_session_motion_authority,
     normalize_unity_telemetry_sample,
     unity_route_progress_from_telemetry_sample,
+    unity_embodiment_status_from_telemetry_sample,
     telemetry_guardrails_for_motion_authority,
     unity_telemetry_samples_from_payload,
 )
@@ -101,6 +102,10 @@ class LiveSessionRuntime:
         default_factory=dict
     )
     unity_route_progress_history: list[dict[str, object]] = field(default_factory=list)
+    latest_unity_embodiment_status_by_vehicle_id: dict[int, dict[str, object]] = field(
+        default_factory=dict
+    )
+    unity_embodiment_history: list[dict[str, object]] = field(default_factory=list)
     latest_unity_telemetry_by_vehicle_id: dict[int, dict[str, object]] = field(
         default_factory=dict
     )
@@ -169,6 +174,7 @@ class LiveSessionRuntime:
                 working_scenario_path=self.artifacts.working_scenario_path,
                 pending_route_commands=self.pending_route_commands,
                 latest_unity_route_progress_by_vehicle_id=self.latest_unity_route_progress_by_vehicle_id,
+                latest_unity_embodiment_status_by_vehicle_id=self.latest_unity_embodiment_status_by_vehicle_id,
                 latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
                 motion_authority=self.motion_authority,
             )
@@ -191,6 +197,10 @@ class LiveSessionRuntime:
                 if route_progress is not None:
                     self.latest_unity_route_progress_by_vehicle_id[vehicle_id] = route_progress
                     self.unity_route_progress_history.append(route_progress)
+                embodiment_status = unity_embodiment_status_from_telemetry_sample(sample)
+                if embodiment_status is not None:
+                    self.latest_unity_embodiment_status_by_vehicle_id[vehicle_id] = embodiment_status
+                    self.unity_embodiment_history.append(embodiment_status)
             self.unity_telemetry_history.extend(normalized_samples)
             return {
                 "ok": True,
@@ -203,6 +213,10 @@ class LiveSessionRuntime:
                 "latest_route_progress_by_vehicle_id": [
                     self.latest_unity_route_progress_by_vehicle_id[vehicle_id]
                     for vehicle_id in sorted(self.latest_unity_route_progress_by_vehicle_id)
+                ],
+                "latest_embodiment_status_by_vehicle_id": [
+                    self.latest_unity_embodiment_status_by_vehicle_id[vehicle_id]
+                    for vehicle_id in sorted(self.latest_unity_embodiment_status_by_vehicle_id)
                 ],
                 "motion_authority": self.motion_authority,
                 "guardrails": telemetry_guardrails_for_motion_authority(
@@ -340,6 +354,8 @@ class LiveSessionRuntime:
             self.pending_route_commands = []
             self.latest_unity_route_progress_by_vehicle_id = {}
             self.unity_route_progress_history = []
+            self.latest_unity_embodiment_status_by_vehicle_id = {}
+            self.unity_embodiment_history = []
             self.latest_unity_telemetry_by_vehicle_id = {}
             self.unity_telemetry_history = []
             return self._refresh_locked(
@@ -362,8 +378,8 @@ class LiveSessionRuntime:
             route_preview_requests=route_preview_requests,
             play_state=self.play_state,
             pending_route_commands=self.pending_route_commands,
-            motion_authority=self.motion_authority,
-        )
+                motion_authority=self.motion_authority,
+            )
         self._write_bundle(bundle)
         return bundle
 
