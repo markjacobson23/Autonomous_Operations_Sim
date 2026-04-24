@@ -94,6 +94,10 @@ export function OperateRail({
     selectedVehicleLead !== null
       ? bundle.commandCenter.vehicleInspections.find((entry) => entry.vehicleId === selectedVehicleLead) ?? null
       : null;
+  const selectedOperatorVehicle =
+    selectedVehicleLead !== null
+      ? bundle.operatorState.vehicles.find((entry) => entry.vehicleId === selectedVehicleLead) ?? null
+      : null;
   const selectedPlan =
     routePlans.find((entry) => entry.id === activeRoutePlanId) ?? routePlans[0] ?? null;
 
@@ -119,6 +123,10 @@ export function OperateRail({
   const hazardSignals = bundle.alerts.filter((alert) => alert.toLowerCase().includes("anomaly"));
   const congestionSignals = bundle.alerts.filter((alert) => alert.toLowerCase().includes("congested"));
   const selectedVehicleSummary = summarizeVehicleIds(selectedVehicleIds);
+  const selectedOperatorSummary =
+    selectedOperatorVehicle === null
+      ? null
+      : summarizeOperatorVehicle(selectedOperatorVehicle);
   const selectedRoadSummary =
     selectedRoad === null
       ? "Select a road on the map to prime the road control entry point."
@@ -1138,6 +1146,7 @@ function humanizePreviewReason(reason: string): string {
           The command center stays grounded in the current bundle, selection, and authoritative session state.
         </p>
         <div className="operate-chip-row">
+          <span className="operate-chip operate-chip-muted">Motion authority: {bundle.operatorState.motionAuthority}</span>
           {selectedVehicles.length > 0 ? (
             selectedVehicles.map((vehicle) => (
               <span key={vehicle.vehicleId} className="operate-chip">
@@ -1150,6 +1159,7 @@ function humanizePreviewReason(reason: string): string {
         </div>
         <div className="minimap-context-strip">
           {bundle.alerts.length > 0 ? <span>{bundle.alerts[0]}</span> : <span>No active alerts.</span>}
+          {selectedOperatorSummary !== null ? <span>{selectedOperatorSummary}</span> : null}
           {congestionSignals.length > 0 ? <span>{congestionSignals[0]}</span> : null}
           {hazardSignals.length > 0 ? <span>{hazardSignals[0]}</span> : null}
           <span>{queueCount > 0 ? `${queueCount} selected vehicle(s) waiting` : "No selected queue pressure."}</span>
@@ -1172,6 +1182,21 @@ function createCommandFeedback(
     message,
     detail,
   };
+}
+
+function summarizeOperatorVehicle(vehicle: {
+  vehicleId: number;
+  routeStatus: string | null;
+  routeProgress: number | null;
+  embodimentState: string | null;
+  blockageReason: string | null;
+  exceptionCode: string | null;
+}): string {
+  const progress = vehicle.routeProgress === null ? "unknown progress" : `${Math.round(vehicle.routeProgress * 100)}%`;
+  const routeStatus = vehicle.routeStatus ?? "no route";
+  const embodimentState = vehicle.embodimentState ?? "unknown embodiment";
+  const blockage = vehicle.blockageReason ?? vehicle.exceptionCode;
+  return `Vehicle ${vehicle.vehicleId} · ${routeStatus} · ${progress} · ${embodimentState}${blockage ? ` · ${blockage}` : ""}`;
 }
 
 async function submitJson(endpoint: string, payload: JsonRecord): Promise<{

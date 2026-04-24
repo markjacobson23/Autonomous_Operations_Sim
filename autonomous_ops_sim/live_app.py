@@ -51,6 +51,7 @@ from autonomous_ops_sim.visualization.state import VehicleSurfaceState
 from autonomous_ops_sim.unity_bridge import (
     DEFAULT_SESSION_MOTION_AUTHORITY,
     build_unity_bootstrap_record,
+    build_unity_operator_state_record,
     build_unity_telemetry_response,
     normalize_session_motion_authority,
     normalize_unity_telemetry_sample,
@@ -151,6 +152,9 @@ class LiveSessionRuntime:
                 play_state=self.play_state,
                 pending_route_commands=self.pending_route_commands,
                 motion_authority=self.motion_authority,
+                latest_unity_route_progress_by_vehicle_id=self.latest_unity_route_progress_by_vehicle_id,
+                latest_unity_embodiment_status_by_vehicle_id=self.latest_unity_embodiment_status_by_vehicle_id,
+                latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
             )
             self._write_bundle(bundle)
             return bundle
@@ -166,6 +170,9 @@ class LiveSessionRuntime:
                 play_state=self.play_state,
                 pending_route_commands=self.pending_route_commands,
                 motion_authority=self.motion_authority,
+                latest_unity_route_progress_by_vehicle_id=self.latest_unity_route_progress_by_vehicle_id,
+                latest_unity_embodiment_status_by_vehicle_id=self.latest_unity_embodiment_status_by_vehicle_id,
+                latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
             )
             return build_unity_bootstrap_record(
                 session=self.session,
@@ -202,6 +209,7 @@ class LiveSessionRuntime:
                     self.latest_unity_embodiment_status_by_vehicle_id[vehicle_id] = embodiment_status
                     self.unity_embodiment_history.append(embodiment_status)
             self.unity_telemetry_history.extend(normalized_samples)
+            self._refresh_locked()
             return {
                 "ok": True,
                 "telemetry_count": len(self.unity_telemetry_history),
@@ -378,8 +386,15 @@ class LiveSessionRuntime:
             route_preview_requests=route_preview_requests,
             play_state=self.play_state,
             pending_route_commands=self.pending_route_commands,
-                motion_authority=self.motion_authority,
-            )
+            motion_authority=self.motion_authority,
+            latest_unity_route_progress_by_vehicle_id=(
+                self.latest_unity_route_progress_by_vehicle_id
+            ),
+            latest_unity_embodiment_status_by_vehicle_id=(
+                self.latest_unity_embodiment_status_by_vehicle_id
+            ),
+            latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
+        )
         self._write_bundle(bundle)
         return bundle
 
@@ -943,6 +958,9 @@ def export_live_app_artifacts(
                 source_scenario_path=scenario_file,
                 working_scenario_path=working_scenario_path,
                 motion_authority=initial_session.motion_authority,
+                latest_unity_route_progress_by_vehicle_id={},
+                latest_unity_embodiment_status_by_vehicle_id={},
+                latest_unity_telemetry_by_vehicle_id={},
             ),
             indent=2,
             sort_keys=True,
@@ -972,6 +990,9 @@ def export_live_app_artifacts(
             source_scenario_path=scenario_file,
             working_scenario_path=working_scenario_path,
             motion_authority=initial_session.motion_authority,
+            latest_unity_route_progress_by_vehicle_id={},
+            latest_unity_embodiment_status_by_vehicle_id={},
+            latest_unity_telemetry_by_vehicle_id={},
         ),
         launch_path,
         title=f"Autonomous Ops Live Session ({load_scenario(scenario_file).name})",
@@ -1055,6 +1076,9 @@ def _build_live_bundle_record(
     pending_route_commands: tuple[AssignVehicleDestinationCommand, ...]
     | list[AssignVehicleDestinationCommand] = (),
     motion_authority: str = DEFAULT_SESSION_MOTION_AUTHORITY,
+    latest_unity_route_progress_by_vehicle_id: dict[int, dict[str, object]] | None = None,
+    latest_unity_embodiment_status_by_vehicle_id: dict[int, dict[str, object]] | None = None,
+    latest_unity_telemetry_by_vehicle_id: dict[int, dict[str, object]] | None = None,
 ) -> dict[str, object]:
     normalized_motion_authority = normalize_session_motion_authority(motion_authority)
     bundle = live_session_bundle_to_dict(
@@ -1092,6 +1116,21 @@ def _build_live_bundle_record(
             command_to_dict(command) for command in pending_route_commands
         ],
     }
+    bundle["operator_state"] = build_unity_operator_state_record(
+        session=session,
+        live_bundle=bundle,
+        pending_route_commands=pending_route_commands,
+        latest_unity_route_progress_by_vehicle_id=(
+            latest_unity_route_progress_by_vehicle_id or {}
+        ),
+        latest_unity_embodiment_status_by_vehicle_id=(
+            latest_unity_embodiment_status_by_vehicle_id or {}
+        ),
+        latest_unity_telemetry_by_vehicle_id=(
+            latest_unity_telemetry_by_vehicle_id or {}
+        ),
+        motion_authority=normalized_motion_authority,
+    )
     return bundle
 
 

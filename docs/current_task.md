@@ -13,53 +13,56 @@ If this file conflicts with those docs, the canonical docs win.
 
 ## Active roadmap item
 
-Phase 5 — Terrain and physics embodiment
+Phase 6 — Operator integration
 
 ## Objective
 
-Make Unity route execution physically meaningful enough to surface operationally relevant outcomes back to Python.
+Expose Unity route progress, embodiment state, and blockage state through operator-facing surfaces without creating shadow truth.
 
-This task is about introducing the first terrain/physics embodiment seam, not about full realism.
+This task is about making the browser/operator flow understand what Unity is doing and what it is reporting, while keeping Python as the only authority.
 
 ## Why this task exists
 
-Phases 1–4 established:
+Phases 1–5 established:
 
 - a canonical Python ↔ Unity bridge
 - real simulator bootstrap
 - explicit motion authority
-- Unity-side route execution over backend-issued routes
-- backend-visible route progress and completion
+- Unity route execution over backend-issued routes
+- backend-visible route progress
+- backend-visible embodiment and blockage state
 
-The next required step is to make Unity execution produce physically meaningful outcomes rather than pure placeholder kinematic movement.
+The next required step is to make those states visible and usable to operators.
 
 The system must now support:
 
-- terrain-aware or scene-aware movement constraints
-- basic collision or blockage detection
-- backend-visible exception/blockage signals
-- operational consequences that remain Python-owned
+- inspecting Unity-driven progress from operator-facing read models
+- seeing embodiment/blockage state in live views
+- keeping command and replay flows coherent while Unity handles embodiment
+- avoiding any client-side interpretation layer that becomes competing truth
 
 ## In scope
 
-- add a minimal terrain/physics embodiment layer to the Unity route-following path
-- introduce basic collision or blockage detection for Unity-controlled vehicles
-- report blockage/exception state back through the canonical telemetry bridge
-- expose backend-visible embodiment status through the canonical Unity bridge state
-- keep Unity movement simple but no longer purely abstract waypoint motion
-- preserve route-following behavior from Phase 4
+- expose Unity route progress, embodiment status, and blockage status in operator-facing read models or bundle surfaces
+- keep the browser/live surfaces grounded in Python-owned state
+- make inspection surfaces coherent for:
+  - current motion authority
+  - route progress
+  - embodiment state
+  - blockage/exception details
+- keep replay/live/read-model flow stable
+- preserve existing command and session control behavior
 - preserve Python-motion mode unchanged
 
 ## Out of scope
 
 - do not redesign routing or dispatch
-- do not move route legality into Unity
-- do not implement advanced vehicle dynamics
-- do not implement realistic tire/suspension/traction simulation
-- do not add ML-Agents, sensors, or advanced autonomy logic
-- do not introduce a second reporting channel
 - do not redesign the world model
-- do not remove Python fallback behavior
+- do not implement major UI redesigns
+- do not add a second bridge or second read-model authority
+- do not move operator truth into Unity
+- do not add advanced analytics or explanation systems yet
+- do not remove compatibility paths unless trivially safe
 
 ## Architectural constraints
 
@@ -71,93 +74,91 @@ The system must now support:
   - command truth
   - session truth
 
-- Unity may surface physically meaningful execution outcomes, but must not become the source of operational truth
+- Operator-facing surfaces must consume Python-owned read models, not directly trust Unity as authority
 
-- Terrain/physics effects must feed back into Python through the canonical bridge
+- Unity-originated progress and embodiment signals must be visible only through backend-owned projections
 
-- Unity must not invent new operational states that bypass backend visibility
+- Replay/live/read-model flow must remain coherent across Python-motion and Unity-motion sessions
 
 ## Required backend behavior
 
-### Embodiment feedback
+### Operator-facing projections
 
-The backend telemetry/bridge path must support the first meaningful embodiment signals, such as:
+The live/operator-facing surfaces should expose, in a coherent way:
 
-- blocked or obstructed movement
-- collision or contact event
-- inability to reach the next waypoint under current local conditions
-- route execution exception state if needed
+- motion authority
+- route-following status
+- route progress
+- embodiment state
+- blockage or exception details when present
 
-These signals must be stored in Python-owned runtime state and be visible through the canonical bridge.
+These should appear in operator-facing bundle/read-model structures rather than being isolated only inside Unity bootstrap surfaces.
 
-### Operational consequences
+### Inspection coherence
 
-The backend should be able to observe that Unity route execution is no longer proceeding normally.
+At minimum, an operator should be able to inspect a vehicle and determine:
 
-This task does not need to fully solve backend replanning or policy response, but it must make those conditions visible and structurally usable later.
+- whether it is Python-motion or Unity-motion
+- whether it has an active route
+- whether it is progressing, blocked, complete, or otherwise exceptional
+- what the current blockage or embodiment issue is, if any
 
 ## Unity-side expectations
 
-If the Unity project is present in the workspace, Unity should:
+If the Unity project is present in the workspace, Unity does not need major new behavior for this phase.
 
-- move route-following vehicles in a slightly more embodied way than pure abstract waypoint snapping
-- use minimal built-in physics or collision-aware movement where appropriate
-- detect when movement is blocked or colliding
-- report that state back through the existing telemetry bridge
-- keep placeholder visuals acceptable
-
-This phase is about meaningful execution signals, not polished realism.
+Only make tiny Unity changes if needed to keep the operator-facing/read-model flow aligned with the existing bridge.
 
 ## Allowed files to change
 
 Only the minimum files needed for this slice.
 
 Expected categories:
-- `autonomous_ops_sim/unity_bridge.py`
 - `autonomous_ops_sim/live_app.py`
-- tests covering embodiment/blockage feedback
-- Unity route-following/runtime code for minimal terrain/physics embodiment
-- tiny glue changes required by the canonical bridge
+- `autonomous_ops_sim/unity_bridge.py`
+- tests covering operator-facing live/read-model behavior
+- minimal frontend/read-model projection glue if required
+- tiny Unity adjustments only if strictly needed
 
 ## Files that must not be broadly rewritten
 
 - world-model files
 - routing/dispatch architecture
-- unrelated frontend/operator files
 - unrelated simulation subsystems
-- large Unity scene systems unrelated to route execution
+- large frontend redesign files
+- large Unity runtime changes
 
 ## Deliverables
 
-1. Minimal terrain/physics-aware Unity route execution
-2. Canonical bridge support for blockage/exception feedback
-3. Backend-visible embodiment status stored in Python-owned runtime state
-4. Tests validating backend-side embodiment feedback behavior
+1. Operator-facing read-model exposure of Unity progress/embodiment state
+2. Coherent vehicle inspection data for Unity-motion sessions
+3. Stable live/replay/read-model flow that remains Python-authoritative
+4. Tests validating backend/operator-facing projection behavior
 5. Existing Python-only and Python-motion paths still working
 
 ## Acceptance criteria
 
 This task is complete when:
 
-- Unity execution can surface physically meaningful blockage/exception outcomes
-- those outcomes are reported back to Python through the canonical bridge
-- Python can observe embodiment failures without surrendering operational truth
-- route execution still works in the non-blocked case
-- the existing bridge remains canonical
+- operator-facing surfaces can show Unity route progress and embodiment state
+- blockage/exception details are visible through backend-owned read models
+- vehicle inspection is coherent in Unity-motion sessions
+- the browser/live/read-model flow remains grounded in Python truth
+- existing command/session behavior still works
 - Python-motion mode still works unchanged
 
 ## Practical rule
 
 Prefer:
 
-- meaningful embodiment signals over ambitious realism
-- explicit backend-visible status over local Unity-only behavior
-- small, testable seams
+- exposing backend-owned truth clearly
+- small read-model extensions over UI churn
+- coherence across clients
 - reversible changes
 
 Reject:
 
-- Unity-owned operational truth
-- second reporting channels
-- advanced realism before operational usefulness
-- giant rewrites
+- Unity-owned operator truth
+- direct client dependence on Unity-only state
+- giant UI rewrites
+- second competing read models

@@ -159,6 +159,30 @@ export type LiveAnalysisSignalViewModel = {
   vehicleId: number | null;
 };
 
+export type LiveOperatorVehicleStatusViewModel = {
+  vehicleId: number;
+  currentNodeId: number;
+  motionAuthority: string;
+  routeStatus: string | null;
+  routeProgress: number | null;
+  currentTargetNodeId: number | null;
+  currentWaypointIndex: number | null;
+  routeDestinationNodeId: number | null;
+  routeCompleted: boolean | null;
+  embodimentState: string | null;
+  blockageReason: string | null;
+  blockageEdgeId: number | null;
+  blockageNodeId: number | null;
+  exceptionCode: string | null;
+};
+
+export type LiveOperatorStateViewModel = {
+  motionAuthority: string;
+  vehicleCount: number;
+  blockedVehicleIds: number[];
+  vehicles: LiveOperatorVehicleStatusViewModel[];
+};
+
 export type LiveBundleViewModel = {
   bundleUrl: string;
   loadState: LoadState;
@@ -171,6 +195,7 @@ export type LiveBundleViewModel = {
     scenarioName: string;
     surfaceName: string;
     apiVersion: string;
+    motionAuthority: string;
     playState: string;
     stepSeconds: string;
     simulatedTime: string;
@@ -242,6 +267,7 @@ export type LiveBundleViewModel = {
   analysis: {
     anomalySignals: LiveAnalysisSignalViewModel[];
   };
+  operatorState: LiveOperatorStateViewModel;
   utility: {
     frontendOwnedState: readonly string[];
     simulatorOwnedTruth: readonly string[];
@@ -278,6 +304,7 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
   const authoring = readRecord(bundle, "authoring");
   const sessionControl = readRecord(bundle, "session_control");
   const commandCenter = readRecord(bundle, "command_center");
+  const operatorState = readRecord(bundle, "operator_state");
   const snapshot = readRecord(bundle, "snapshot");
   const mapSurface = readRecord(bundle, "map_surface");
   const renderGeometry = readRecord(bundle, "render_geometry");
@@ -567,6 +594,42 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
     vehicleId: readNumberOrNull(entry, "vehicle_id"),
   }));
 
+  const operatorVehicles = readArray(operatorState, "vehicles").flatMap((entry, index) => {
+    const operatorVehicle = isRecord(entry) ? entry : null;
+    if (operatorVehicle === null) {
+      return [];
+    }
+
+    return [
+      {
+        vehicleId: readNumber(operatorVehicle, "vehicle_id", index + 1),
+        currentNodeId: readNumber(operatorVehicle, "current_node_id", -1),
+        motionAuthority: readString(
+          operatorVehicle,
+          "motion_authority",
+          readString(sessionControl, "motion_authority", "python"),
+        ),
+        routeStatus: readStringOrNull(operatorVehicle, "route_status"),
+        routeProgress: readNumberOrNull(operatorVehicle, "route_progress"),
+        currentTargetNodeId: readNumberOrNull(operatorVehicle, "current_target_node_id"),
+        currentWaypointIndex: readNumberOrNull(operatorVehicle, "current_waypoint_index"),
+        routeDestinationNodeId: readNumberOrNull(operatorVehicle, "route_destination_node_id"),
+        routeCompleted: readBooleanOrNull(operatorVehicle, "route_completed"),
+        embodimentState: readStringOrNull(operatorVehicle, "embodiment_state"),
+        blockageReason: readStringOrNull(operatorVehicle, "blockage_reason"),
+        blockageEdgeId: readNumberOrNull(operatorVehicle, "blockage_edge_id"),
+        blockageNodeId: readNumberOrNull(operatorVehicle, "blockage_node_id"),
+        exceptionCode: readStringOrNull(operatorVehicle, "exception_code"),
+      },
+    ];
+  });
+  const blockedVehicleIds = readNumberArray(operatorState, "blocked_vehicle_ids");
+  const operatorMotionAuthority = readString(
+    operatorState,
+    "motion_authority",
+    readString(sessionControl, "motion_authority", "python"),
+  );
+
   const blockedEdgeIds = readNumberArray(snapshot, "blocked_edge_ids");
   const congestedRoadCount = trafficRoadStates.filter((roadState) => readNumber(roadState, "congestion_intensity", 0) > 0.2).length;
   const queuedVehicleCount = trafficRoadStates.reduce(
@@ -604,6 +667,7 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
         ?.replace(/\.json$/u, "") ?? "live session",
       surfaceName: readString(metadata, "surface_name", "live_session_bundle"),
       apiVersion: numberToString(readNumber(metadata, "api_version", Number.NaN), "unknown"),
+      motionAuthority: readString(sessionControl, "motion_authority", "python"),
       playState: readString(sessionControl, "play_state", "paused"),
       stepSeconds: secondsToString(readNumber(sessionControl, "step_seconds", Number.NaN)),
       simulatedTime: secondsToString(readNumber(bundle, "simulated_time_s", Number.NaN)),
@@ -661,6 +725,12 @@ export function buildLiveBundleViewModel(resource: LiveBundleResource): LiveBund
     },
     analysis: {
       anomalySignals,
+    },
+    operatorState: {
+      motionAuthority: operatorMotionAuthority,
+      vehicleCount: readNumber(operatorState, "vehicle_count", operatorVehicles.length),
+      blockedVehicleIds,
+      vehicles: operatorVehicles,
     },
     utility: {
       frontendOwnedState: [
@@ -800,6 +870,14 @@ function readStringOrNull(value: JsonRecord | null | undefined, key: string): st
   }
   const nested = value[key];
   return typeof nested === "string" && nested.trim().length > 0 ? nested : null;
+}
+
+function readBooleanOrNull(value: JsonRecord | null | undefined, key: string): boolean | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const nested = value[key];
+  return typeof nested === "boolean" ? nested : null;
 }
 
 function readNumber(value: JsonRecord | null | undefined, key: string, fallback: number): number {

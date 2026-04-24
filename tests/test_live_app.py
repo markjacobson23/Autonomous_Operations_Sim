@@ -519,6 +519,12 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
             "embodiment_state"
         ] == "moving"
 
+        live_bundle_payload = _read_live_bundle(base_url)
+        assert live_bundle_payload["operator_state"]["motion_authority"] == "python"
+        assert live_bundle_payload["operator_state"]["vehicles"][0]["vehicle_id"] == vehicle_id
+        assert live_bundle_payload["operator_state"]["vehicles"][0]["route_status"] == "active"
+        assert live_bundle_payload["operator_state"]["vehicles"][0]["embodiment_state"] == "moving"
+
         refreshed_bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
         refreshed_bootstrap_payload = json.loads(
             refreshed_bootstrap_response.read().decode("utf-8")
@@ -594,6 +600,9 @@ def test_live_app_frontend_server_exposes_unity_motion_authority_explicitly(tmp_
         assert server._runtime.latest_unity_telemetry_by_vehicle_id[vehicle_id][
             "vehicle_id"
         ] == vehicle_id
+        live_bundle_payload = _read_live_bundle(base_url)
+        assert live_bundle_payload["operator_state"]["motion_authority"] == "unity"
+        assert live_bundle_payload["operator_state"]["vehicles"][0]["motion_authority"] == "unity"
     finally:
         server.stop()
 
@@ -788,6 +797,11 @@ def test_live_app_frontend_server_projects_blocked_embodiment_state(
             "blockage_edge_id"
         ] == blocker_edge_id
         assert server._runtime.unity_embodiment_history[-1]["embodiment_state"] == "blocked"
+        live_bundle_payload = _read_live_bundle(base_url)
+        assert live_bundle_payload["operator_state"]["motion_authority"] == "unity"
+        assert live_bundle_payload["operator_state"]["blocked_vehicle_ids"] == [vehicle_id]
+        assert live_bundle_payload["operator_state"]["vehicles"][0]["route_status"] == "blocked"
+        assert live_bundle_payload["operator_state"]["vehicles"][0]["embodiment_state"] == "blocked"
 
         refreshed_bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
         refreshed_bootstrap_payload = json.loads(

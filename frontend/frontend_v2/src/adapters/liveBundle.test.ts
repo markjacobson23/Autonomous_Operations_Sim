@@ -24,6 +24,7 @@ function makeBaseBundle(): any {
     session_control: {
       play_state: "paused",
       step_seconds: 0.5,
+      motion_authority: "unity",
       session_control_endpoint: "/api/live/session/control",
       command_endpoint: "/api/live/command",
       route_preview_endpoint: "/api/live/preview",
@@ -242,6 +243,38 @@ function makeBaseBundle(): any {
       ],
       timestamp_s: 10,
     },
+    operator_state: {
+      motion_authority: "unity",
+      vehicle_count: 1,
+      blocked_vehicle_ids: [77],
+      vehicles: [
+        {
+          vehicle_id: 77,
+          current_node_id: 2,
+          motion_authority: "unity",
+          route_status: "blocked",
+          route_progress: 0.5,
+          current_target_node_id: 3,
+          current_waypoint_index: 1,
+          route_destination_node_id: 3,
+          route_completed: false,
+          embodiment_state: "blocked",
+          blockage_reason: "blocked_edge",
+          blockage_edge_id: 12,
+          blockage_node_id: 3,
+          exception_code: "movement_blocked",
+          latest_route_progress: {
+            route_status: "blocked",
+          },
+          latest_embodiment_status: {
+            embodiment_state: "blocked",
+          },
+          latest_telemetry: {
+            vehicle_id: 77,
+          },
+        },
+      ],
+    },
     simulated_time_s: 10,
     seed: 42,
   };
@@ -321,5 +354,25 @@ describe("live bundle adapter contracts", () => {
     const second = buildLiveBundleViewModel(makeResource(secondBundle));
 
     expect(first.sessionIdentity.key).toBe(second.sessionIdentity.key);
+  });
+
+  it("surfaces operator-owned unity state alongside the session bundle", () => {
+    const bundle = buildLiveBundleViewModel(makeResource(makeBaseBundle()));
+
+    expect(bundle.sessionIdentity.motionAuthority).toBe("unity");
+    expect(bundle.operatorState.motionAuthority).toBe("unity");
+    expect(bundle.operatorState.blockedVehicleIds).toEqual([77]);
+    expect(bundle.operatorState.vehicleCount).toBe(1);
+    expect(bundle.operatorState.vehicles[0]).toMatchObject({
+      vehicleId: 77,
+      currentNodeId: 2,
+      routeStatus: "blocked",
+      routeProgress: 0.5,
+      embodimentState: "blocked",
+      blockageReason: "blocked_edge",
+      blockageEdgeId: 12,
+      blockageNodeId: 3,
+      exceptionCode: "movement_blocked",
+    });
   });
 });
