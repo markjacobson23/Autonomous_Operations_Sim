@@ -13,166 +13,178 @@ If this file conflicts with those docs, the canonical docs win.
 
 ## Active roadmap item
 
-Phase 3 — Motion authority seam
+Phase 4 — Route execution in Unity
 
 ## Objective
 
-Introduce an explicit motion-authority seam so the system can distinguish between:
+Implement the first end-to-end route execution slice where Unity can follow backend-issued route intent instead of only consuming a bootstrap snapshot.
 
-- Python motion authority
-- Unity motion authority
-
-This task is about making motion ownership explicit in backend/runtime contracts and state handling.
-It is not yet about full Unity route execution, full physics authority, or removing Python motion.
+This task is about route-following over backend truth, not about advanced physics, terrain realism, collision handling, or ML/AI behavior.
 
 ## Why this task exists
 
-Phase 1 established the HTTP/JSON bridge.
-Phase 2 established a clearer real-simulator bootstrap and a minimal Unity bootstrap consumer.
+Phases 1–3 established:
 
-The next required step is to stop treating motion authority as implicit.
+- a canonical Python ↔ Unity bridge
+- a real-simulator Unity bootstrap
+- explicit motion authority
+- a dedicated Unity bridge module
 
-The system must be able to represent, explicitly and safely:
+The next required step is to make Unity execute backend-issued route intent in a minimal but real way.
 
-- sessions where Python computes and advances motion
-- sessions where Unity is allowed to embody motion while Python remains authoritative for operational truth
+The system must now support:
 
-Without this seam, later Unity execution work will remain brittle or ambiguous.
+- Python computing and owning route intent
+- Unity consuming that route intent as waypoints or ordered route nodes
+- Unity reporting route progress back through the canonical bridge
+- Python tracking progress without surrendering operational truth
 
 ## In scope
 
-- introduce explicit motion authority state in the backend/session layer
-- make motion authority visible in the Unity bootstrap from real runtime/session state instead of hardcoded values
-- support per-session motion authority selection now
-- leave room for per-vehicle motion authority later without implementing it yet
-- add safe backend handling for Unity telemetry under the future Unity-motion path
-- define the backend-side guardrails for what Unity telemetry may update and what it may not update
-- keep the existing Phase 1/2 bridge path as the single canonical bridge
+- expose backend-issued route-following data in the canonical Unity bridge
+- provide enough ordered route/waypoint information for Unity to follow a route
+- implement minimal Unity-side route following for placeholder vehicles
+- report route progress and arrival/completion back to Python through the canonical bridge
+- keep progress and completion semantics explicit and backend-visible
+- preserve stable vehicle identity mapping
+- preserve Python-motion mode unchanged
+- make Unity-route execution apply only where motion authority and current bridge semantics allow it
 
 ## Out of scope
 
 - do not remove or break Python motion
-- do not make Unity the source of task, route, or command truth
-- do not implement full route execution in Unity yet
-- do not redesign routing, dispatch, or command legality
+- do not redesign routing or dispatch logic
+- do not move route legality into Unity
 - do not redesign the world model
+- do not add terrain-aware driving yet
+- do not add collision/blockage physics yet unless a tiny placeholder status is strictly needed
 - do not add WebSockets or gRPC yet
-- do not add ML-Agents, sensors, or advanced physics behavior yet
-- do not implement per-vehicle motion authority yet unless a tiny seam is needed to support it later
+- do not add ML-Agents, sensors, or advanced vehicle controllers yet
+- do not implement per-vehicle authority switching unless a tiny seam is required for future support
 
 ## Architectural constraints
 
 - Python remains authoritative for:
   - world truth
   - runtime truth
+  - route legality
   - task identity
-  - routing legality
   - command truth
   - session truth
 
-- Unity may embody motion only under an explicit contract
+- Unity may execute route motion only as an embodied client/runtime layer
 
-- Motion authority must be represented explicitly, not inferred from whether telemetry exists
+- Unity route-following data must be derived from backend route truth, not invented locally
 
-- The Unity bridge must remain one canonical path
-  - do not introduce a second competing bootstrap/telemetry mechanism
-
-- Python motion must remain available as the fallback path during transition
+- The canonical bridge must remain the only Python ↔ Unity bridge path
 
 ## Required backend behavior
 
-### Session-level motion authority
+### Route intent for Unity
 
-The backend should support an explicit session-level motion authority field with values equivalent to:
+The canonical Unity bootstrap or related canonical bridge payload should expose enough backend-derived route information for Unity to follow a route for a vehicle under Unity motion authority.
 
-- `python`
-- `unity`
+At minimum, Unity should be able to determine:
 
-This field should be readable from the runtime/session layer and exposed through the Unity bootstrap.
+- which vehicle has an active backend-issued route
+- the ordered route nodes and/or waypoint positions
+- the current destination / target node
+- when the backend considers the route pending vs active vs complete if such state is already available
+
+### Progress feedback
+
+Unity must report route-following progress back to Python through the canonical telemetry/bridge path.
+
+At minimum, the bridge should support reporting:
+
+- vehicle id
+- current position/speed/timestamp
+- current route progress signal
+- current target waypoint/node if known
+- arrival/completion signal when the route is finished
+
+This task may extend the telemetry contract if needed, but must do so through the existing canonical bridge path rather than inventing a second reporting channel.
 
 ### Python-motion mode
 
 In Python-motion mode:
 
-- Python remains responsible for advancing vehicle motion
-- Unity telemetry may be recorded, but must not become authoritative motion truth
+- existing behavior must remain unchanged
+- Unity route-following logic must not become authoritative
 
 ### Unity-motion mode
 
 In Unity-motion mode:
 
+- Unity may follow backend-issued route data
 - Python still owns operational/task/command truth
-- Unity telemetry is expected as the embodied motion signal
-- backend handling should be structured so later phases can safely reconcile telemetry into runtime state
+- progress and completion must remain backend-visible and must not bypass Python session truth
 
-This task does not need to fully solve that reconciliation yet, but it must establish the seam cleanly.
+## Unity-side expectations
 
-## Telemetry guardrails
+If the Unity project is present in the workspace, Unity should:
 
-Under the new seam, the backend should make clear:
+- consume the route-following data from the canonical bootstrap/bridge payload
+- move placeholder vehicles along the ordered route in a minimal, deterministic way
+- preserve stable `vehicle_id` identity
+- avoid taking over backend concepts like command legality or task truth
+- report progress back to Python through the existing bridge
 
-- what telemetry fields are accepted
-- what backend state may be updated from telemetry
-- what backend state must never be overwritten by telemetry alone
-
-At minimum, telemetry must not directly replace:
-
-- task identity
-- route legality
-- command truth
-- scenario/world truth
+Minimal placeholder movement is acceptable.
+This phase is about route execution semantics, not realism.
 
 ## Allowed files to change
 
 Only the minimum files needed for this slice.
 
 Expected categories:
-- backend live/session runtime state
-- bootstrap serialization
-- telemetry ingestion path
-- tests validating motion authority behavior
-- Unity bootstrap consumer only if a tiny adjustment is needed to reflect the new explicit authority field
+- `autonomous_ops_sim/unity_bridge.py`
+- `autonomous_ops_sim/live_app.py`
+- tests covering route-following bridge behavior
+- Unity bootstrap/runtime consumer code for minimal route execution
+- tiny glue changes required by the canonical bridge
 
 ## Files that must not be broadly rewritten
 
-- static world model files
+- world-model files
 - routing/dispatch architecture
-- unrelated frontend/operator workflow files
+- unrelated frontend/operator files
 - unrelated simulation subsystems
-- full Unity movement/controller systems
+- full terrain/physics systems
+- unrelated Unity scene systems
 
 ## Deliverables
 
-1. Explicit session-level motion authority state
-2. Bootstrap derived from real runtime/session authority state rather than hardcoded motion authority
-3. Backend-side telemetry guardrails aligned with motion authority
-4. Tests proving:
-   - Python-motion mode behavior
-   - Unity-motion mode contract visibility
-   - existing Python-only path remains intact
+1. Backend-derived route-following data exposed through the canonical bridge
+2. Minimal Unity-side route execution over backend-issued route intent
+3. Progress/completion reporting back to Python through the canonical bridge
+4. Tests validating backend-side route/progress contract behavior
+5. Existing Python-only and Python-motion paths still working
 
 ## Acceptance criteria
 
 This task is complete when:
 
-- motion authority is explicit in backend/runtime state
-- the Unity bootstrap reports real motion authority state rather than a hardcoded value
+- Unity can follow backend-issued routes in a minimal way
+- route data is clearly derived from backend truth
+- route progress and arrival/completion are reported back to Python
+- Python can track route progress without surrendering operational truth
+- the existing bridge remains canonical
 - Python-motion mode still works unchanged
-- the codebase is better prepared for later Unity-motion reconciliation
-- Python authority is preserved throughout
-- the existing bridge remains the single canonical bridge path
 
 ## Practical rule
 
 Prefer:
-- additive seams
-- explicit authority
-- reversible changes
-- fallback-safe behavior
+
+- explicit route/progress contracts
+- additive seams over redesign
+- minimal placeholder movement over ambitious realism
+- behavioral clarity over visual polish
 
 Reject:
+
+- Unity-owned route legality
+- local route invention in Unity
+- second bridge/reporting channels
+- premature terrain/physics complexity
 - giant rewrites
-- Unity-owned operational truth
-- telemetry that silently becomes authoritative
-- premature route-execution logic
-- a second competing bridge or motion path

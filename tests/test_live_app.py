@@ -435,6 +435,18 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
                 "vehicle_id": vehicle_id,
             }
         ]
+        assert bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
+            "vehicle_id"
+        ] == vehicle_id
+        assert bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
+            "destination_node_id"
+        ] == destination_node_id
+        assert bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
+            "node_ids"
+        ][0] == current_node_id
+        assert bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
+            "waypoints"
+        ][0]["node_id"] == current_node_id
         assert bootstrap_payload["bootstrap"]["runtime_vehicle_snapshot"][0][
             "vehicle_id"
         ] == vehicle_id
@@ -452,6 +464,10 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
                 "heading_rad": 1.57,
                 "current_node_id": current_node_id,
                 "current_edge_id": current_edge_id,
+                "route_status": "active",
+                "route_progress": 0.4,
+                "current_target_node_id": destination_node_id,
+                "current_waypoint_index": 1,
             }
         }
         telemetry_response = request.urlopen(
@@ -471,6 +487,7 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
             telemetry_payload["telemetry"]["guardrails"]["telemetry_role"]
             == "observational_motion_signal"
         )
+        assert "route_status" in telemetry_payload["telemetry"]["guardrails"]["accepted_fields"]
         assert "task_identity" in telemetry_payload["telemetry"]["guardrails"][
             "telemetry_must_not_overwrite"
         ]
@@ -483,6 +500,12 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
         assert server._runtime.latest_unity_telemetry_by_vehicle_id[vehicle_id][
             "speed"
         ] == 4.25
+        assert server._runtime.latest_unity_route_progress_by_vehicle_id[vehicle_id][
+            "route_status"
+        ] == "active"
+        assert server._runtime.latest_unity_route_progress_by_vehicle_id[vehicle_id][
+            "current_target_node_id"
+        ] == destination_node_id
 
         refreshed_bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
         refreshed_bootstrap_payload = json.loads(
@@ -491,6 +514,9 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
         assert refreshed_bootstrap_payload["bootstrap"][
             "latest_unity_telemetry_by_vehicle_id"
         ][0]["vehicle_id"] == vehicle_id
+        assert refreshed_bootstrap_payload["bootstrap"][
+            "latest_unity_route_progress_by_vehicle_id"
+        ][0]["route_status"] == "active"
     finally:
         server.stop()
 
@@ -552,6 +578,99 @@ def test_live_app_frontend_server_exposes_unity_motion_authority_explicitly(tmp_
         assert server._runtime.latest_unity_telemetry_by_vehicle_id[vehicle_id][
             "vehicle_id"
         ] == vehicle_id
+    finally:
+        server.stop()
+
+
+def test_live_app_frontend_server_projects_unity_route_completion_back_to_backend(
+    tmp_path,
+) -> None:
+    frontend_dist = tmp_path / "dist"
+    frontend_dist.mkdir()
+    (frontend_dist / "index.html").write_text("<!doctype html><title>Serious UI</title>", encoding="utf-8")
+
+    artifacts = export_live_app_artifacts(
+        scenario_path="scenarios/showpiece_pack/01_mine_ore_shift.json",
+        output_directory=tmp_path / "output",
+        frontend_dist_directory=frontend_dist,
+    )
+    bundle = json.loads(artifacts.live_session_bundle_path.read_text(encoding="utf-8"))
+    vehicle_id = bundle["snapshot"]["vehicles"][0]["vehicle_id"]
+    destination_node_id = bundle["map_surface"]["edges"][0]["end_node_id"]
+    server = LiveAppServer(
+        artifacts.output_directory,
+        artifacts=artifacts,
+        motion_authority="unity",
+        port=0,
+    )
+    server.start()
+    base_url = f"http://{server.host}:{server.port}"
+
+    try:
+        request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/live/command",
+                data=json.dumps(
+                    {
+                        "command_type": "assign_vehicle_destination",
+                        "vehicle_id": vehicle_id,
+                        "destination_node_id": destination_node_id,
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+
+        bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
+        bootstrap_payload = json.loads(bootstrap_response.read().decode("utf-8"))
+        route_following = bootstrap_payload["bootstrap"]["runtime"]["route_following"][0]
+        assert route_following["route_status"] == "active"
+        assert route_following["current_target_node_id"] == route_following["waypoints"][1][
+            "node_id"
+        ]
+
+        telemetry_response = request.urlopen(
+            request.Request(
+                url=f"{base_url}/api/unity/telemetry",
+                data=json.dumps(
+                    {
+                        "telemetry": {
+                            "vehicle_id": vehicle_id,
+                            "timestamp_s": 3.5,
+                            "position": route_following["waypoints"][-1]["position"],
+                            "speed": 0.0,
+                            "route_status": "complete",
+                            "route_progress": 1.0,
+                            "current_target_node_id": destination_node_id,
+                            "current_waypoint_index": len(route_following["waypoints"]) - 1,
+                            "route_destination_node_id": destination_node_id,
+                            "route_completed": True,
+                        }
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+        )
+        telemetry_payload = json.loads(telemetry_response.read().decode("utf-8"))
+        assert telemetry_payload["telemetry"]["latest_route_progress_by_vehicle_id"][0][
+            "route_status"
+        ] == "complete"
+        assert telemetry_payload["telemetry"]["latest_route_progress_by_vehicle_id"][0][
+            "route_completed"
+        ] is True
+        assert server._runtime.latest_unity_route_progress_by_vehicle_id[vehicle_id][
+            "route_status"
+        ] == "complete"
+
+        refreshed_bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
+        refreshed_bootstrap_payload = json.loads(
+            refreshed_bootstrap_response.read().decode("utf-8")
+        )
+        assert refreshed_bootstrap_payload["bootstrap"]["latest_unity_route_progress_by_vehicle_id"][0][
+            "route_status"
+        ] == "complete"
     finally:
         server.stop()
 
