@@ -455,13 +455,23 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
             "embodiment_state"
         ] == "inactive"
         assert bootstrap_payload["bootstrap"]["world"]["blocked_edge_ids"] == []
-        assert bootstrap_payload["bootstrap"]["runtime_vehicle_snapshot"][0][
-            "vehicle_id"
-        ] == vehicle_id
         assert bootstrap_payload["bootstrap"]["bridge"]["schema_version"] == 1
         assert bootstrap_payload["bootstrap"]["bridge"]["bootstrap_endpoint"] == "/api/unity/bootstrap"
         assert bootstrap_payload["bootstrap"]["bridge"]["telemetry_endpoint"] == "/api/unity/telemetry"
         assert bootstrap_payload["bootstrap"]["provenance"]["source_surface_name"] == "live_session_bundle"
+        for deprecated_key in (
+            "runtime_vehicle_snapshot",
+            "vehicle_identity_map",
+            "pending_route_intents",
+            "route_following_by_vehicle_id",
+            "latest_unity_telemetry_by_vehicle_id",
+            "latest_unity_route_progress_by_vehicle_id",
+            "latest_unity_embodiment_status_by_vehicle_id",
+            "bridge_endpoints",
+        ):
+            assert deprecated_key not in bootstrap_payload["bootstrap"]
+        assert "map_surface" not in bootstrap_payload["bootstrap"]["world"]
+        assert "embodiment_status" not in bootstrap_payload["bootstrap"]["runtime"]
 
         telemetry_request_payload = {
             "telemetry": {
@@ -544,14 +554,14 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
             refreshed_bootstrap_response.read().decode("utf-8")
         )
         assert refreshed_bootstrap_payload["bootstrap"][
-            "latest_unity_telemetry_by_vehicle_id"
-        ][0]["vehicle_id"] == vehicle_id
-        assert refreshed_bootstrap_payload["bootstrap"][
-            "latest_unity_route_progress_by_vehicle_id"
-        ][0]["route_status"] == "active"
-        assert refreshed_bootstrap_payload["bootstrap"][
-            "latest_unity_embodiment_status_by_vehicle_id"
-        ][0]["embodiment_state"] == "moving"
+            "runtime"
+        ]["vehicle_snapshot"][0]["vehicle_id"] == vehicle_id
+        assert refreshed_bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
+            "route_status"
+        ] == "active"
+        assert refreshed_bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
+            "embodiment_state"
+        ] == "moving"
     finally:
         server.stop()
 
@@ -715,10 +725,10 @@ def test_live_app_frontend_server_projects_unity_route_completion_back_to_backen
         refreshed_bootstrap_payload = json.loads(
             refreshed_bootstrap_response.read().decode("utf-8")
         )
-        assert refreshed_bootstrap_payload["bootstrap"]["latest_unity_route_progress_by_vehicle_id"][0][
+        assert refreshed_bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
             "route_status"
         ] == "complete"
-        assert refreshed_bootstrap_payload["bootstrap"]["latest_unity_embodiment_status_by_vehicle_id"][0][
+        assert refreshed_bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
             "embodiment_state"
         ] == "complete"
         live_bundle_payload = _read_live_bundle(base_url)
@@ -840,8 +850,8 @@ def test_live_app_frontend_server_projects_blocked_embodiment_state(
             refreshed_bootstrap_response.read().decode("utf-8")
         )
         assert refreshed_bootstrap_payload["bootstrap"][
-            "latest_unity_embodiment_status_by_vehicle_id"
-        ][0]["embodiment_state"] == "blocked"
+            "runtime"
+        ]["route_following"][0]["embodiment_state"] == "blocked"
         assert refreshed_bootstrap_payload["bootstrap"]["runtime"]["route_following"][0][
             "embodiment_state"
         ] == "blocked"

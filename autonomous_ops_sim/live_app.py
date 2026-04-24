@@ -155,7 +155,6 @@ class LiveSessionRuntime:
                 motion_authority=self.motion_authority,
                 latest_unity_route_progress_by_vehicle_id=self.latest_unity_route_progress_by_vehicle_id,
                 latest_unity_embodiment_status_by_vehicle_id=self.latest_unity_embodiment_status_by_vehicle_id,
-                latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
                 unity_route_progress_history=self.unity_route_progress_history,
                 unity_embodiment_history=self.unity_embodiment_history,
                 unity_telemetry_history=self.unity_telemetry_history,
@@ -176,7 +175,6 @@ class LiveSessionRuntime:
                 motion_authority=self.motion_authority,
                 latest_unity_route_progress_by_vehicle_id=self.latest_unity_route_progress_by_vehicle_id,
                 latest_unity_embodiment_status_by_vehicle_id=self.latest_unity_embodiment_status_by_vehicle_id,
-                latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
                 unity_route_progress_history=self.unity_route_progress_history,
                 unity_embodiment_history=self.unity_embodiment_history,
                 unity_telemetry_history=self.unity_telemetry_history,
@@ -189,7 +187,6 @@ class LiveSessionRuntime:
                 pending_route_commands=self.pending_route_commands,
                 latest_unity_route_progress_by_vehicle_id=self.latest_unity_route_progress_by_vehicle_id,
                 latest_unity_embodiment_status_by_vehicle_id=self.latest_unity_embodiment_status_by_vehicle_id,
-                latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
                 motion_authority=self.motion_authority,
             )
 
@@ -400,7 +397,6 @@ class LiveSessionRuntime:
             latest_unity_embodiment_status_by_vehicle_id=(
                 self.latest_unity_embodiment_status_by_vehicle_id
             ),
-            latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
             unity_route_progress_history=self.unity_route_progress_history,
             unity_embodiment_history=self.unity_embodiment_history,
             unity_telemetry_history=self.unity_telemetry_history,
@@ -970,7 +966,6 @@ def export_live_app_artifacts(
                 motion_authority=initial_session.motion_authority,
                 latest_unity_route_progress_by_vehicle_id={},
                 latest_unity_embodiment_status_by_vehicle_id={},
-                latest_unity_telemetry_by_vehicle_id={},
                 unity_route_progress_history=[],
                 unity_embodiment_history=[],
                 unity_telemetry_history=[],
@@ -1005,7 +1000,6 @@ def export_live_app_artifacts(
             motion_authority=initial_session.motion_authority,
             latest_unity_route_progress_by_vehicle_id={},
             latest_unity_embodiment_status_by_vehicle_id={},
-            latest_unity_telemetry_by_vehicle_id={},
             unity_route_progress_history=[],
             unity_embodiment_history=[],
             unity_telemetry_history=[],
@@ -1094,7 +1088,6 @@ def _build_live_bundle_record(
     motion_authority: str = DEFAULT_SESSION_MOTION_AUTHORITY,
     latest_unity_route_progress_by_vehicle_id: dict[int, dict[str, object]] | None = None,
     latest_unity_embodiment_status_by_vehicle_id: dict[int, dict[str, object]] | None = None,
-    latest_unity_telemetry_by_vehicle_id: dict[int, dict[str, object]] | None = None,
     unity_route_progress_history: list[dict[str, object]] | tuple[dict[str, object], ...] = (),
     unity_embodiment_history: list[dict[str, object]] | tuple[dict[str, object], ...] = (),
     unity_telemetry_history: list[dict[str, object]] | tuple[dict[str, object], ...] = (),
@@ -1145,9 +1138,6 @@ def _build_live_bundle_record(
         latest_unity_embodiment_status_by_vehicle_id=(
             latest_unity_embodiment_status_by_vehicle_id or {}
         ),
-        latest_unity_telemetry_by_vehicle_id=(
-            latest_unity_telemetry_by_vehicle_id or {}
-        ),
         motion_authority=normalized_motion_authority,
     )
     bundle["replay_analysis"] = build_unity_replay_analysis_record(
@@ -1158,9 +1148,6 @@ def _build_live_bundle_record(
         ),
         latest_unity_embodiment_status_by_vehicle_id=(
             latest_unity_embodiment_status_by_vehicle_id or {}
-        ),
-        latest_unity_telemetry_by_vehicle_id=(
-            latest_unity_telemetry_by_vehicle_id or {}
         ),
         unity_route_progress_history=unity_route_progress_history,
         unity_embodiment_history=unity_embodiment_history,

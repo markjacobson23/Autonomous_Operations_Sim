@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines ownership, truth boundaries, and runtime contracts for Autonomous Operations Sim.
+This document defines ownership, truth boundaries, runtime contracts, and canonical derived surfaces for Autonomous Operations Sim.
 
 It exists to keep the codebase centered on one rule:
 
@@ -52,6 +52,7 @@ Owns:
 - task/job execution
 - deterministic progression
 - metrics and trace inputs
+- backend-owned Unity-ingested telemetry, progress, and embodiment history after ingestion
 
 Must not own:
 
@@ -69,6 +70,7 @@ Owns:
 - play/pause/step semantics
 - replayable command history
 - runtime mutation path
+- session-level motion authority selection
 
 Must not allow:
 
@@ -79,9 +81,10 @@ Must not allow:
 
 Owns:
 
-- replay/export surfaces
 - live bundle surfaces
-- inspection read models
+- Unity bootstrap projection
+- operator-facing read models
+- replay/analysis read models
 - command-center read models
 - render-ready geometry projections
 - structured summaries for clients and analysis
@@ -91,6 +94,28 @@ Must not own:
 - competing runtime truth
 - independent route truth
 - independent motion logic
+
+## Canonical derived surfaces
+
+The intended long-lived derived surfaces are:
+
+### Live session bundle core
+Canonical for simulator/live state shared across operator-facing consumers.
+
+### Unity bootstrap
+Canonical for Unity runtime consumption.
+
+This surface should expose nested canonical sections, not flat compatibility mirrors.
+
+### `operator_state`
+Canonical for operator-facing live inspection.
+
+This is the operator-facing projection of Unity-influenced route progress, embodiment state, blockage state, and motion authority, as owned by Python.
+
+### `replay_analysis`
+Canonical for backend-owned replay and analysis.
+
+This is derived from Python-owned history after Unity-originated signals have been ingested into backend runtime state.
 
 ## 5. Runtime Clients and Operator Surfaces
 
@@ -117,6 +142,8 @@ Unity must not own:
 - final command legality
 - stable scenario truth
 - task identity
+- replay truth
+- operator truth
 
 ### 5.2 Browser / Operator Surfaces
 
@@ -135,10 +162,11 @@ They must not own:
 - final route truth
 - conflict truth
 - topology truth
+- Unity-only truth outside backend projections
 
 ## Motion authority model
 
-The architecture must support two modes:
+The architecture supports two modes:
 
 ### Python motion authority
 
@@ -156,7 +184,7 @@ Use this mode for:
 
 Python issues route/goal intent.
 Unity executes embodied motion and reports telemetry back.
-Python remains authoritative for task, routing legality, command truth, and session truth.
+Python remains authoritative for task, routing legality, command truth, session truth, and replay truth.
 
 Use this mode for:
 
@@ -174,50 +202,54 @@ The architecture should support:
 - per-session authority selection first
 - per-vehicle authority selection later
 
+Telemetry must not silently become authoritative motion truth merely because it exists.
+
 ## Python ↔ Unity contract
 
 Python sends:
 
 - bootstrap world/state bundles
 - route or target intent
-- permissions / accepted commands
+- accepted commands
 - future runtime constraints
 
 Unity sends:
 
 - telemetry
-- progress/completion events
-- collision/blockage events
+- route progress/completion events
+- collision/blockage/exception events
 - future sensor summaries where needed
+
+All Unity-originated signals become meaningful only after ingestion into Python-owned runtime state.
 
 ## Transport principles
 
-The initial Unity bridge should follow these rules:
+The bridge follows these rules:
 
 1. Start simple.
 2. Reuse existing HTTP/JSON patterns first.
 3. Keep payloads versioned and explicit.
 4. Avoid inventing a separate truth model just for Unity.
 
-The first transport should prove the contract before the project moves to more complex options such as WebSockets or gRPC.
+More complex transports are possible later, but must not change authority boundaries.
 
 ## Telemetry contract
 
-Minimum telemetry should include:
+Minimum telemetry includes:
 
 - vehicle id
 - x/y/z position
 - speed
 - timestamp
 
-Soon after, telemetry should expand to include:
+The bridge may also include:
 
 - heading/rotation
 - nearest node id or current edge id when known
 - active target or route-progress state
-- collision/blockage flags
+- embodiment/blockage/exception state
 
-Python should ingest Unity telemetry through a dedicated bridge/update path rather than scattering it into unrelated UI code.
+Python must ingest Unity telemetry through one dedicated bridge/update path rather than scattering it into unrelated UI code.
 
 ## Route and command execution contract
 
@@ -239,8 +271,8 @@ Unity executes:
 Unity reports:
 
 - current telemetry
-- target reached
 - route progress
+- completion
 - blocked/collision/failure events
 
 ## Environment/runtime assumptions
@@ -259,7 +291,7 @@ Unity runtime assumptions should be:
 - Static world truth: World Model
 - Runtime vehicle truth: Simulator Runtime
 - Command truth: Command Layer
-- Render/read models: Derived Surface Layer
+- Live/read/replay projections: Derived Surface Layer
 - Client interaction state: Runtime Clients
 - Persistent edits: Authoring Layer
 
@@ -269,11 +301,14 @@ Reject changes that create:
 
 - frontend shadow truth
 - Unity-only simulation truth disconnected from Python
+- Unity-owned operator truth
+- Unity-owned replay truth
 - environment-specific architecture forks
 - visual realism that contradicts runtime truth
 - speculative multi-runtime sprawl without clear ownership
+- reintroduced flat compatibility mirrors without a real consumer
 - a separate long-lived Unity-only data model
 
 ## Final statement
 
-Autonomous Operations Sim is a Python-authoritative simulation system with explicit command/session semantics, a derived-surface layer for safe consumption, and runtime clients such as Unity that embody and present truth without replacing it.
+Autonomous Operations Sim is a Python-authoritative simulation system with explicit command/session semantics, explicit motion authority, a canonical Unity bridge, backend-owned operator and replay surfaces, and runtime clients such as Unity that embody and present truth without replacing it.

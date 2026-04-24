@@ -2,128 +2,162 @@
 
 ## Purpose
 
-This document is the active roadmap for the current project direction.
+This document is the durable roadmap and status record for the current project direction.
 
-The immediate goal is to evolve from a Python-only simulator with browser-oriented derived surfaces into a Python-authoritative system with a Unity runtime for embodied motion, rendering, and future physics/sensor work.
+The immediate goal was to evolve from a Python-only simulator with browser-oriented derived surfaces into a Python-authoritative system with a Unity runtime for embodied motion, rendering, and future physics/sensor work.
+
+That hybrid foundation is now implemented.
 
 ## Locked decisions
 
 1. Python remains authoritative for world truth, runtime truth, commands, routing legality, and deterministic progression.
 2. Unity is an execution/runtime layer, not a replacement simulator.
 3. The world model remains shared across mining, yard, and city.
-4. Old browser/operator surfaces remain consumers, not authorities.
-5. Motion authority must become explicit rather than implicit.
+4. Operator-facing surfaces remain consumers, not authorities.
+5. Motion authority must be explicit rather than implicit.
+6. Replay and analysis truth remains backend-owned.
 
-## Phase 1 — Contract and bridge
+## Completed foundation phases
 
-Goal:
-- establish the Python ↔ Unity contract
+### Phase 1 — Contract and bridge
+Status: complete
 
-Deliverables:
+Delivered:
 - simulator-shaped bootstrap payload
 - telemetry payload
 - stable vehicle identity mapping
 - initial Unity runtime client
 - initial HTTP/JSON bridge proving the contract end to end
 
-Done when:
-- Python can send target/route intent
-- Unity can read it
-- Unity can report telemetry back
+### Phase 2 — Real simulator bootstrap
+Status: complete
 
-## Phase 2 — Real simulator bootstrap
-
-Goal:
-- replace toy payloads with real simulator-derived surfaces
-
-Deliverables:
+Delivered:
 - Unity bootstrap derived from live session/runtime data
 - vehicle spawning from real scenario state
 - initial world geometry/waypoint generation from backend truth
 
-Done when:
-- Unity can represent a real simulator scenario without fake bridge data
+### Phase 3 — Motion authority seam
+Status: complete
 
-## Phase 3 — Motion authority seam
-
-Goal:
-- make motion ownership explicit
-
-Deliverables:
+Delivered:
 - Python-motion mode
 - Unity-motion mode
 - safe runtime ingestion of Unity telemetry
 - per-session authority selection
-- later per-vehicle authority selection
+- backend-visible motion authority in the Unity bridge
 
-Done when:
-- the same scenario can run in either motion mode
+Guardrail preserved:
+- Python motion remains the fallback path
 
-Guardrail:
-- do not remove or break Python motion before Unity motion mode is stable
-- Python motion remains the fallback path during transition
+### Phase 4 — Route execution in Unity
+Status: complete
 
-## Phase 4 — Route execution in Unity
-
-Goal:
-- move from single targets to backend-issued routes
-
-Deliverables:
+Delivered:
 - waypoint/route following
 - progress reporting
 - arrival/completion signals
 - failure/blockage reporting
 - runtime command feedback
 
-Done when:
-- Unity-controlled vehicles can complete backend-issued routes
-- Python can track route progress without surrendering operational truth
+### Phase 5 — Terrain and physics embodiment
+Status: complete
 
-## Phase 5 — Terrain and physics embodiment
-
-Goal:
-- make Unity execution physically meaningful
-
-Deliverables:
-- terrain-aware movement
-- collision handling
-- richer vehicle representation
+Delivered:
+- minimal physically meaningful Unity execution
+- blockage/collision-aware execution feedback
+- backend-visible embodiment state
 - exception/blockage feedback to Python
 - operational consequences that flow back into backend state
 
-Done when:
-- Unity execution affects real operational outcomes, not just visuals
+### Phase 6 — Operator integration
+Status: complete
 
-## Phase 6 — Operator integration
+Delivered:
+- operator-facing `operator_state` read model
+- stable live/read-model flow grounded in Python truth
+- coherent inspection of Unity-motion sessions from browser/operator surfaces
 
-Goal:
-- keep operator workflows coherent across clients
+### Phase 7 — Replay and analysis groundwork
+Status: complete
 
-Deliverables:
-- usable inspection/command surfaces
-- stable replay/live/read-model flow
-- map/runtime surfaces that remain grounded in Python truth
+Delivered:
+- backend-owned `replay_analysis` surface
+- vehicle-level route progress and embodiment history projection
+- replay/analysis summaries derived from Python-owned history after Unity ingestion
 
-Done when:
-- operators can inspect, preview, command, and understand runs while Unity handles embodiment
+## Completed stabilization pass
 
-## Phase 7 — Future extensions
+### Cleanup and canonical-surface consolidation
+Status: complete
 
-Possible later phases:
-- sensors
+Delivered:
+- removal of redundant Unity bootstrap compatibility mirrors
+- preservation of canonical nested bootstrap surfaces
+- preservation of `operator_state`
+- preservation of `replay_analysis`
+- reduction of bundle/bridge duplication without changing authority boundaries
+
+## Current stable architecture outcome
+
+The hybrid stack now includes:
+
+- canonical Python ↔ Unity HTTP/JSON bridge
+- real simulator-derived Unity bootstrap
+- explicit Python-motion and Unity-motion authority modes
+- Unity route execution over backend-issued route intent
+- backend-owned embodiment and blockage feedback
+- operator-facing live inspection through `operator_state`
+- backend-owned replay/analysis through `replay_analysis`
+
+## Next candidate tracks
+
+The project no longer needs another mandatory foundation phase before useful work.
+Future work should be chosen deliberately from one of these tracks:
+
+### Track A — Recovery and replanning
+Possible work:
+- backend response to blockage or exception outcomes
+- replanning after Unity-reported failure states
+- clearer active-route vs pending-route execution state
+
+### Track B — Per-vehicle motion authority
+Possible work:
+- move from per-session authority selection to selective per-vehicle authority
+- preserve the same backend-owned truth boundaries
+
+### Track C — Transport hardening
+Possible work:
+- polling/coalescing improvements
+- higher-frequency bridge updates
+- later transport upgrades if actually justified
+
+### Track D — Richer operator analysis
+Possible work:
+- lightweight replay inspection UI
+- richer operator explanations derived from backend-owned state
+- better comparison and anomaly review tools
+
+### Track E — Sensors / autonomy experiments
+Possible work:
+- simulated sensors
 - ML/AI runtime experiments
-- stronger replay/analysis
-- richer traffic realism
-- benchmark-guided optimization
+- perception-oriented Unity extensions
+
+### Track F — Richer traffic realism
+Possible work:
+- lane behavior
+- more nuanced conflict/reservation behavior
+- more realistic traffic interactions
 
 ## Practical rule
 
 At each step, prefer:
 
-- additive seams
 - explicit ownership
 - reversible changes
 - fallback-safe behavior
+- canonical surfaces over compatibility clutter
 
 Reject:
 
@@ -131,4 +165,5 @@ Reject:
 - Unity-owned operational truth
 - client-side shadow truth
 - environment-specific hacks
-- premature transport complexity before contract clarity
+- premature transport complexity
+- duplicated read models without a clear consumer
