@@ -13,56 +13,49 @@ If this file conflicts with those docs, the canonical docs win.
 
 ## Active roadmap item
 
-Phase 6 — Operator integration
+Phase 7 — Replay and analysis groundwork
 
 ## Objective
 
-Expose Unity route progress, embodiment state, and blockage state through operator-facing surfaces without creating shadow truth.
+Add a backend-owned replay/analysis surface for Unity-influenced runs so operators and future tools can inspect what happened after or during a run without relying on Unity as a source of truth.
 
-This task is about making the browser/operator flow understand what Unity is doing and what it is reporting, while keeping Python as the only authority.
+This task is about creating a minimal but real replay/analysis foundation, not a full analytics platform.
 
 ## Why this task exists
 
-Phases 1–5 established:
+Phases 1–6 established:
 
 - a canonical Python ↔ Unity bridge
-- real simulator bootstrap
 - explicit motion authority
-- Unity route execution over backend-issued routes
-- backend-visible route progress
-- backend-visible embodiment and blockage state
+- backend-owned route progress and embodiment state
+- operator-facing read models grounded in Python truth
 
-The next required step is to make those states visible and usable to operators.
+The next useful extension is to make run history inspectable as a coherent replay/analysis surface.
 
 The system must now support:
 
-- inspecting Unity-driven progress from operator-facing read models
-- seeing embodiment/blockage state in live views
-- keeping command and replay flows coherent while Unity handles embodiment
-- avoiding any client-side interpretation layer that becomes competing truth
+- understanding what happened during a Unity-motion run
+- reconstructing route progress and embodiment events from backend-owned history
+- viewing a stable replay/analysis summary without inventing new authority
 
 ## In scope
 
-- expose Unity route progress, embodiment status, and blockage status in operator-facing read models or bundle surfaces
-- keep the browser/live surfaces grounded in Python-owned state
-- make inspection surfaces coherent for:
-  - current motion authority
-  - route progress
-  - embodiment state
-  - blockage/exception details
-- keep replay/live/read-model flow stable
-- preserve existing command and session control behavior
+- add a backend-owned replay/analysis surface derived from existing Python-owned history
+- expose route progress history and embodiment/blockage history in a structured replay/analysis record
+- include enough session/run metadata to understand what happened
+- make the replay/analysis surface available through the live bundle or a closely related backend-owned surface
+- preserve current operator/live behavior
 - preserve Python-motion mode unchanged
 
 ## Out of scope
 
 - do not redesign routing or dispatch
 - do not redesign the world model
-- do not implement major UI redesigns
-- do not add a second bridge or second read-model authority
-- do not move operator truth into Unity
-- do not add advanced analytics or explanation systems yet
-- do not remove compatibility paths unless trivially safe
+- do not implement full timeline scrubbers or major frontend replay UI
+- do not add sensors or ML/AI runtime features yet
+- do not create a second source of truth
+- do not move replay authority into Unity
+- do not do a broad analytics/dashboard rewrite
 
 ## Architectural constraints
 
@@ -73,41 +66,45 @@ The system must now support:
   - task identity
   - command truth
   - session truth
+  - replay/analysis truth
 
-- Operator-facing surfaces must consume Python-owned read models, not directly trust Unity as authority
+- Replay/analysis must be derived from backend-owned state and history, not from Unity-local memory
 
-- Unity-originated progress and embodiment signals must be visible only through backend-owned projections
-
-- Replay/live/read-model flow must remain coherent across Python-motion and Unity-motion sessions
+- The canonical Python ↔ Unity bridge remains singular
+- Replay data may consume Unity-originated signals only after they have been ingested into Python-owned runtime state
 
 ## Required backend behavior
 
-### Operator-facing projections
+### Replay/analysis projection
 
-The live/operator-facing surfaces should expose, in a coherent way:
+The backend should expose a replay/analysis record that includes, at minimum:
 
+- session/run identity
 - motion authority
-- route-following status
-- route progress
-- embodiment state
-- blockage or exception details when present
+- route progress history
+- embodiment/blockage history
+- notable vehicle-level events or state transitions where already derivable
+- counts or summaries useful for operator understanding
 
-These should appear in operator-facing bundle/read-model structures rather than being isolated only inside Unity bootstrap surfaces.
+### Vehicle-level analysis
 
-### Inspection coherence
+At minimum, a vehicle-level analysis record should allow a user or future tool to determine:
 
-At minimum, an operator should be able to inspect a vehicle and determine:
+- whether a vehicle was under Python or Unity motion authority
+- whether it completed its route
+- whether it became blocked
+- what blockage/exception state occurred
+- what progress history is known from backend-owned records
 
-- whether it is Python-motion or Unity-motion
-- whether it has an active route
-- whether it is progressing, blocked, complete, or otherwise exceptional
-- what the current blockage or embodiment issue is, if any
+## Frontend expectations
 
-## Unity-side expectations
+If frontend/operator code is touched, keep changes minimal.
 
-If the Unity project is present in the workspace, Unity does not need major new behavior for this phase.
+Allowed frontend work:
+- parse the replay/analysis surface
+- expose a small operator-facing summary or inspection view if helpful
 
-Only make tiny Unity changes if needed to keep the operator-facing/read-model flow aligned with the existing bridge.
+Do not turn this into a major replay UI build.
 
 ## Allowed files to change
 
@@ -116,9 +113,8 @@ Only the minimum files needed for this slice.
 Expected categories:
 - `autonomous_ops_sim/live_app.py`
 - `autonomous_ops_sim/unity_bridge.py`
-- tests covering operator-facing live/read-model behavior
-- minimal frontend/read-model projection glue if required
-- tiny Unity adjustments only if strictly needed
+- tests covering replay/analysis projection behavior
+- minimal frontend adapter/read-model glue if needed
 
 ## Files that must not be broadly rewritten
 
@@ -130,35 +126,34 @@ Expected categories:
 
 ## Deliverables
 
-1. Operator-facing read-model exposure of Unity progress/embodiment state
-2. Coherent vehicle inspection data for Unity-motion sessions
-3. Stable live/replay/read-model flow that remains Python-authoritative
-4. Tests validating backend/operator-facing projection behavior
-5. Existing Python-only and Python-motion paths still working
+1. A backend-owned replay/analysis surface
+2. Vehicle-level route/embodiment history projection
+3. Stable replay/analysis data for Unity-motion sessions
+4. Tests validating replay/analysis projection behavior
+5. Existing Python-only, Python-motion, and operator-read-model paths still working
 
 ## Acceptance criteria
 
 This task is complete when:
 
-- operator-facing surfaces can show Unity route progress and embodiment state
-- blockage/exception details are visible through backend-owned read models
-- vehicle inspection is coherent in Unity-motion sessions
-- the browser/live/read-model flow remains grounded in Python truth
-- existing command/session behavior still works
-- Python-motion mode still works unchanged
+- a backend-owned replay/analysis surface exists
+- Unity-originated route/embodiment history is visible only through Python-owned records
+- a vehicle’s route completion/blockage history can be inspected coherently
+- current live/operator flows still work
+- Python remains the only authority
 
 ## Practical rule
 
 Prefer:
 
-- exposing backend-owned truth clearly
-- small read-model extensions over UI churn
-- coherence across clients
+- backend-owned replay truth
+- small structured projections
+- incremental inspection value
 - reversible changes
 
 Reject:
 
-- Unity-owned operator truth
-- direct client dependence on Unity-only state
-- giant UI rewrites
-- second competing read models
+- Unity-owned replay truth
+- giant replay UI rewrites
+- analytics sprawl
+- second competing histories

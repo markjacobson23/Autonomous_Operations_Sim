@@ -52,6 +52,7 @@ from autonomous_ops_sim.unity_bridge import (
     DEFAULT_SESSION_MOTION_AUTHORITY,
     build_unity_bootstrap_record,
     build_unity_operator_state_record,
+    build_unity_replay_analysis_record,
     build_unity_telemetry_response,
     normalize_session_motion_authority,
     normalize_unity_telemetry_sample,
@@ -155,6 +156,9 @@ class LiveSessionRuntime:
                 latest_unity_route_progress_by_vehicle_id=self.latest_unity_route_progress_by_vehicle_id,
                 latest_unity_embodiment_status_by_vehicle_id=self.latest_unity_embodiment_status_by_vehicle_id,
                 latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
+                unity_route_progress_history=self.unity_route_progress_history,
+                unity_embodiment_history=self.unity_embodiment_history,
+                unity_telemetry_history=self.unity_telemetry_history,
             )
             self._write_bundle(bundle)
             return bundle
@@ -173,6 +177,9 @@ class LiveSessionRuntime:
                 latest_unity_route_progress_by_vehicle_id=self.latest_unity_route_progress_by_vehicle_id,
                 latest_unity_embodiment_status_by_vehicle_id=self.latest_unity_embodiment_status_by_vehicle_id,
                 latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
+                unity_route_progress_history=self.unity_route_progress_history,
+                unity_embodiment_history=self.unity_embodiment_history,
+                unity_telemetry_history=self.unity_telemetry_history,
             )
             return build_unity_bootstrap_record(
                 session=self.session,
@@ -394,6 +401,9 @@ class LiveSessionRuntime:
                 self.latest_unity_embodiment_status_by_vehicle_id
             ),
             latest_unity_telemetry_by_vehicle_id=self.latest_unity_telemetry_by_vehicle_id,
+            unity_route_progress_history=self.unity_route_progress_history,
+            unity_embodiment_history=self.unity_embodiment_history,
+            unity_telemetry_history=self.unity_telemetry_history,
         )
         self._write_bundle(bundle)
         return bundle
@@ -961,6 +971,9 @@ def export_live_app_artifacts(
                 latest_unity_route_progress_by_vehicle_id={},
                 latest_unity_embodiment_status_by_vehicle_id={},
                 latest_unity_telemetry_by_vehicle_id={},
+                unity_route_progress_history=[],
+                unity_embodiment_history=[],
+                unity_telemetry_history=[],
             ),
             indent=2,
             sort_keys=True,
@@ -993,6 +1006,9 @@ def export_live_app_artifacts(
             latest_unity_route_progress_by_vehicle_id={},
             latest_unity_embodiment_status_by_vehicle_id={},
             latest_unity_telemetry_by_vehicle_id={},
+            unity_route_progress_history=[],
+            unity_embodiment_history=[],
+            unity_telemetry_history=[],
         ),
         launch_path,
         title=f"Autonomous Ops Live Session ({load_scenario(scenario_file).name})",
@@ -1079,6 +1095,9 @@ def _build_live_bundle_record(
     latest_unity_route_progress_by_vehicle_id: dict[int, dict[str, object]] | None = None,
     latest_unity_embodiment_status_by_vehicle_id: dict[int, dict[str, object]] | None = None,
     latest_unity_telemetry_by_vehicle_id: dict[int, dict[str, object]] | None = None,
+    unity_route_progress_history: list[dict[str, object]] | tuple[dict[str, object], ...] = (),
+    unity_embodiment_history: list[dict[str, object]] | tuple[dict[str, object], ...] = (),
+    unity_telemetry_history: list[dict[str, object]] | tuple[dict[str, object], ...] = (),
 ) -> dict[str, object]:
     normalized_motion_authority = normalize_session_motion_authority(motion_authority)
     bundle = live_session_bundle_to_dict(
@@ -1129,6 +1148,23 @@ def _build_live_bundle_record(
         latest_unity_telemetry_by_vehicle_id=(
             latest_unity_telemetry_by_vehicle_id or {}
         ),
+        motion_authority=normalized_motion_authority,
+    )
+    bundle["replay_analysis"] = build_unity_replay_analysis_record(
+        session=session,
+        live_bundle=bundle,
+        latest_unity_route_progress_by_vehicle_id=(
+            latest_unity_route_progress_by_vehicle_id or {}
+        ),
+        latest_unity_embodiment_status_by_vehicle_id=(
+            latest_unity_embodiment_status_by_vehicle_id or {}
+        ),
+        latest_unity_telemetry_by_vehicle_id=(
+            latest_unity_telemetry_by_vehicle_id or {}
+        ),
+        unity_route_progress_history=unity_route_progress_history,
+        unity_embodiment_history=unity_embodiment_history,
+        unity_telemetry_history=unity_telemetry_history,
         motion_authority=normalized_motion_authority,
     )
     return bundle

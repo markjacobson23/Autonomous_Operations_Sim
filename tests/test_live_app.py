@@ -75,6 +75,10 @@ def test_export_live_app_artifacts_falls_back_to_standalone_viewer_when_no_front
     assert bundle["metadata"]["surface_name"] == "live_session_bundle"
     assert bundle["seed"] == 3801
     assert bundle["authoring"]["working_scenario_path"] == str(artifacts.working_scenario_path)
+    assert bundle["replay_analysis"]["summary"]["telemetry_sample_count"] == 0
+    assert bundle["replay_analysis"]["summary"]["vehicle_count"] == len(
+        bundle["snapshot"]["vehicles"]
+    )
 
 
 def test_export_live_app_artifacts_prefers_frontend_dist_when_available(tmp_path) -> None:
@@ -524,6 +528,16 @@ def test_live_app_frontend_server_supports_unity_bootstrap_and_telemetry_bridge(
         assert live_bundle_payload["operator_state"]["vehicles"][0]["vehicle_id"] == vehicle_id
         assert live_bundle_payload["operator_state"]["vehicles"][0]["route_status"] == "active"
         assert live_bundle_payload["operator_state"]["vehicles"][0]["embodiment_state"] == "moving"
+        assert live_bundle_payload["replay_analysis"]["summary"]["telemetry_sample_count"] == 1
+        assert live_bundle_payload["replay_analysis"]["summary"]["route_progress_event_count"] == 1
+        assert live_bundle_payload["replay_analysis"]["summary"]["embodiment_event_count"] == 1
+        assert live_bundle_payload["replay_analysis"]["vehicles"][0]["vehicle_id"] == vehicle_id
+        assert live_bundle_payload["replay_analysis"]["vehicles"][0]["route_progress_history"][0][
+            "route_status"
+        ] == "active"
+        assert live_bundle_payload["replay_analysis"]["vehicles"][0]["outcome"][
+            "embodiment_state"
+        ] == "moving"
 
         refreshed_bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
         refreshed_bootstrap_payload = json.loads(
@@ -603,6 +617,8 @@ def test_live_app_frontend_server_exposes_unity_motion_authority_explicitly(tmp_
         live_bundle_payload = _read_live_bundle(base_url)
         assert live_bundle_payload["operator_state"]["motion_authority"] == "unity"
         assert live_bundle_payload["operator_state"]["vehicles"][0]["motion_authority"] == "unity"
+        assert live_bundle_payload["replay_analysis"]["summary"]["telemetry_sample_count"] == 1
+        assert live_bundle_payload["replay_analysis"]["vehicles"][0]["vehicle_id"] == vehicle_id
     finally:
         server.stop()
 
@@ -705,6 +721,13 @@ def test_live_app_frontend_server_projects_unity_route_completion_back_to_backen
         assert refreshed_bootstrap_payload["bootstrap"]["latest_unity_embodiment_status_by_vehicle_id"][0][
             "embodiment_state"
         ] == "complete"
+        live_bundle_payload = _read_live_bundle(base_url)
+        assert live_bundle_payload["replay_analysis"]["summary"]["completed_vehicle_ids"] == [
+            vehicle_id
+        ]
+        assert live_bundle_payload["replay_analysis"]["vehicles"][0]["outcome"][
+            "route_status"
+        ] == "complete"
     finally:
         server.stop()
 
@@ -802,6 +825,15 @@ def test_live_app_frontend_server_projects_blocked_embodiment_state(
         assert live_bundle_payload["operator_state"]["blocked_vehicle_ids"] == [vehicle_id]
         assert live_bundle_payload["operator_state"]["vehicles"][0]["route_status"] == "blocked"
         assert live_bundle_payload["operator_state"]["vehicles"][0]["embodiment_state"] == "blocked"
+        assert live_bundle_payload["replay_analysis"]["summary"]["blocked_vehicle_ids"] == [
+            vehicle_id
+        ]
+        assert live_bundle_payload["replay_analysis"]["vehicles"][0]["timeline"][-1][
+            "event_type"
+        ] in {"route_progress", "embodiment"}
+        assert live_bundle_payload["replay_analysis"]["vehicles"][0]["outcome"][
+            "exception_code"
+        ] == "movement_blocked"
 
         refreshed_bootstrap_response = request.urlopen(f"{base_url}/api/unity/bootstrap")
         refreshed_bootstrap_payload = json.loads(
